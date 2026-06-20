@@ -12,11 +12,12 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 // @ts-expect-error - vendored JS module, no types
-import { db } from '../vendor/seeker/firebaseInit.js';
+import { auth, db, storage } from '../vendor/seeker/firebaseInit.js';
 // @ts-expect-error - vendored JS module, no types
 import { submitTaskCore } from '../vendor/seeker/submitTaskCore.js';
-import { getScreenshot } from './storage/db';
+import { getRecording, getScreenshot } from './storage/db';
 import type { Action, Session, Step } from './types';
 import { blobToBase64 } from './utils/screenshot';
 
@@ -97,7 +98,11 @@ export interface EnrichmentMap {
   [stepIndex: number]: { thought?: string };
 }
 
-async function buildTaskData(session: Session, enrich?: EnrichmentMap) {
+async function buildTaskData(
+  session: Session,
+  enrich?: EnrichmentMap,
+  recordingUrl?: string | null,
+) {
   // Map each captured step to a seeker trajectory step.
   const steps = await Promise.all(
     session.steps.map(async (step, i) => {
@@ -144,7 +149,7 @@ async function buildTaskData(session: Session, enrich?: EnrichmentMap) {
       total_frames_captured: steps.length,
       total_duration_ms: session.ended_at - session.started_at,
       urls_visited: urlsVisited,
-      recording_url: null,
+      recording_url: recordingUrl ?? null,
       recording_size_bytes: 0,
       data_format: 'screenshot_action_pairs_v2',
     },
@@ -216,13 +221,36 @@ export async function submitSessionToDrafted(
   session: Session,
   enrich?: EnrichmentMap,
 ): Promise<SubmitResult> {
-  const taskData = await buildTaskData(session, enrich);
+  // Upload the screen recording (if one was captured) to the same Storage
+  // path the seeker uses: trajectories/{uid}/{sessionId}.webm. Best-effort:
+  // a video failure must not block the trajectory submission.
+  const recordingUrl = await uploadRecordingIfAny(session.id);
+  const taskData = await buildTaskData(session, enrich, recordingUrl);
   const behavioralData = buildBehavioralData(session);
   return (await submitTaskCore(
     'computer_use_trajectory',
     taskData,
     behavioralData,
   )) as SubmitResult;
+}
+
+async function uploadRecordingIfAny(sessionId: string): Promise<string | null> {
+  try {
+    const blob = await getRecording(sessionId);
+    if (!blob || blob.size === 0) return null;
+    const uid = auth.currentUser?.uid;
+    if (!uid) return null;
+    const path = `trajectories/${uid}/${sessionId}.webm`;
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, blob, {
+      contentType: 'video/webm',
+      customMetadata: { owner: uid, session_id: sessionId },
+    });
+    return await getDownloadURL(storageRef);
+  } catch (err) {
+    console.warn('[submit] recording upload failed (non-blocking):', err);
+    return null;
+  }
 }
 
 /**

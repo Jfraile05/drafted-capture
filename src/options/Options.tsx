@@ -125,6 +125,24 @@ export function Options() {
               />
             </div>
 
+            {/* Screen recording */}
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="block font-medium">Record screen video</div>
+                <p className="text-sm text-text-muted">
+                  Also capture a full screen recording. Chrome asks which screen to share each time
+                  you start. The video uploads with your trajectory.
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={settings.record_video}
+                onChange={(e) => updateSettings({ record_video: e.target.checked })}
+                className="h-5 w-5 cursor-pointer accent-green"
+                aria-label="Record screen video"
+              />
+            </div>
+
             {/* Screenshot Interval */}
             <div className="space-y-2">
               <div className="block font-medium">

@@ -10,7 +10,9 @@
     "storage",
     "alarms",
     "downloads",
-    "sidePanel"
+    "sidePanel",
+    "offscreen",
+    "desktopCapture"
   ],
   "host_permissions": ["<all_urls>"],
   "background": {

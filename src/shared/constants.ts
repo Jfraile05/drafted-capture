@@ -15,6 +15,8 @@ export const STORAGE_KEYS = {
 
 /** Blob store: hash -> PNG Blob. */
 export const DB_SCREENSHOTS = 'drafted-capture-screenshots';
+/** Session video recordings: sessionId -> webm Blob. */
+export const DB_RECORDINGS = 'drafted-capture-recordings';
 /** Steps store: `${sessionId}` -> Step[] for the live session (chunked appends). */
 export const DB_STEPS = 'drafted-capture-steps';
 /** Archive store: sessionId -> Session (full, with steps + segments). */
@@ -55,6 +57,7 @@ export const BADGE_PAUSED_COLOR = '#F5A623';
 export const DEFAULT_SETTINGS: Settings = {
   drafted_api_key: '',
   screenshot_on_action: true,
+  record_video: false,
   screenshot_interval_ms: SCREENSHOT_INTERVAL_MS,
   domain_blocklist: [],
   mask_all_inputs: false,

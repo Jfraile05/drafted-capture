@@ -81,47 +81,60 @@ export function Segments({
       <div className="card p-4 space-y-3">
         <div className="flex items-center gap-2 text-sm font-medium text-text">
           <Plus size={18} weight="regular" />
-          New segment
+          Create a segment
+        </div>
+
+        <div className="text-xs text-text-faint">
+          Mark a set of steps as a task. Pick the range, name it, choose a category, then save.
         </div>
 
         {rangeStart !== null && rangeEnd !== null ? (
-          <div className="text-xs text-text-muted bg-violet/10 px-3 py-2 rounded-btn">
-            Steps {Math.min(rangeStart, rangeEnd)} to {Math.max(rangeStart, rangeEnd)}
+          <div className="text-xs text-text bg-violet/10 px-3 py-2 rounded-btn border border-violet/20">
+            Selected: steps {Math.min(rangeStart, rangeEnd)} to {Math.max(rangeStart, rangeEnd)}
           </div>
         ) : (
-          <div className="text-xs text-text-faint italic">
-            Select a range in the timeline (click start, shift+click end or use "Set end")
+          <div className="text-xs text-text-muted bg-bg-input px-3 py-2 rounded-btn border border-white/[0.06]">
+            No range selected. Click a step in Timeline, then shift+click another.
           </div>
         )}
 
-        <input
-          type="text"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="Segment label"
-          className="w-full bg-bg-input text-sm text-text px-3 py-2 rounded-btn border border-white/[0.06] focus:border-green/30 outline-none"
-        />
+        <div>
+          <label className="text-xs text-text-muted mb-1.5 block">Task name</label>
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="e.g. Fill out checkout form"
+            className="w-full bg-bg-input text-sm text-text px-3 py-2 rounded-btn border border-white/[0.06] focus:border-green/30 outline-none"
+          />
+        </div>
 
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value as TaskCategory | '')}
-          className="w-full bg-bg-input text-sm text-text px-3 py-2 rounded-btn border border-white/[0.06] focus:border-green/30 outline-none"
-        >
-          <option value="">Select category</option>
-          {TASK_CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+        <div>
+          <label className="text-xs text-text-muted mb-1.5 block">Category</label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value as TaskCategory | '')}
+            className="w-full bg-bg-input text-sm text-text px-3 py-2 rounded-btn border border-white/[0.06] focus:border-green/30 outline-none"
+          >
+            <option value="">Select a category</option>
+            {TASK_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Optional notes"
-          className="w-full bg-bg-input text-sm text-text px-3 py-2 rounded-btn border border-white/[0.06] focus:border-green/30 outline-none resize-none"
-          rows={3}
-        />
+        <div>
+          <label className="text-xs text-text-muted mb-1.5 block">Notes (optional)</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Any additional context about this task"
+            className="w-full bg-bg-input text-sm text-text px-3 py-2 rounded-btn border border-white/[0.06] focus:border-green/30 outline-none resize-none"
+            rows={3}
+          />
+        </div>
 
         <button
           type="button"
@@ -129,7 +142,7 @@ export function Segments({
           disabled={!canCreate || saving}
           className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green/20 text-green rounded-btn hover:bg-green/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {saving ? 'Saving...' : 'Create segment'}
+          {saving ? 'Saving...' : 'Save segment'}
         </button>
       </div>
 

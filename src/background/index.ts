@@ -26,6 +26,7 @@ import {
   handleTabUpdated,
 } from './coordinator';
 import { exportSession } from './exporter';
+import { startRecording, stopRecording } from './recorder';
 import {
   getCaptureState,
   pauseCapture,
@@ -63,7 +64,9 @@ async function handleMessage(
         const intent = (msg.payload as { intent?: string } | undefined)?.intent;
         const live = await getLiveSession();
         if (!live || live.state === 'idle') {
-          return await startCapture(intent);
+          const started = await startCapture(intent);
+          await maybeStartRecording(started.id);
+          return started;
         }
         if (live.state === 'capturing') {
           return await pauseCapture();
@@ -74,8 +77,11 @@ async function handleMessage(
       }
     }
 
-    case 'START_CAPTURE':
-      return startCapture((msg.payload as { intent?: string } | undefined)?.intent);
+    case 'START_CAPTURE': {
+      const started = await startCapture((msg.payload as { intent?: string } | undefined)?.intent);
+      await maybeStartRecording(started.id);
+      return started;
+    }
 
     case 'PAUSE_CAPTURE':
       return pauseCapture();
@@ -88,6 +94,7 @@ async function handleMessage(
       // where Firebase auth is reliable; the worker stays Firebase-free so STOP
       // can never hang on auth/network. The popup auto-submits on the
       // capturing/paused -> idle transition.
+      await stopRecording();
       const sessionId = await stopCapture();
       return { sessionId };
     }
@@ -171,6 +178,18 @@ async function handleMessage(
       const exhaustive: never = msg.type;
       throw new Error(`Unknown message type: ${exhaustive}`);
     }
+  }
+}
+
+// Start screen recording for a session if the setting is on. Best-effort:
+// prompts for a screen once; if cancelled, capture proceeds screenshot-only.
+async function maybeStartRecording(sessionId: string): Promise<void> {
+  try {
+    const settings = await getSettings();
+    if (!settings.record_video) return;
+    await startRecording(sessionId);
+  } catch (err) {
+    console.warn('[bg] recording start skipped:', err);
   }
 }
 

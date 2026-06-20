@@ -1,4 +1,4 @@
-import { ArrowsClockwise } from '@phosphor-icons/react';
+import { ArrowsClockwise, Plus, Trash } from '@phosphor-icons/react';
 import { useCallback, useEffect, useState } from 'react';
 import { sendMessage, useLiveSession } from '../shared/hooks';
 import type { Session } from '../shared/types';
@@ -6,6 +6,7 @@ import { Export } from './Export';
 import { Inspector } from './Inspector';
 import { Replay } from './Replay';
 import { Segments } from './Segments';
+import { SubmitBar } from './SubmitBar';
 import { Timeline } from './Timeline';
 
 type Tab = 'timeline' | 'replay' | 'segments' | 'export';
@@ -89,6 +90,40 @@ export function App() {
     setSessions((prev) => prev.map((s) => (s.id === updatedSession.id ? updatedSession : s)));
   };
 
+  const handleClearAllSessions = async () => {
+    if (!confirm('Delete all sessions? This cannot be undone.')) return;
+    setLoading(true);
+    try {
+      for (const s of sessions) {
+        await sendMessage('DELETE_SESSION', { id: s.id });
+      }
+      setSessions([]);
+      setSelectedSessionId(null);
+      setSelectedSession(null);
+    } catch (err) {
+      console.error('Failed to clear sessions:', err);
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!confirm('Delete this session? This cannot be undone.')) return;
+    try {
+      await sendMessage('DELETE_SESSION', { id: sessionId });
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+      if (selectedSessionId === sessionId) {
+        setSelectedSessionId(null);
+        setSelectedSession(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete session:', err);
+    }
+  };
+
+  const handleLabelRange = () => {
+    setActiveTab('segments');
+  };
+
   return (
     <div className="flex flex-col h-screen w-full overflow-hidden bg-bg">
       <header className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
@@ -116,34 +151,61 @@ export function App() {
         <div className="flex-1 overflow-y-auto p-4">
           {loading && <div className="text-text-muted text-center py-8">Loading sessions...</div>}
           {!loading && sessions.length === 0 && (
-            <div className="text-text-muted text-center py-8">
-              No sessions recorded yet. Start capturing from the popup.
+            <div className="text-center py-8 space-y-4">
+              <div className="text-text-muted">No sessions recorded yet.</div>
+              <div className="flex items-center justify-center gap-2 text-sm text-text-faint">
+                <Plus size={16} weight="regular" />
+                Start capturing from the popup to create a session
+              </div>
             </div>
           )}
           {!loading && sessions.length > 0 && (
-            <div className="space-y-2">
-              {sessions.map((s) => (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-sm text-text-muted">{sessions.length} sessions</div>
                 <button
                   type="button"
-                  key={s.id}
-                  onClick={() => handleSessionSelect(s.id)}
-                  className="w-full card p-4 hover:bg-bg-card-hover transition-colors text-left"
+                  onClick={handleClearAllSessions}
+                  className="flex items-center gap-2 px-3 py-1.5 text-xs bg-coral/20 text-coral rounded-btn hover:bg-coral/30 transition-colors"
                 >
-                  <div className="font-medium text-text">
-                    {new Date(s.started_at).toLocaleString()}
-                  </div>
-                  <div className="text-sm text-text-muted mt-1">
-                    {s.outcome.total_steps} steps · {s.segments.length} segments
-                  </div>
+                  <Trash size={14} weight="regular" />
+                  Clear all
                 </button>
-              ))}
-            </div>
+              </div>
+              <div className="space-y-2">
+                {sessions.map((s) => (
+                  <div key={s.id} className="card p-4 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleSessionSelect(s.id)}
+                      className="flex-1 text-left hover:opacity-80 transition-opacity"
+                    >
+                      <div className="font-medium text-text">
+                        {new Date(s.started_at).toLocaleString()}
+                      </div>
+                      <div className="text-sm text-text-muted mt-1">
+                        {s.outcome.total_steps} steps · {s.segments.length} segments
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSession(s.id)}
+                      className="p-2 rounded-btn hover:bg-coral/20 text-text-muted hover:text-coral transition-colors flex-shrink-0"
+                      title="Delete session"
+                    >
+                      <Trash size={16} weight="regular" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       )}
 
       {selectedSessionId && selectedSession && (
         <div className="flex-1 flex flex-col overflow-hidden">
+          <SubmitBar session={selectedSession} onSessionUpdate={handleSessionUpdate} />
           <div className="flex border-b border-white/[0.06]">
             {(['timeline', 'replay', 'segments', 'export'] as Tab[]).map((tab) => (
               <button
@@ -171,6 +233,7 @@ export function App() {
                   rangeEnd={rangeEnd}
                   onStepSelect={handleStepSelect}
                   onShiftStepSelect={handleShiftStepSelect}
+                  onLabelRange={handleLabelRange}
                 />
                 {selectedStepIndex !== null && (
                   <Inspector

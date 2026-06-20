@@ -19,6 +19,7 @@ export default defineConfig({
         popup: resolve(__dirname, 'src/popup/index.html'),
         panel: resolve(__dirname, 'src/panel/index.html'),
         options: resolve(__dirname, 'src/options/index.html'),
+        offscreen: resolve(__dirname, 'src/offscreen/index.html'),
       },
     },
   },

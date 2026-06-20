@@ -1,3 +1,4 @@
+import { Info, TagSimple } from '@phosphor-icons/react';
 import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
 import type { Session } from '../shared/types';
 import { actionLabel, fmtDuration, hostOf } from '../shared/utils/format';
@@ -10,6 +11,7 @@ interface TimelineProps {
   rangeEnd: number | null;
   onStepSelect: (index: number) => void;
   onShiftStepSelect: (index: number) => void;
+  onLabelRange?: () => void;
 }
 
 export function Timeline({
@@ -19,6 +21,7 @@ export function Timeline({
   rangeEnd,
   onStepSelect,
   onShiftStepSelect,
+  onLabelRange,
 }: TimelineProps) {
   const handleClick = (index: number, e: React.MouseEvent) => {
     if (e.shiftKey && rangeStart !== null) {
@@ -42,8 +45,32 @@ export function Timeline({
     return index >= start && index <= end;
   };
 
+  const hasNoSegments = session.segments.length === 0;
+  const hasRange = rangeStart !== null && rangeEnd !== null;
+  const rangeCount = hasRange ? Math.abs((rangeEnd ?? 0) - (rangeStart ?? 0)) + 1 : 0;
+
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
+    <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+      {hasNoSegments && (
+        <div className="card p-3 flex items-start gap-3 bg-violet/5 border border-violet/20">
+          <Info size={18} weight="regular" className="text-violet flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-text-muted">
+            <div className="font-medium text-text mb-1">No segments yet</div>
+            Select a step, then shift+click another to mark a task, or label the whole session in
+            Segments.
+          </div>
+        </div>
+      )}
+      {hasRange && onLabelRange && (
+        <button
+          type="button"
+          onClick={onLabelRange}
+          className="w-full card p-3 hover:bg-bg-card-hover transition-colors flex items-center gap-3"
+        >
+          <TagSimple size={18} weight="regular" className="text-violet flex-shrink-0" />
+          <div className="text-sm font-medium text-text">Label these {rangeCount} steps</div>
+        </button>
+      )}
       {session.steps.map((step) => {
         const idx = step.index;
         const Icon = ACTION_ICON_COMPONENT[step.action.type];

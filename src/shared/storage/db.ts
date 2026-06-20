@@ -17,12 +17,27 @@ import {
   keys as idbKeys,
   set as idbSet,
 } from 'idb-keyval';
-import { DB_SCREENSHOTS, DB_SESSIONS, DB_STEPS } from '../constants';
+import { DB_RECORDINGS, DB_SCREENSHOTS, DB_SESSIONS, DB_STEPS } from '../constants';
 import type { Session, Step } from '../types';
 
 const screenshotStore = createStore(`drafted-capture-${DB_SCREENSHOTS}`, DB_SCREENSHOTS);
 const stepsStore = createStore(`drafted-capture-${DB_STEPS}`, DB_STEPS);
 const sessionsStore = createStore(`drafted-capture-${DB_SESSIONS}`, DB_SESSIONS);
+const recordingStore = createStore(`drafted-capture-${DB_RECORDINGS}`, DB_RECORDINGS);
+
+// ── Recordings (sessionId -> webm Blob) ─────────────────────────────────────
+
+export function putRecording(sessionId: string, blob: Blob): Promise<void> {
+  return idbSet(sessionId, blob, recordingStore);
+}
+
+export function getRecording(sessionId: string): Promise<Blob | undefined> {
+  return idbGet<Blob>(sessionId, recordingStore);
+}
+
+export function deleteRecording(sessionId: string): Promise<void> {
+  return idbDel(sessionId, recordingStore);
+}
 
 // ── Screenshots (hash -> Blob) ──────────────────────────────────────────────
 

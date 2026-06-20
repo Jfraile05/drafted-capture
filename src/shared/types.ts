@@ -248,6 +248,9 @@ export interface Settings {
   drafted_api_key: string;
   /** Capture a screenshot on every discrete action. */
   screenshot_on_action: boolean;
+  /** Record a screen video for the whole session (prompts for a screen on
+   *  start). Off by default since it requires a one-time picker each session. */
+  record_video: boolean;
   /** Periodic screenshot cadence in ms to catch passive state changes. */
   screenshot_interval_ms: number;
   /** Domains to never capture on (privacy). Wildcards supported. */
