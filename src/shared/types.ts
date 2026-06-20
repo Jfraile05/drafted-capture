@@ -183,7 +183,7 @@ export interface Session {
   started_at: number;
   ended_at: number;
   /** Optional intent the user declared before capturing. */
-  intent?: string;
+  intent?: string | null;
   environment: Environment;
   steps: Step[];
   segments: Segment[];

@@ -113,70 +113,81 @@ export async function stopCapture(): Promise<string | null> {
   const live = await getLiveSession();
   if (!live) return null;
 
-  const steps = await getSteps(live.id);
-
-  const uniqueTabs = new Set(steps.map((s) => s.origin.tab_id));
-  const uniqueDomains = Array.from(
-    new Set(
-      steps
-        .map((s) => {
-          try {
-            return new URL(s.origin.url).hostname;
-          } catch {
-            return '';
-          }
-        })
-        .filter(Boolean),
-    ),
-  );
-
-  const totalDuration = steps.length > 0 ? Date.now() - live.started_at : 0;
-
-  // If the user declared an intent before capturing, seed a segment spanning
-  // the whole session so the intent rides through as the instruction label.
-  const seededSegments =
-    live.intent && steps.length > 0
-      ? [
-          {
-            id: crypto.randomUUID(),
-            start_index: 0,
-            end_index: steps.length - 1,
-            label: live.intent,
-            category: null,
-            notes: '',
-            created_at: new Date().toISOString(),
-          },
-        ]
-      : [];
-
-  const session: Session = {
-    id: live.id,
-    source: 'human',
-    started_at: live.started_at,
-    ended_at: Date.now(),
-    intent: live.intent,
-    environment: live.environment,
-    steps,
-    segments: seededSegments,
-    outcome: {
-      total_steps: steps.length,
-      total_duration_ms: totalDuration,
-      tabs_touched: uniqueTabs.size,
-      domains_touched: uniqueDomains,
-    },
-    metadata: live.metadata,
-  };
-
-  await putSession(session);
-  await clearSteps(live.id);
+  // CRITICAL ORDERING: clear the live session and stop capture FIRST, before
+  // any operation that can throw (IndexedDB archive). If archiving failed
+  // first, the UI would never transition out of "paused/capturing" and Stop
+  // would appear broken. Capture must always stop the instant Stop is pressed.
   await setLiveSession(null);
+  await chrome.action.setBadgeText({ text: '' }).catch(() => {});
+  await chrome.alarms.clear(ALARM_SCREENSHOT).catch(() => {});
+  await broadcastCaptureState(false).catch(() => {});
 
-  await chrome.action.setBadgeText({ text: '' });
-  await chrome.alarms.clear(ALARM_SCREENSHOT);
-  await broadcastCaptureState(false);
+  // Now archive. Wrapped so a storage hiccup never propagates as a failed Stop.
+  try {
+    const steps = await getSteps(live.id);
 
-  console.log('[session] stopped + archived:', session.id, session.outcome.total_steps, 'steps');
-  return session.id;
+    const uniqueTabs = new Set(steps.map((s) => s.origin?.tab_id ?? -1));
+    const uniqueDomains = Array.from(
+      new Set(
+        steps
+          .map((s) => {
+            try {
+              return s.origin?.url ? new URL(s.origin.url).hostname : '';
+            } catch {
+              return '';
+            }
+          })
+          .filter(Boolean),
+      ),
+    );
+
+    const totalDuration = steps.length > 0 ? Date.now() - live.started_at : 0;
+
+    // If the user declared an intent before capturing, seed a segment spanning
+    // the whole session so the intent rides through as the instruction label.
+    const seededSegments =
+      live.intent && steps.length > 0
+        ? [
+            {
+              id: crypto.randomUUID(),
+              start_index: 0,
+              end_index: steps.length - 1,
+              label: live.intent,
+              category: null,
+              notes: '',
+              created_at: new Date().toISOString(),
+            },
+          ]
+        : [];
+
+    const session: Session = {
+      id: live.id,
+      source: 'human',
+      started_at: live.started_at,
+      ended_at: Date.now(),
+      intent: live.intent ?? null,
+      environment: live.environment,
+      steps,
+      segments: seededSegments,
+      outcome: {
+        total_steps: steps.length,
+        total_duration_ms: totalDuration,
+        tabs_touched: uniqueTabs.size,
+        domains_touched: uniqueDomains,
+      },
+      metadata: live.metadata,
+    };
+
+    await putSession(session);
+    await clearSteps(live.id);
+    console.log('[session] stopped + archived:', session.id, steps.length, 'steps');
+    return session.id;
+  } catch (err) {
+    // Capture already stopped above; surface the archive failure but do not
+    // throw, so the popup still transitions to idle.
+    console.error('[session] archive failed after stop:', err);
+    return null;
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────

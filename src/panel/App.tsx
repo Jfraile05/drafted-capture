@@ -21,11 +21,16 @@ export function App() {
   const [activeTab, setActiveTab] = useState<Tab>('timeline');
   const [loading, setLoading] = useState(true);
 
-  const loadSessions = useCallback(async () => {
+  const loadSessions = useCallback(async (autoSelectNewest = false) => {
     setLoading(true);
     try {
       const list = await sendMessage<Session[]>('LIST_SESSIONS');
       setSessions(list);
+      // When opened fresh (e.g. right after a capture stops), jump straight
+      // into the newest session so the user can label it immediately.
+      if (autoSelectNewest && list.length > 0) {
+        setSelectedSessionId((cur) => cur ?? list[0].id);
+      }
     } catch (err) {
       console.error('Failed to load sessions:', err);
     }
@@ -33,7 +38,7 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    loadSessions();
+    loadSessions(true);
   }, [loadSessions]);
 
   useEffect(() => {
@@ -92,7 +97,7 @@ export function App() {
         </div>
         <button
           type="button"
-          onClick={loadSessions}
+          onClick={() => loadSessions()}
           className="p-2 rounded-btn hover:bg-bg-card transition-colors"
           title="Refresh sessions"
         >

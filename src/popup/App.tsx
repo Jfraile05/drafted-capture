@@ -33,13 +33,21 @@ export default function App() {
     prevStateRef.current = currentState;
 
     if ((prevState === 'capturing' || prevState === 'paused') && currentState === null) {
+      // A capture just stopped and archived. Two paths:
+      //  - signed in  -> upload now, then open the panel to label/enrich.
+      //  - signed out -> keep the data locally, prompt login; upload on login.
+      if (user) {
+        // Open the panel first (closest to the Stop gesture), then upload.
+        openPanel();
+        submitLatestUnsubmitted().catch(() => {});
+      } else {
+        setShowLogin(true);
+      }
       setShowSavedToast(true);
-      // Auto-submit the just-archived session to Drafted (no-op if signed out).
-      submitLatestUnsubmitted().catch(() => {});
       const timer = setTimeout(() => setShowSavedToast(false), 5000);
       return () => clearTimeout(timer);
     }
-  }, [liveSession?.state]);
+  }, [liveSession?.state, user]);
 
   if (!settings.onboarding_complete) {
     return <Onboarding />;
@@ -50,6 +58,12 @@ export default function App() {
       <Login
         onSuccess={() => {
           setShowLogin(false);
+          // Upload any session captured before signing in, then open to label.
+          submitLatestUnsubmitted()
+            .catch(() => {})
+            .finally(() => {
+              openPanel();
+            });
         }}
       />
     );
@@ -77,16 +91,17 @@ export default function App() {
     await sendMessage('STOP_CAPTURE');
   };
 
-  const handleOpenPanel = async () => {
+  async function openPanel() {
     try {
-      const window = await chrome.windows.getCurrent();
-      if (window.id !== undefined) {
-        await chrome.sidePanel.open({ windowId: window.id });
+      const win = await chrome.windows.getCurrent();
+      if (win.id !== undefined) {
+        await chrome.sidePanel.open({ windowId: win.id });
       }
     } catch (err) {
       console.error('Failed to open side panel:', err);
     }
-  };
+  }
+  const handleOpenPanel = openPanel;
 
   const handleOpenOptions = () => {
     chrome.runtime.openOptionsPage();
