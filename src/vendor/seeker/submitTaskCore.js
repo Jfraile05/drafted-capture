@@ -27,6 +27,110 @@ import {
 } from './lib/telemetry';
 import { TASK_EVENTS } from './lib/telemetry/events';
 
+const TASK_TYPE_CONFIG = {
+  rlhf_preference_ranking: {
+    badge_type: 'RLHF Evaluator',
+    field_key: 'rlhf_preference_ranking',
+  },
+  computer_use_trajectory: {
+    badge_type: 'Computer Use Demonstrator',
+    field_key: 'computer_use_trajectory',
+  },
+  multilingual_evaluation: {
+    badge_type: 'Multilingual Evaluator',
+    field_key: 'multilingual_evaluation',
+  },
+  process_supervision: {
+    badge_type: 'Reasoning Verifier',
+    field_key: 'process_supervision',
+  },
+  red_teaming: {
+    badge_type: 'Red Team Analyst',
+    field_key: 'red_teaming',
+  },
+  tool_call_evaluation: {
+    badge_type: 'Agentic Trace Evaluator',
+    field_key: 'tool_call_evaluation',
+  },
+  code_review: {
+    badge_type: 'Code Reviewer',
+    field_key: 'code_review',
+  },
+  creative_writing: {
+    badge_type: 'Creative Writer',
+    field_key: 'creative_writing',
+  },
+  agent_workflow_evaluation: {
+    badge_type: 'Agent Workflow Evaluator',
+    field_key: 'agent_workflow_evaluation',
+  },
+};
+
+/**
+ * Strip and upload base64 screenshots from computer_use trajectories.
+ * Returns a cleaned taskData with screenshot URLs instead of base64 blobs.
+ */
+async function processComputerUseScreenshots(taskData, userId, taskId) {
+  if (!taskData.trajectory?.steps) {
+    return taskData;
+  }
+
+  const cleanedSteps = await Promise.all(
+    taskData.trajectory.steps.map(async (step) => {
+      if (!step.screenshot?.startsWith('data:image')) {
+        return step; // Not a base64 image, return as-is
+      }
+
+      try {
+        // Convert base64 to blob
+        const arr = step.screenshot.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        const n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        for (let i = 0; i < n; i++) u8arr[i] = bstr.charCodeAt(i);
+        const blob = new Blob([u8arr], { type: mime });
+
+        // Upload to storage
+        const filename = `${step.step_index}.jpg`;
+        const path = `annotated-screenshots/${userId}/${taskId}/${filename}`;
+        const storageRef = ref(storage, path);
+        await uploadBytes(storageRef, blob, {
+          contentType: 'image/jpeg',
+          customMetadata: { owner: userId, task_id: taskId, step_index: step.step_index },
+        });
+
+        // Return step with URL instead of base64
+        return {
+          ...step,
+          screenshot: path, // store the path reference, not the blob
+          screenshot_storage_path: path,
+        };
+      } catch (err) {
+        console.error(
+          `[processComputerUseScreenshots] Failed to upload step ${step.step_index}:`,
+          err,
+        );
+        // On failure, strip the image entirely rather than failing submission
+        return {
+          ...step,
+          screenshot: undefined,
+          screenshot_upload_error: err.message,
+        };
+      }
+    }),
+  );
+
+  return {
+    ...taskData,
+    trajectory: {
+      ...taskData.trajectory,
+      steps: cleanedSteps,
+    },
+  };
+}
+
+
 export async function submitTaskCore(taskType, taskData, behavioralData) {
   try {
     // --- Pre-submission size check ---
