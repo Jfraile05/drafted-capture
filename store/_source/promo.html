@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@800&family=Plus+Jakarta+Sans:wght@600;700&family=Inter:wght@400;500&display=swap');
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { overflow: hidden; font-family: 'Inter', sans-serif; }
+      body {
+        width: var(--w); height: var(--h);
+        background:
+          radial-gradient(ellipse 70% 80% at 20% 10%, rgba(155,127,255,0.18), transparent 55%),
+          radial-gradient(ellipse 80% 90% at 95% 100%, rgba(77,255,160,0.14), transparent 55%),
+          #0A0518;
+        display: flex; align-items: center; gap: var(--gap); padding: 0 var(--pad);
+      }
+      .mark {
+        flex: none; border-radius: 24%;
+        background: radial-gradient(circle at 35% 28%, #1E1248, #120A2E 55%, #0A0518);
+        display: flex; align-items: center; justify-content: center;
+        box-shadow: 0 0 60px rgba(77,255,160,0.18);
+      }
+      .ring { border: solid #4DFFA0; border-radius: 999px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 30px rgba(77,255,160,0.4); }
+      .core { background: linear-gradient(135deg,#7BFFC0,#2BE588); border-radius: 999px; }
+      .txt .wm { font-family:'Poppins',sans-serif; font-weight:800; color:#EEF0FF; letter-spacing:-0.02em; }
+      .txt .wm .dot { color:#4DFFA0; }
+      .txt .tag { font-family:'Plus Jakarta Sans',sans-serif; font-weight:600; color:#9A8FC8; }
+    </style>
+  </head>
+  <body>
+    <div class="mark"></div>
+    <div class="txt">
+      <div class="wm">drafted<span class="dot">.</span> capture</div>
+      <div class="tag">flip it on. capture everything.</div>
+    </div>
+    <script>
+      // Sizes injected per render via query string ?w=&h=
+      const p = new URLSearchParams(location.search);
+      const w = +p.get('w'), h = +p.get('h');
+      const r = document.documentElement.style;
+      r.setProperty('--w', w + 'px'); r.setProperty('--h', h + 'px');
+      const small = w < 800;
+      r.setProperty('--gap', (small ? 22 : 48) + 'px');
+      r.setProperty('--pad', (small ? 32 : 90) + 'px');
+      const mark = document.querySelector('.mark');
+      const ms = small ? 132 : 300;
+      mark.style.width = ms + 'px'; mark.style.height = ms + 'px';
+      const ring = document.createElement('div');
+      ring.className = 'ring';
+      const rs = ms * 0.52, rb = ms * 0.05;
+      ring.style.width = rs + 'px'; ring.style.height = rs + 'px'; ring.style.borderWidth = rb + 'px';
+      const core = document.createElement('div');
+      core.className = 'core';
+      core.style.width = rs * 0.46 + 'px'; core.style.height = rs * 0.46 + 'px';
+      ring.appendChild(core); mark.appendChild(ring);
+      document.querySelector('.wm').style.fontSize = (small ? 34 : 64) + 'px';
+      const tag = document.querySelector('.tag');
+      tag.style.fontSize = (small ? 16 : 30) + 'px';
+      tag.style.marginTop = (small ? 8 : 18) + 'px';
+    </script>
+  </body>
+</html>

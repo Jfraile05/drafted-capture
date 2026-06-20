@@ -1,0 +1,37 @@
+{
+  "name": "drafted-capture",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Ambient computer-use trajectory recorder. Flip it on, capture everything, label later.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "format": "biome format --write src/"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@phosphor-icons/react": "^2.1.0",
+    "idb-keyval": "^6.2.0",
+    "fflate": "^0.8.0",
+    "firebase": "^10.14.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@crxjs/vite-plugin": "^2.0.0-beta.27",
+    "vite": "^5.4.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.0",
+    "postcss": "^8.4.0",
+    "@biomejs/biome": "^1.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/chrome": "^0.0.287"
+  }
+}

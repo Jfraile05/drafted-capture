@@ -1,0 +1,104 @@
+════════════════════════════════════════════════════════════════════════
+ drafted. Capture — Chrome Web Store "Privacy" tab answers
+ Extension ID: lpjabpanndaajdijdmlibdamdcjcdnni
+ Fill each field top-to-bottom. Copy the text between the lines into each box.
+════════════════════════════════════════════════════════════════════════
+
+
+────────────────────────────────────────────────────────────────────────
+ SINGLE PURPOSE DESCRIPTION   (one box, max 1000 chars)
+────────────────────────────────────────────────────────────────────────
+drafted. Capture records the user's own browser interactions (clicks, keystrokes, scrolls, navigation, and screenshots) and exports them as structured computer-use training data in standard AI lab formats. That is its single purpose.
+
+
+────────────────────────────────────────────────────────────────────────
+ PERMISSION JUSTIFICATIONS   (one box each)
+────────────────────────────────────────────────────────────────────────
+
+[ tabs justification ]
+Used to know which tab and URL each recorded action belongs to, to capture a screenshot of the active tab, and to keep recording continuous as the user moves between tabs during a session. Tab data is read only while the user has capture turned on.
+
+[ storage justification ]
+Used to save the user's settings and the recorded session locally on their device (extension storage and IndexedDB). Recorded data is not transmitted anywhere; it stays on the machine until the user chooses to export it.
+
+[ alarms justification ]
+Used to take a periodic screenshot of the screen state on a fixed interval during an active recording, so passive page changes (a page finishing loading, a timer updating) are captured even when the user is not clicking. Active only while recording.
+
+[ downloads justification ]
+Used to save the exported session as a ZIP file (JSON plus screenshots) to the user's computer when they click Export. Triggered only by an explicit user action.
+
+[ sidePanel justification ]
+Used to open the review workspace in Chrome's side panel, where the user steps through their recorded timeline, inspects steps, labels task segments, and exports. UI only.
+
+[ Host permission justification ]
+The extension records the user's own actions on whatever sites they choose to demonstrate a task on, which cannot be known in advance, so broad host access is required. It uses a passive content listener that activates only while the user has capture turned on, and a domain blocklist lets the user exclude any sites. It does not read or transmit page content to third parties.
+
+
+────────────────────────────────────────────────────────────────────────
+ ARE YOU USING REMOTE CODE?
+────────────────────────────────────────────────────────────────────────
+Select:  >> No, I am not using Remote code <<
+
+(Reason: all JS, styles, and fonts are bundled in the package and run locally.
+ The Justification box for remote code will disappear once you pick "No".)
+
+
+────────────────────────────────────────────────────────────────────────
+ DATA USAGE — "What user data do you plan to collect?"
+ Check ONLY these boxes:
+────────────────────────────────────────────────────────────────────────
+[x] Authentication information
+        (the extension can capture typed text and screenshots, which may
+         include credentials on screen; disclose to be safe. Passwords in
+         password fields are masked, but be conservative.)
+[x] Web history
+        (it records the pages/URLs visited during a capture session)
+[x] User activity
+        (clicks, mouse position, scroll, keystrokes — the core of what it does)
+[x] Website content
+        (screenshots and visible page text/elements)
+
+Leave UNCHECKED:
+[ ] Personally identifiable information   (not collected as a field)
+[ ] Health information
+[ ] Financial and payment information
+[ ] Personal communications
+[ ] Location
+
+NOTE: If you prefer maximum caution you may also tick "Personally identifiable
+information" and "Personal communications" since a user could record a page
+containing those. The four above are the honest minimum for what the tool does.
+
+
+────────────────────────────────────────────────────────────────────────
+ CERTIFY DISCLOSURES — tick all three:
+────────────────────────────────────────────────────────────────────────
+[x] I do not sell or transfer user data to third parties, outside of the approved use cases
+[x] I do not use or transfer user data for purposes unrelated to my item's single purpose
+[x] I do not use or transfer user data to determine creditworthiness or for lending purposes
+
+
+────────────────────────────────────────────────────────────────────────
+ PRIVACY POLICY URL   (required)
+────────────────────────────────────────────────────────────────────────
+https://joindrafted.com/capture-privacy
+
+** This page MUST be live and public before you can publish. The HTML is ready
+   at store/privacy.html — host it at that URL (or change the URL above to
+   wherever you host it). If it is not live yet, this field will keep blocking. **
+
+
+────────────────────────────────────────────────────────────────────────
+ SETTINGS PAGE (separate from this tab) — clears the last 2 errors
+────────────────────────────────────────────────────────────────────────
+Publisher contact email:  rodrigo@joindrafted.com
+Then click the verification link Google emails you so it shows "verified".
+
+
+────────────────────────────────────────────────────────────────────────
+ FINISH
+────────────────────────────────────────────────────────────────────────
+1. Click "Save Draft" on this Privacy tab.
+2. Go to Distribution tab -> set Visibility = Unlisted.
+3. When all yellow-banner items are cleared, click Publish.
+════════════════════════════════════════════════════════════════════════

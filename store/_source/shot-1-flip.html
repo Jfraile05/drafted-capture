@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@800&family=Plus+Jakarta+Sans:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1280px; height: 800px; overflow: hidden; font-family: 'Inter', sans-serif; }
+      body {
+        background:
+          radial-gradient(ellipse 70% 60% at 18% 8%, rgba(155,127,255,0.16), transparent 55%),
+          radial-gradient(ellipse 80% 70% at 92% 96%, rgba(77,255,160,0.12), transparent 55%),
+          #0A0518;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0 110px; position: relative;
+      }
+      .grain::after {
+        content:''; position:fixed; inset:0; pointer-events:none; opacity:0.05; mix-blend-mode:overlay;
+        background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+      /* Left copy */
+      .copy { max-width: 560px; }
+      .wordmark { font-family:'Poppins',sans-serif; font-weight:800; font-size:30px; letter-spacing:-0.02em; color:#EEF0FF; margin-bottom:40px; }
+      .wordmark .dot { color:#4DFFA0; }
+      h1 { font-family:'Plus Jakarta Sans',sans-serif; font-weight:700; font-size:64px; line-height:1.05; color:#EEF0FF; letter-spacing:-0.03em; }
+      h1 .g { color:#4DFFA0; }
+      p.sub { margin-top:26px; font-size:22px; line-height:1.5; color:#9A8FC8; font-weight:400; max-width:500px; }
+      .pills { margin-top:40px; display:flex; gap:12px; flex-wrap:wrap; }
+      .pill { font-size:15px; color:#C9C2E8; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07); padding:9px 16px; border-radius:999px; }
+      /* Right: popup mock */
+      .popup {
+        width: 360px; border-radius: 22px; padding: 26px 22px 22px;
+        background: radial-gradient(ellipse at 20% 12%, rgba(155,127,255,0.10), transparent 60%), #110B25;
+        border: 1px solid rgba(255,255,255,0.07);
+        box-shadow: 0 40px 120px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.02);
+      }
+      .pheader { display:flex; align-items:center; justify-content:space-between; }
+      .pmark { font-family:'Poppins',sans-serif; font-weight:800; font-size:20px; color:#EEF0FF; }
+      .pmark .dot { color:#4DFFA0; }
+      .picons { display:flex; gap:10px; }
+      .picon { width:30px; height:30px; border-radius:8px; background:rgba(255,255,255,0.05); display:flex; align-items:center; justify-content:center; }
+      .picon svg { width:16px; height:16px; stroke:#7A6FA8; fill:none; stroke-width:1.6; }
+      .toggle-wrap { display:flex; flex-direction:column; align-items:center; padding:42px 0 18px; }
+      .toggle {
+        width:128px; height:128px; border-radius:999px; position:relative;
+        background: radial-gradient(circle at 50% 40%, rgba(77,255,160,0.18), rgba(77,255,160,0.03) 70%);
+        border:2px solid rgba(77,255,160,0.45);
+        box-shadow: 0 0 50px rgba(77,255,160,0.30);
+        display:flex; align-items:center; justify-content:center;
+      }
+      .toggle .core { width:58px; height:58px; border-radius:999px; background:linear-gradient(135deg,#7BFFC0,#2BE588); box-shadow:0 0 24px rgba(77,255,160,0.5); }
+      .tlabel { margin-top:26px; font-family:'Plus Jakarta Sans',sans-serif; font-weight:700; font-size:22px; color:#EEF0FF; }
+      .tsub { margin-top:8px; font-size:14px; color:#7A6FA8; text-align:center; max-width:240px; line-height:1.45; }
+      .foot { margin-top:24px; text-align:center; font-size:12px; color:#3D2E6A; }
+    </style>
+  </head>
+  <body class="grain">
+    <div class="copy">
+      <div class="wordmark">drafted<span class="dot">.</span> capture</div>
+      <h1>flip it on.<br /><span class="g">capture</span> everything.</h1>
+      <p class="sub">every click, keystroke, scroll, and screen state across every tab becomes structured computer-use training data. label it into tasks later, or never.</p>
+      <div class="pills">
+        <span class="pill">all tabs</span>
+        <span class="pill">screenshots + coordinates</span>
+        <span class="pill">lab-ready json</span>
+      </div>
+    </div>
+
+    <div class="popup">
+      <div class="pheader">
+        <div class="pmark">drafted<span class="dot">.</span></div>
+        <div class="picons">
+          <div class="picon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+          <div class="picon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></div>
+        </div>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle"><div class="core"></div></div>
+        <div class="tlabel">start capturing</div>
+        <div class="tsub">everything you do becomes training data. stop anytime.</div>
+      </div>
+      <div class="foot">captures across all tabs · ⌘⇧Y toggles</div>
+    </div>
+  </body>
+</html>

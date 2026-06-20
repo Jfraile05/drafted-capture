@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bg" cx="30%" cy="22%" r="90%">
+      <stop offset="0%" stop-color="#1E1248"/>
+      <stop offset="55%" stop-color="#120A2E"/>
+      <stop offset="100%" stop-color="#0A0518"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#4DFFA0" stop-opacity="0.55"/>
+      <stop offset="70%" stop-color="#4DFFA0" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#4DFFA0" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7BFFC0"/>
+      <stop offset="100%" stop-color="#2BE588"/>
+    </linearGradient>
+  </defs>
+
+  <!-- rounded-square deep-space tile -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- soft capture glow -->
+  <circle cx="256" cy="256" r="190" fill="url(#glow)"/>
+
+  <!-- capture ring -->
+  <circle cx="256" cy="256" r="132" fill="none" stroke="url(#ring)" stroke-width="26"/>
+
+  <!-- center record dot -->
+  <circle cx="256" cy="256" r="64" fill="url(#ring)"/>
+</svg>

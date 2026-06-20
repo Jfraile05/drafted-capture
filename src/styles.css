@@ -1,0 +1,130 @@
+/* Fonts are self-hosted (see src/fonts.css + src/fonts/). No remote fetch:
+   the extension renders fully offline and uses zero remote code. */
+@import url("./fonts.css");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0a0518;
+  --bg-card: #150d2e;
+  --bg-card-hover: #1e1248;
+  --bg-input: #110b25;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-active: rgba(77, 255, 160, 0.25);
+  --green: #4dffa0;
+  --green-dim: rgba(77, 255, 160, 0.12);
+  --green-glow: 0 0 24px rgba(77, 255, 160, 0.35);
+  --violet: #9b7fff;
+  --orange: #f5a623;
+  --coral: #ff6b8a;
+  --text: #eef0ff;
+  --text-muted: #7a6fa8;
+  --text-faint: #3d2e6a;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Inter", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* drafted. wordmark — Poppins 800, green dot. Used nowhere else. */
+.wordmark {
+  font-family: "Poppins", sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+.wordmark .dot {
+  color: var(--green);
+}
+
+/* Film-grain overlay for atmosphere — layered over the deep-space bg. */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Radial atmosphere behind cards. */
+.atmosphere {
+  background: radial-gradient(ellipse 80% 60% at 15% 0%, rgba(155, 127, 255, 0.08), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(77, 255, 160, 0.06), transparent 55%),
+    var(--bg);
+}
+
+.card {
+  background: radial-gradient(ellipse at 20% 20%, rgba(155, 127, 255, 0.05) 0%, transparent 60%),
+    var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.82);
+  }
+}
+.pulse-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(77, 255, 160, 0.45);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(77, 255, 160, 0);
+  }
+}
+.ring {
+  animation: ring 1.8s ease-out infinite;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise 0.35s ease both;
+}
