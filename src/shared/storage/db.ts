@@ -1,10 +1,12 @@
 // ════════════════════════════════════════════════════════════════════════
-//  IndexedDB layer — three named stores, one shared connection.
+//  IndexedDB layer — three independent stores.
 //
-//  Why not idb-keyval's default store? Because we need three logical stores
-//  (screenshot blobs, live step chunks, archived sessions) in one DB so a
-//  single connection serves the whole worker. idb-keyval lets us bind a
-//  custom Store to a named objectStore, which is exactly this.
+//  IMPORTANT: idb-keyval's createStore() only creates its object store during
+//  the version-1 onupgradeneeded of the named database. Calling createStore()
+//  three times with the SAME db name creates ONLY the first store; the other
+//  two object stores never exist, and any transaction on them throws
+//  "One of the specified object stores was not found." So each logical store
+//  gets its OWN database. Correct and simple.
 // ════════════════════════════════════════════════════════════════════════
 
 import {
@@ -18,11 +20,9 @@ import {
 import { DB_SCREENSHOTS, DB_SESSIONS, DB_STEPS } from '../constants';
 import type { Session, Step } from '../types';
 
-const DB_NAME = 'drafted-capture';
-
-const screenshotStore = createStore(DB_NAME, DB_SCREENSHOTS);
-const stepsStore = createStore(DB_NAME, DB_STEPS);
-const sessionsStore = createStore(DB_NAME, DB_SESSIONS);
+const screenshotStore = createStore(`drafted-capture-${DB_SCREENSHOTS}`, DB_SCREENSHOTS);
+const stepsStore = createStore(`drafted-capture-${DB_STEPS}`, DB_STEPS);
+const sessionsStore = createStore(`drafted-capture-${DB_SESSIONS}`, DB_SESSIONS);
 
 // ── Screenshots (hash -> Blob) ──────────────────────────────────────────────
 
