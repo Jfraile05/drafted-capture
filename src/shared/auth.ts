@@ -51,8 +51,8 @@ export function onAuthChanged(cb: (user: User | null) => void): () => void {
 }
 
 /** React hook for auth state. On first mount, if signed out, attempts a
- *  silent sign-in from an open candidate.joindrafted.com / joindrafted.com
- *  session before settling. */
+ *  silent sign-in from an open joindrafted.com session (or the legacy
+ *  candidate.joindrafted.com, which now redirects there) before settling. */
 export function useAuth(): { user: User | null; loading: boolean } {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,8 +75,8 @@ export function useAuth(): { user: User | null; loading: boolean } {
 }
 
 /**
- * Best-effort seeker bridge: detect an open joindrafted.com or
- * candidate.joindrafted.com tab and try to extract the logged-in email.
+ * Best-effort seeker bridge: detect an open joindrafted.com tab (or the legacy
+ * candidate.joindrafted.com) and try to extract the logged-in email.
  *
  * LIMITATION: Firebase stores auth sessions in IndexedDB under
  * 'firebaseLocalStorageDb'. Extensions can executeScript on a tab to read
@@ -125,8 +125,9 @@ export async function trySeekerBridge(): Promise<{ email?: string } | null> {
 const FIREBASE_API_KEY = 'AIzaSyCmQRXoSyXy5rGm8JjF5JGH_eFQibKW_0g';
 
 /**
- * Attempt a SILENT sign-in using an open candidate.joindrafted.com /
- * joindrafted.com session.
+ * Attempt a SILENT sign-in using an open joindrafted.com session. The legacy
+ * candidate.joindrafted.com is still matched: it 301s to the apex, but a tab
+ * opened before the redirect can still be sitting on the old host.
  *
  * Mechanism: read the seeker page's persisted Firebase user from its
  * IndexedDB (via executeScript), take its refresh token, exchange it at

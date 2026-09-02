@@ -135,12 +135,12 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
       <div className="text-center text-text-muted text-xs">
         no account?{' '}
         <a
-          href="https://candidate.joindrafted.com"
+          href="https://joindrafted.com/onboarding"
           target="_blank"
           rel="noopener noreferrer"
           className="text-green hover:underline"
         >
-          sign up on candidate.joindrafted.com
+          sign up on joindrafted.com
         </a>
       </div>
     </div>
