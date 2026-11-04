@@ -13,7 +13,7 @@ import {
   EXTENSION_VERSION,
 } from '../shared/constants';
 import { clearSteps, getSteps, putSession } from '../shared/storage/db';
-import { getLiveSession, getSettings, setLiveSession } from '../shared/storage/live';
+import { getLiveSession, getSettings, setLiveSession, withLiveLock } from '../shared/storage/live';
 import type {
   CaptureState,
   CaptureStats,
@@ -50,7 +50,7 @@ export async function startCapture(intent?: string): Promise<LiveSession> {
     stats: { clicks: 0, keystrokes: 0, scrolls: 0, navigations: 0, screenshots: 0 },
   };
 
-  await setLiveSession(live);
+  await withLiveLock(() => setLiveSession(live));
   resetCaptureQueue();
 
   await chrome.action.setBadgeText({ text: '0' });
@@ -69,11 +69,14 @@ export async function startCapture(intent?: string): Promise<LiveSession> {
 // ── Pause ─────────────────────────────────────────────────────────────────
 
 export async function pauseCapture(): Promise<LiveSession | null> {
-  const live = await getLiveSession();
-  if (!live || live.state !== 'capturing') return live;
-
-  live.state = 'paused';
-  await setLiveSession(live);
+  const { live, changed } = await withLiveLock(async () => {
+    const cur = await getLiveSession();
+    if (!cur || cur.state !== 'capturing') return { live: cur, changed: false };
+    cur.state = 'paused';
+    await setLiveSession(cur);
+    return { live: cur, changed: true };
+  });
+  if (!changed || !live) return live;
 
   await chrome.action.setBadgeBackgroundColor({ color: BADGE_PAUSED_COLOR });
   await chrome.alarms.clear(ALARM_SCREENSHOT);
@@ -86,11 +89,14 @@ export async function pauseCapture(): Promise<LiveSession | null> {
 // ── Resume ────────────────────────────────────────────────────────────────
 
 export async function resumeCapture(): Promise<LiveSession | null> {
-  const live = await getLiveSession();
-  if (!live || live.state !== 'paused') return live;
-
-  live.state = 'capturing';
-  await setLiveSession(live);
+  const { live, changed } = await withLiveLock(async () => {
+    const cur = await getLiveSession();
+    if (!cur || cur.state !== 'paused') return { live: cur, changed: false };
+    cur.state = 'capturing';
+    await setLiveSession(cur);
+    return { live: cur, changed: true };
+  });
+  if (!changed || !live) return live;
 
   await chrome.action.setBadgeBackgroundColor({ color: BADGE_ON_COLOR });
 
@@ -110,14 +116,18 @@ export async function resumeCapture(): Promise<LiveSession | null> {
 // Returns the archived session id (so the caller can auto-submit), or null
 // if there was nothing to stop.
 export async function stopCapture(): Promise<string | null> {
-  const live = await getLiveSession();
-  if (!live) return null;
-
   // CRITICAL ORDERING: clear the live session and stop capture FIRST, before
   // any operation that can throw (IndexedDB archive). If archiving failed
   // first, the UI would never transition out of "paused/capturing" and Stop
   // would appear broken. Capture must always stop the instant Stop is pressed.
-  await setLiveSession(null);
+  // Clearing happens under the live lock, so no in-flight step can write the
+  // session back afterwards; steps that finish later see no session and drop.
+  const live = await withLiveLock(async () => {
+    const cur = await getLiveSession();
+    if (cur) await setLiveSession(null);
+    return cur;
+  });
+  if (!live) return null;
   await chrome.action.setBadgeText({ text: '' }).catch(() => {});
   await chrome.alarms.clear(ALARM_SCREENSHOT).catch(() => {});
   await broadcastCaptureState(false).catch(() => {});

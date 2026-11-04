@@ -78,7 +78,10 @@ export async function startRecording(sessionId: string): Promise<boolean> {
 
 /** Stop recording. The offscreen doc persists the webm to IndexedDB on stop. */
 export async function stopRecording(): Promise<void> {
-  if (!recording) return;
+  // No early return on the in-memory flag: it resets to false whenever the
+  // worker is evicted mid-session, which left the offscreen recorder running
+  // after Stop. The offscreen doc ignores STOP when it is not recording, and
+  // both calls below already tolerate there being no offscreen document.
   recording = false;
   chrome.runtime.sendMessage({ target: 'offscreen', type: 'STOP_RECORDING' }).catch(() => {});
   // Give MediaRecorder a moment to flush + persist, then tear down the doc.

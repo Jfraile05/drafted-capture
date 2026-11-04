@@ -8,19 +8,56 @@
 
 import { LIVE_RECENT_LIMIT } from '../shared/constants';
 import { appendStep } from '../shared/storage/db';
-import { getLiveSession, getSettings, setLiveSession } from '../shared/storage/live';
+import { getLiveSession, getSettings, setLiveSession, withLiveLock } from '../shared/storage/live';
 import type {
   Action,
   CaptureEventPayload,
+  LiveSession,
   ModifierKey,
   RawEvent,
   Step,
   StepOrigin,
-  StepSummary,
 } from '../shared/types';
 import { captureVisible } from '../shared/utils/captureQueue';
 import { actionLabel } from '../shared/utils/format';
 import { stopCapture } from './session';
+
+// ── Commit a step ─────────────────────────────────────────────────────────
+
+// Every handler builds its step (including the slow screenshot) with no lock
+// held, then commits it here. The commit re-reads the live session under the
+// lock and drops the step if the session was paused, stopped, or replaced while
+// the screenshot was in flight. It also assigns the index and writes only the
+// fields it owns, so it can never overwrite a Pause or Stop with a stale copy.
+async function commitStep(
+  liveId: string,
+  step: Step,
+  opts: { label: string; bump?: (live: LiveSession) => void },
+): Promise<boolean> {
+  return withLiveLock(async () => {
+    const cur = await getLiveSession();
+    if (!cur || cur.id !== liveId || cur.state !== 'capturing') return false;
+
+    step.index = cur.step_count;
+    const newCount = await appendStep(cur.id, step);
+
+    opts.bump?.(cur);
+    cur.recent.push({
+      index: step.index,
+      type: step.action.type,
+      label: opts.label,
+      url: step.origin.url,
+      timestamp: step.timestamp,
+    });
+    if (cur.recent.length > LIVE_RECENT_LIMIT) cur.recent.shift();
+
+    cur.step_count = newCount;
+    await setLiveSession(cur);
+    // Inside the lock so a Stop that follows cannot be undone by a late badge write.
+    await chrome.action.setBadgeText({ text: String(newCount) });
+    return true;
+  });
+}
 
 // ── Capture event (from content) ──────────────────────────────────────────
 
@@ -82,31 +119,11 @@ export async function handleCaptureEvent(
     annotation: null,
   };
 
-  const newCount = await appendStep(live.id, step);
-
-  // Update stats.
-  incrementStats(live, action.type);
-
-  // Update recent summaries (capped ring buffer).
-  const summary: StepSummary = {
-    index: step.index,
-    type: action.type,
+  const ok = await commitStep(live.id, step, {
     label: actionLabel(action),
-    url: origin.url,
-    timestamp: step.timestamp,
-  };
-  live.recent.push(summary);
-  if (live.recent.length > LIVE_RECENT_LIMIT) {
-    live.recent.shift();
-  }
-
-  live.step_count = newCount;
-  await setLiveSession(live);
-
-  // Update badge.
-  await chrome.action.setBadgeText({ text: String(newCount) });
-
-  return { ok: true };
+    bump: (cur) => incrementStats(cur, action.type),
+  });
+  return { ok };
 }
 
 // ── Interval screenshot ───────────────────────────────────────────────────
@@ -145,24 +162,12 @@ export async function handleIntervalScreenshot(): Promise<void> {
     annotation: null,
   };
 
-  const newCount = await appendStep(live.id, step);
-
-  live.stats.screenshots++;
-  const summary: StepSummary = {
-    index: step.index,
-    type: 'screenshot',
+  await commitStep(live.id, step, {
     label: 'Screen state',
-    url: origin.url,
-    timestamp: step.timestamp,
-  };
-  live.recent.push(summary);
-  if (live.recent.length > LIVE_RECENT_LIMIT) {
-    live.recent.shift();
-  }
-
-  live.step_count = newCount;
-  await setLiveSession(live);
-  await chrome.action.setBadgeText({ text: String(newCount) });
+    bump: (cur) => {
+      cur.stats.screenshots++;
+    },
+  });
 }
 
 // ── Tab events ────────────────────────────────────────────────────────────
@@ -201,21 +206,7 @@ export async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo):
     annotation: null,
   };
 
-  const newCount = await appendStep(live.id, step);
-
-  const summary: StepSummary = {
-    index: step.index,
-    type: 'tab_switch',
-    label: actionLabel(action),
-    url: origin.url,
-    timestamp: step.timestamp,
-  };
-  live.recent.push(summary);
-  if (live.recent.length > LIVE_RECENT_LIMIT) live.recent.shift();
-
-  live.step_count = newCount;
-  await setLiveSession(live);
-  await chrome.action.setBadgeText({ text: String(newCount) });
+  await commitStep(live.id, step, { label: actionLabel(action) });
 }
 
 export async function handleTabUpdated(
@@ -254,23 +245,11 @@ export async function handleTabUpdated(
     annotation: null,
   };
 
-  const newCount = await appendStep(live.id, step);
-
-  incrementStats(live, 'navigate');
-
-  const summary: StepSummary = {
-    index: step.index,
-    type: 'navigate',
+  const ok = await commitStep(live.id, step, {
     label: actionLabel(action),
-    url: origin.url,
-    timestamp: step.timestamp,
-  };
-  live.recent.push(summary);
-  if (live.recent.length > LIVE_RECENT_LIMIT) live.recent.shift();
-
-  live.step_count = newCount;
-  await setLiveSession(live);
-  await chrome.action.setBadgeText({ text: String(newCount) });
+    bump: (cur) => incrementStats(cur, 'navigate'),
+  });
+  if (!ok) return;
 
   // Re-send capture state to newly loaded tab.
   if (tab.id !== undefined) {
@@ -307,21 +286,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     annotation: null,
   };
 
-  const newCount = await appendStep(live.id, step);
-
-  const summary: StepSummary = {
-    index: step.index,
-    type: 'tab_open',
-    label: actionLabel(action),
-    url: origin.url,
-    timestamp: step.timestamp,
-  };
-  live.recent.push(summary);
-  if (live.recent.length > LIVE_RECENT_LIMIT) live.recent.shift();
-
-  live.step_count = newCount;
-  await setLiveSession(live);
-  await chrome.action.setBadgeText({ text: String(newCount) });
+  await commitStep(live.id, step, { label: actionLabel(action) });
 }
 
 export async function handleTabRemoved(
@@ -350,21 +315,7 @@ export async function handleTabRemoved(
     annotation: null,
   };
 
-  const newCount = await appendStep(live.id, step);
-
-  const summary: StepSummary = {
-    index: step.index,
-    type: 'tab_close',
-    label: 'Close tab',
-    url: '',
-    timestamp: step.timestamp,
-  };
-  live.recent.push(summary);
-  if (live.recent.length > LIVE_RECENT_LIMIT) live.recent.shift();
-
-  live.step_count = newCount;
-  await setLiveSession(live);
-  await chrome.action.setBadgeText({ text: String(newCount) });
+  await commitStep(live.id, step, { label: 'Close tab' });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
