@@ -8,9 +8,11 @@
 
 import {
   ALARM_SCREENSHOT,
+  ALARM_SESSION_CAP,
   BADGE_ON_COLOR,
   BADGE_PAUSED_COLOR,
   EXTENSION_VERSION,
+  MAX_SESSION_MS,
 } from '../shared/constants';
 import { clearSteps, getSteps, putSession } from '../shared/storage/db';
 import { getLiveSession, getSettings, setLiveSession, withLiveLock } from '../shared/storage/live';
@@ -21,8 +23,32 @@ import type {
   LiveSession,
   Session,
   SessionMetadata,
+  Settings,
 } from '../shared/types';
 import { resetCaptureQueue } from '../shared/utils/captureQueue';
+import { stopRecording } from './recorder';
+
+// ── Session time limit ────────────────────────────────────────────────────
+
+/** The limit for one session: the saved setting, never above the 24 hour ceiling. */
+export function sessionCapMs(settings: Pick<Settings, 'max_duration_ms'>): number {
+  return Math.min(settings.max_duration_ms, MAX_SESSION_MS);
+}
+
+/** Stops the session if it has run to its limit. Called by the cap alarm.
+ *  Returns true when it stopped one. The clock is wall time from the start, so
+ *  a session left paused is stopped too. */
+export async function enforceSessionCap(): Promise<boolean> {
+  const live = await getLiveSession();
+  if (!live) return false;
+  const cap = sessionCapMs(await getSettings());
+  // Small tolerance so an alarm that lands a moment early still counts, while
+  // a stale alarm cannot stop a session that just started.
+  if (Date.now() - live.started_at < cap - 5000) return false;
+  console.log('[session] time limit reached, stopping:', live.id);
+  await stopCapture();
+  return true;
+}
 
 // ── Start ─────────────────────────────────────────────────────────────────
 
@@ -59,6 +85,7 @@ export async function startCapture(intent?: string): Promise<LiveSession> {
   await chrome.alarms.create(ALARM_SCREENSHOT, {
     periodInMinutes: settings.screenshot_interval_ms / 60000,
   });
+  await chrome.alarms.create(ALARM_SESSION_CAP, { when: live.started_at + sessionCapMs(settings) });
 
   await broadcastCaptureState(true);
 
@@ -128,8 +155,12 @@ export async function stopCapture(): Promise<string | null> {
     return cur;
   });
   if (!live) return null;
+  // Every way a session ends (Stop, time limit, step limit) runs through here,
+  // so the screen recording stops with it.
+  await stopRecording().catch(() => {});
   await chrome.action.setBadgeText({ text: '' }).catch(() => {});
   await chrome.alarms.clear(ALARM_SCREENSHOT).catch(() => {});
+  await chrome.alarms.clear(ALARM_SESSION_CAP).catch(() => {});
   await broadcastCaptureState(false).catch(() => {});
 
   // Now archive. Wrapped so a storage hiccup never propagates as a failed Stop.

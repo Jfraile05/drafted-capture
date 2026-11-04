@@ -7,36 +7,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 
-// ── Minimal chrome mock (values are cloned like the real storage area) ──────
-const area = () => {
-  const data: Record<string, unknown> = {};
-  const clone = <T>(v: T): T => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
-  return {
-    data,
-    get: async (k: string) => {
-      await Promise.resolve();
-      return k in data ? { [k]: clone(data[k]) } : {};
-    },
-    set: async (o: Record<string, unknown>) => {
-      await Promise.resolve();
-      for (const [k, v] of Object.entries(o)) data[k] = clone(v);
-    },
-    remove: async (k: string) => {
-      await Promise.resolve();
-      delete data[k];
-    },
-  };
-};
-const session = area();
-(globalThis as any).chrome = {
-  storage: { session, local: area() },
-  action: { setBadgeText: async () => {}, setBadgeBackgroundColor: async () => {} },
-  alarms: { create: async () => {}, clear: async () => true },
-  tabs: { query: async () => [], sendMessage: async () => {}, get: async () => ({}) },
-  scripting: { executeScript: async () => {} },
-  windows: { getCurrent: async () => ({ width: 1200, height: 800 }) },
-  runtime: { getManifest: () => ({ content_scripts: [] }) },
-};
+import { session } from './stubs/chrome';
 
 const { handleCaptureEvent } = await import('../src/background/coordinator');
 const { pauseCapture, resumeCapture, startCapture, stopCapture } = await import('../src/background/session');

@@ -9,6 +9,7 @@
     "scripting",
     "storage",
     "alarms",
+    "idle",
     "downloads",
     "sidePanel",
     "offscreen",

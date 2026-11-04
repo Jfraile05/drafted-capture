@@ -47,6 +47,18 @@ export const LIVE_RECENT_LIMIT = 8;
 /** Alarm name for the periodic screenshot tick. */
 export const ALARM_SCREENSHOT = 'screenshot-tick';
 
+/** Alarm that force-stops a session at its time limit. Wall clock, so it also
+ *  fires on a paused session. */
+export const ALARM_SESSION_CAP = 'session-cap';
+
+/** Hard ceiling on one session. No saved setting can raise it. */
+export const MAX_SESSION_MS = 24 * 60 * 60 * 1000;
+
+/** The previous defaults. Installs that saved them without choosing them are
+ *  moved to the new defaults on update (see migrateLegacyLimits). */
+export const LEGACY_MAX_STEPS = 5000;
+export const LEGACY_MAX_DURATION_MS = 4 * 60 * 60 * 1000;
+
 // ── Brand ─────────────────────────────────────────────────────────────────
 
 export const BADGE_ON_COLOR = '#4DFFA0';
@@ -61,8 +73,10 @@ export const DEFAULT_SETTINGS: Settings = {
   screenshot_interval_ms: SCREENSHOT_INTERVAL_MS,
   domain_blocklist: [],
   mask_all_inputs: false,
-  max_steps: 5000,
-  max_duration_ms: 4 * 60 * 60 * 1000,
+  // A full day at the 2.5s interval screenshot is about 35,000 steps by itself.
+  max_steps: 50_000,
+  max_duration_ms: MAX_SESSION_MS,
+  idle_timeout_ms: 5 * 60 * 1000,
   drafted_org_id: '',
   drafted_project_id: '',
   export_formats: {

@@ -6,7 +6,12 @@
 //  via chrome.storage.onChanged. Full steps live in IndexedDB (see db.ts).
 // ════════════════════════════════════════════════════════════════════════
 
-import { DEFAULT_SETTINGS, STORAGE_KEYS } from '../constants';
+import {
+  DEFAULT_SETTINGS,
+  LEGACY_MAX_DURATION_MS,
+  LEGACY_MAX_STEPS,
+  STORAGE_KEYS,
+} from '../constants';
 import type { LiveSession, Settings } from '../types';
 
 export async function getLiveSession(): Promise<LiveSession | null> {
@@ -42,6 +47,24 @@ export function withLiveLock<T>(fn: () => Promise<T>): Promise<T> {
 export async function getSettings(): Promise<Settings> {
   const r = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
   return { ...DEFAULT_SETTINGS, ...(r[STORAGE_KEYS.SETTINGS] ?? {}) };
+}
+
+/** Installs that saved the old defaults (5,000 steps, 4 hours) never chose them:
+ *  the settings screen writes every field on any change. Move those to the new
+ *  defaults on update so the 24 hour limit applies to them too. A value anyone
+ *  set to something else is left alone. */
+export async function migrateLegacyLimits(): Promise<void> {
+  const key = STORAGE_KEYS.SETTINGS;
+  const raw = (await chrome.storage.local.get(key))[key] as Partial<Settings> | undefined;
+  if (!raw) return;
+  const patch: Partial<Settings> = {};
+  if (raw.max_steps === LEGACY_MAX_STEPS) patch.max_steps = DEFAULT_SETTINGS.max_steps;
+  if (raw.max_duration_ms === LEGACY_MAX_DURATION_MS) {
+    patch.max_duration_ms = DEFAULT_SETTINGS.max_duration_ms;
+  }
+  if (Object.keys(patch).length > 0) {
+    await chrome.storage.local.set({ [key]: { ...raw, ...patch } });
+  }
 }
 
 export async function setSettings(patch: Partial<Settings>): Promise<Settings> {

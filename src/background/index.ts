@@ -5,9 +5,9 @@
 //  state when the worker wakes from eviction.
 // ════════════════════════════════════════════════════════════════════════
 
-import { ALARM_SCREENSHOT } from '../shared/constants';
+import { ALARM_SCREENSHOT, ALARM_SESSION_CAP } from '../shared/constants';
 import { deleteSession, getSession, listSessions, putSession } from '../shared/storage/db';
-import { getLiveSession, getSettings } from '../shared/storage/live';
+import { getLiveSession, getSettings, migrateLegacyLimits } from '../shared/storage/live';
 import type {
   Annotation,
   CaptureEventPayload,
@@ -26,8 +26,10 @@ import {
   handleTabUpdated,
 } from './coordinator';
 import { exportSession } from './exporter';
-import { startRecording, stopRecording } from './recorder';
+import { applyIdleDetection, pauseIfIdle } from './idle';
+import { startRecording } from './recorder';
 import {
+  enforceSessionCap,
   getCaptureState,
   pauseCapture,
   rebroadcastCaptureState,
@@ -94,7 +96,6 @@ async function handleMessage(
       // where Firebase auth is reliable; the worker stays Firebase-free so STOP
       // can never hang on auth/network. The popup auto-submits on the
       // capturing/paused -> idle transition.
-      await stopRecording();
       const sessionId = await stopCapture();
       return { sessionId };
     }
@@ -218,8 +219,21 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === ALARM_SCREENSHOT) {
     handleIntervalScreenshot().catch((err) => console.error('[bg] alarm screenshot error:', err));
+  } else if (alarm.name === ALARM_SESSION_CAP) {
+    enforceSessionCap().catch((err) => console.error('[bg] session cap error:', err));
   }
 });
+
+// ── Idle handler ──────────────────────────────────────────────────────────
+//
+// Registered at the top level so the worker is woken by the event after an
+// eviction. Pauses a capturing session when the student walks away.
+
+chrome.idle.onStateChanged.addListener((state) => {
+  pauseIfIdle(state).catch((err) => console.error('[bg] idle pause error:', err));
+});
+
+applyIdleDetection().catch((err) => console.error('[bg] idle setup error:', err));
 
 // ── Command handler ───────────────────────────────────────────────────────
 
@@ -235,6 +249,7 @@ chrome.commands.onCommand.addListener((command) => {
 
 chrome.runtime.onInstalled.addListener(() => {
   console.log('[bg] drafted. Capture installed');
+  migrateLegacyLimits().catch((err) => console.error('[bg] settings migration error:', err));
 });
 
 // ── Service worker recovery ───────────────────────────────────────────────

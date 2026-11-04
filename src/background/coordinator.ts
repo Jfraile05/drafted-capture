@@ -20,7 +20,7 @@ import type {
 } from '../shared/types';
 import { captureVisible } from '../shared/utils/captureQueue';
 import { actionLabel } from '../shared/utils/format';
-import { stopCapture } from './session';
+import { sessionCapMs, stopCapture } from './session';
 
 // ── Commit a step ─────────────────────────────────────────────────────────
 
@@ -85,7 +85,7 @@ export async function handleCaptureEvent(
 
   // Guard: max duration.
   const elapsed = Date.now() - live.started_at;
-  if (elapsed >= settings.max_duration_ms) {
+  if (elapsed >= sessionCapMs(settings)) {
     console.log('[coordinator] max_duration reached, stopping');
     await stopCapture();
     return { ok: false };

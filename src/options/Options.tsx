@@ -192,8 +192,8 @@ export function Options() {
                 <input
                   type="number"
                   min="100"
-                  max="10000"
-                  step="100"
+                  max="100000"
+                  step="1000"
                   value={settings.max_steps}
                   onChange={(e) =>
                     updateSettings({ max_steps: Number.parseInt(e.target.value, 10) })
@@ -213,7 +213,7 @@ export function Options() {
                 <input
                   type="number"
                   min="10"
-                  max="480"
+                  max="1440"
                   step="10"
                   value={Math.round(settings.max_duration_ms / 60000)}
                   onChange={(e) =>

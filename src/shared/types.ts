@@ -260,6 +260,8 @@ export interface Settings {
   /** Cap session size so storage stays bounded. */
   max_steps: number;
   max_duration_ms: number;
+  /** Pause capture after this long with no keyboard or mouse input. */
+  idle_timeout_ms: number;
   drafted_org_id: string;
   drafted_project_id: string;
   export_formats: ExportFormatFlags;
