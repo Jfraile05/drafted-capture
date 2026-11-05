@@ -140,7 +140,7 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => setShowLogin(true)}
-                className="text-text-muted hover:text-green text-xs transition-colors"
+                className="text-text-muted hover:text-green text-sm transition-colors"
               >
                 sign in
               </button>
@@ -171,7 +171,7 @@ export default function App() {
             onChange={(e) => setIntent(e.target.value)}
             placeholder="what are you about to do? (optional)"
             rows={2}
-            className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-text text-sm placeholder:text-text-faint resize-none focus:border-border-active focus:outline-none transition-colors"
+            className="w-full px-3 py-2 bg-bg-input border border-white/20 rounded-lg text-text text-base placeholder:text-text-faint resize-none focus:border-border-active focus:outline-none transition-colors"
           />
           <button
             type="button"
@@ -184,7 +184,7 @@ export default function App() {
           </button>
           <div className="text-center space-y-1">
             <p className="text-text font-semibold">start capturing</p>
-            <p className="text-text-muted text-xs max-w-[280px]">
+            <p className="text-text-muted text-sm max-w-[280px] text-balance">
               everything you do becomes training data. stop anytime.
             </p>
           </div>
@@ -286,7 +286,7 @@ export default function App() {
       )}
 
       {isIdle && (
-        <p className="text-text-faint text-xs text-center">
+        <p className="text-text-faint text-sm text-center">
           captures across all tabs · ctrl/cmd+shift+y toggles
         </p>
       )}

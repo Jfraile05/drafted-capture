@@ -14,8 +14,8 @@ export default {
         orange: '#F5A623',
         coral: '#FF6B8A',
         text: '#EEF0FF',
-        'text-muted': '#7A6FA8',
-        'text-faint': '#3D2E6A',
+        'text-muted': '#B8AEE0',
+        'text-faint': '#8E83BF',
       },
       fontFamily: {
         poppins: ['Poppins', 'sans-serif'],

@@ -11,7 +11,7 @@
   --bg-card: #150d2e;
   --bg-card-hover: #1e1248;
   --bg-input: #110b25;
-  --border: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.12);
   --border-active: rgba(77, 255, 160, 0.25);
   --green: #4dffa0;
   --green-dim: rgba(77, 255, 160, 0.12);
@@ -20,8 +20,8 @@
   --orange: #f5a623;
   --coral: #ff6b8a;
   --text: #eef0ff;
-  --text-muted: #7a6fa8;
-  --text-faint: #3d2e6a;
+  --text-muted: #b8aee0;
+  --text-faint: #8e83bf;
 }
 
 * {
