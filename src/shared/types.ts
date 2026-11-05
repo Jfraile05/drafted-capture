@@ -65,6 +65,8 @@ export interface DOMContext {
   input_type: string | null;
   /** Masked to bullets for password fields. */
   input_value: string | null;
+  /** Password, card, or one-time-code field. Typed text is never stored. */
+  sensitive?: boolean;
 }
 
 // ── Screenshot ──────────────────────────────────────────────────────────────
@@ -255,6 +257,9 @@ export interface Settings {
   screenshot_interval_ms: number;
   /** Domains to never capture on (privacy). Wildcards supported. */
   domain_blocklist: string[];
+  /** Capture only on domains in `domain_allowlist` (an empty list captures nothing). */
+  allowlist_only: boolean;
+  domain_allowlist: string[];
   /** Mask all text input values, not just passwords. */
   mask_all_inputs: boolean;
   /** Cap session size so storage stays bounded. */

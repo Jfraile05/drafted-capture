@@ -14,6 +14,14 @@ export function Options() {
     updateSettings({ domain_blocklist: domains });
   };
 
+  const handleDomainAllowlistChange = (value: string) => {
+    const domains = value
+      .split('\n')
+      .map((d) => d.trim())
+      .filter(Boolean);
+    updateSettings({ domain_allowlist: domains });
+  };
+
   const handleResetOnboarding = () => {
     updateSettings({ onboarding_complete: false });
     alert('Onboarding reset. Close this page and reopen the extension to see the welcome flow.');
@@ -234,6 +242,41 @@ export function Options() {
           <div className="flex items-center gap-3">
             <ShieldCheck size={24} className="text-orange" />
             <h2 className="text-xl font-semibold">Privacy</h2>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="block font-medium">Only capture allowed sites</div>
+              <p className="text-sm text-text-muted">
+                Capture nothing except the domains listed below. With the list empty, nothing is
+                captured. Incognito windows are never captured.
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={settings.allowlist_only}
+              onChange={(e) => updateSettings({ allowlist_only: e.target.checked })}
+              className="h-5 w-5 cursor-pointer accent-green"
+              aria-label="Only capture allowed sites"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label className="block font-medium">
+              Allowed domains
+              <textarea
+                value={settings.domain_allowlist.join('\n')}
+                onChange={(e) => handleDomainAllowlistChange(e.target.value)}
+                placeholder={'crm.example.com\n*.corp.example.com'}
+                rows={5}
+                className="mt-2 w-full rounded-input border border-[var(--border)] bg-bg-input px-4 py-2.5 font-mono text-sm text-text outline-none transition focus:border-[var(--border-active)] focus:ring-2 focus:ring-orange/10"
+              />
+            </label>
+            <p className="text-sm text-text-muted">
+              One domain per line. <span className="font-mono">*.example.com</span> matches
+              subdomains only, so list the bare domain too if you need it. The blocklist below still
+              wins over this list.
+            </p>
           </div>
 
           <div className="space-y-2">

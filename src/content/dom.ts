@@ -1,6 +1,17 @@
 import type { DOMContext } from '../shared/types';
 import { buildCSSSelector, buildXPath } from '../shared/utils/selector';
 
+const SENSITIVE_AUTOCOMPLETE =
+  /(^|\s)(cc-[a-z-]+|one-time-code|current-password|new-password)(\s|$)/i;
+const SENSITIVE_NAME = /passw|pwd|card.?(num|no)|cvv|cvc|security.?code|ssn|social.?sec/i;
+
+/** Password, card, one-time-code, and similar fields: typed text is never stored. */
+function isSensitiveField(el: HTMLInputElement | HTMLTextAreaElement, inputType: string): boolean {
+  if (inputType === 'password') return true;
+  if (SENSITIVE_AUTOCOMPLETE.test(el.getAttribute('autocomplete') ?? '')) return true;
+  return SENSITIVE_NAME.test(`${el.name} ${el.id}`);
+}
+
 export function extractDOMContext(element: Element): DOMContext | null {
   if (
     element === document.documentElement ||
@@ -32,9 +43,11 @@ export function extractDOMContext(element: Element): DOMContext | null {
 
     let inputType: string | null = null;
     let inputValue: string | null = null;
+    let sensitive = false;
 
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
       inputType = element instanceof HTMLInputElement ? element.type : 'textarea';
+      sensitive = isSensitiveField(element, inputType);
       const value = element.value;
       if (element instanceof HTMLInputElement && element.type === 'password') {
         inputValue = value ? '•'.repeat(value.length) : '';
@@ -65,6 +78,7 @@ export function extractDOMContext(element: Element): DOMContext | null {
       interactive,
       input_type: inputType,
       input_value: inputValue,
+      ...(sensitive ? { sensitive } : {}),
     };
   } catch (err) {
     console.warn('[drafted.capture] extractDOMContext failed', err);

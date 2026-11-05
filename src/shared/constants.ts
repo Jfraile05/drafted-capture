@@ -72,6 +72,8 @@ export const DEFAULT_SETTINGS: Settings = {
   record_video: false,
   screenshot_interval_ms: SCREENSHOT_INTERVAL_MS,
   domain_blocklist: [],
+  allowlist_only: false,
+  domain_allowlist: [],
   mask_all_inputs: false,
   // A full day at the 2.5s interval screenshot is about 35,000 steps by itself.
   max_steps: 50_000,

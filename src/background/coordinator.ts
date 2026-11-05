@@ -20,6 +20,8 @@ import type {
 } from '../shared/types';
 import { captureVisible } from '../shared/utils/captureQueue';
 import { actionLabel } from '../shared/utils/format';
+import { redactStep } from '../shared/utils/redact';
+import { siteAllowed } from '../shared/utils/siteAccess';
 import { sessionCapMs, stopCapture } from './session';
 
 // ── Commit a step ─────────────────────────────────────────────────────────
@@ -32,8 +34,14 @@ import { sessionCapMs, stopCapture } from './session';
 async function commitStep(
   liveId: string,
   step: Step,
-  opts: { label: string; bump?: (live: LiveSession) => void },
+  opts: { label?: string; bump?: (live: LiveSession) => void },
 ): Promise<boolean> {
+  // Redact before anything is stored or shown. The label is derived from the
+  // redacted action so typed text never reaches the live feed either.
+  const settings = await getSettings();
+  redactStep(step, { maskAllInputs: settings.mask_all_inputs });
+  const label = opts.label ?? actionLabel(step.action);
+
   return withLiveLock(async () => {
     const cur = await getLiveSession();
     if (!cur || cur.id !== liveId || cur.state !== 'capturing') return false;
@@ -45,7 +53,7 @@ async function commitStep(
     cur.recent.push({
       index: step.index,
       type: step.action.type,
-      label: opts.label,
+      label,
       url: step.origin.url,
       timestamp: step.timestamp,
     });
@@ -70,9 +78,9 @@ export async function handleCaptureEvent(
 
   const settings = await getSettings();
 
-  // Enforce blocklist.
+  // Enforce allowlist, blocklist, and incognito.
   const url = sender.tab?.url ?? sender.url ?? '';
-  if (isBlocklisted(url, settings.domain_blocklist)) {
+  if (!siteAllowed(url, settings, { incognito: sender.tab?.incognito })) {
     return { ok: false };
   }
 
@@ -120,7 +128,6 @@ export async function handleCaptureEvent(
   };
 
   const ok = await commitStep(live.id, step, {
-    label: actionLabel(action),
     bump: (cur) => incrementStats(cur, action.type),
   });
   return { ok };
@@ -138,7 +145,7 @@ export async function handleIntervalScreenshot(): Promise<void> {
 
   const settings = await getSettings();
   const url = activeTab.url ?? '';
-  if (isBlocklisted(url, settings.domain_blocklist)) return;
+  if (!siteAllowed(url, settings, { incognito: activeTab.incognito })) return;
 
   const screenshot = await captureVisible({ windowId: activeTab.windowId, dpr: 1 });
   if (!screenshot) return;
@@ -180,7 +187,7 @@ export async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo):
   if (!tab.url) return;
 
   const settings = await getSettings();
-  if (isBlocklisted(tab.url, settings.domain_blocklist)) return;
+  if (!siteAllowed(tab.url, settings, { incognito: tab.incognito })) return;
 
   const screenshot =
     activeInfo.windowId !== undefined
@@ -206,7 +213,7 @@ export async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo):
     annotation: null,
   };
 
-  await commitStep(live.id, step, { label: actionLabel(action) });
+  await commitStep(live.id, step, {});
 }
 
 export async function handleTabUpdated(
@@ -221,7 +228,7 @@ export async function handleTabUpdated(
   if (changeInfo.status !== 'complete' || !changeInfo.url) return;
 
   const settings = await getSettings();
-  if (isBlocklisted(changeInfo.url, settings.domain_blocklist)) return;
+  if (!siteAllowed(changeInfo.url, settings, { incognito: tab.incognito })) return;
 
   const screenshot =
     tab.windowId !== undefined ? await captureVisible({ windowId: tab.windowId, dpr: 1 }) : null;
@@ -246,7 +253,6 @@ export async function handleTabUpdated(
   };
 
   const ok = await commitStep(live.id, step, {
-    label: actionLabel(action),
     bump: (cur) => incrementStats(cur, 'navigate'),
   });
   if (!ok) return;
@@ -265,7 +271,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
 
   const url = tab.url ?? tab.pendingUrl ?? '';
   const settings = await getSettings();
-  if (isBlocklisted(url, settings.domain_blocklist)) return;
+  if (!siteAllowed(url, settings, { incognito: tab.incognito })) return;
 
   const action: Action = { type: 'tab_open', url };
   const origin: StepOrigin = {
@@ -286,7 +292,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     annotation: null,
   };
 
-  await commitStep(live.id, step, { label: actionLabel(action) });
+  await commitStep(live.id, step, {});
 }
 
 export async function handleTabRemoved(
@@ -412,19 +418,6 @@ function mapButton(code?: number): 'left' | 'right' | 'middle' {
   if (code === 2) return 'right';
   if (code === 1) return 'middle';
   return 'left';
-}
-
-function isBlocklisted(url: string, blocklist: string[]): boolean {
-  if (!url) return false;
-  try {
-    const { hostname } = new URL(url);
-    return blocklist.some((pattern) => {
-      const regex = new RegExp(pattern.replace(/\*/g, '.*'));
-      return regex.test(hostname);
-    });
-  } catch {
-    return false;
-  }
 }
 
 function incrementStats(
