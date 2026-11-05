@@ -5,26 +5,19 @@
       <stop offset="55%" stop-color="#120A2E"/>
       <stop offset="100%" stop-color="#0A0518"/>
     </radialGradient>
-    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#4DFFA0" stop-opacity="0.55"/>
-      <stop offset="70%" stop-color="#4DFFA0" stop-opacity="0.08"/>
-      <stop offset="100%" stop-color="#4DFFA0" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#7BFFC0"/>
-      <stop offset="100%" stop-color="#2BE588"/>
-    </linearGradient>
   </defs>
 
   <!-- rounded-square deep-space tile -->
   <rect x="0" y="0" width="512" height="512" rx="112" fill="url(#bg)"/>
 
-  <!-- soft capture glow -->
-  <circle cx="256" cy="256" r="190" fill="url(#glow)"/>
-
-  <!-- capture ring -->
-  <circle cx="256" cy="256" r="132" fill="none" stroke="url(#ring)" stroke-width="26"/>
-
-  <!-- center record dot -->
-  <circle cx="256" cy="256" r="64" fill="url(#ring)"/>
+  <!-- Sidekick mascot, "waiting" (Ready) state, from src/shared/Brand.tsx -->
+  <g transform="translate(256 262) scale(1.75) translate(-160 -147)">
+    <g transform="rotate(-8 160 150)">
+      <path d="M160 52 C218 50 260 93 261 150 C262 204 218 241 159 241 C101 241 59 204 59 150 C59 96 101 54 160 52Z" fill="#FFFFFF"/>
+      <g fill="#000000" transform="rotate(-9 160 146)">
+        <rect x="119" y="116" width="25" height="58" rx="12.5"/>
+        <rect x="176" y="116" width="25" height="58" rx="12.5"/>
+      </g>
+    </g>
+  </g>
 </svg>

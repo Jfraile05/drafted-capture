@@ -1,5 +1,6 @@
-import { ArrowsClockwise, Plus, Trash } from '@phosphor-icons/react';
+import { ArrowLeft, ArrowsClockwise, Trash } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Brand from '../shared/Brand';
 import { sendMessage, useLiveSession } from '../shared/hooks';
 import type { Session } from '../shared/types';
 import { Export } from './Export';
@@ -138,92 +139,131 @@ export function App() {
     setActiveTab('segments');
   };
 
+  const tabLabels: Record<Tab, string> = {
+    timeline: 'Steps',
+    replay: 'Replay',
+    segments: 'Tasks',
+    export: 'Export',
+  };
+
+  const closeSession = () => {
+    setSelectedSessionId(null);
+    setSelectedStepIndex(null);
+    handleClearRange();
+  };
+
   return (
-    <div className="flex flex-col h-screen w-full overflow-hidden bg-bg">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
-        <div className="wordmark text-lg">
-          drafted<span className="dot">.</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => loadSessions()}
-          className="p-2 rounded-btn hover:bg-bg-card transition-colors"
-          title="Refresh sessions"
-        >
-          <ArrowsClockwise size={18} className="text-text-muted" weight="regular" />
-        </button>
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-bg">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] px-3">
+        <Brand size="text-lg" className="pl-1" />
+        {!selectedSession && (
+          <button
+            type="button"
+            onClick={() => loadSessions()}
+            className="icon-btn"
+            aria-label="Refresh sessions"
+            title="Refresh"
+          >
+            <ArrowsClockwise size={18} />
+          </button>
+        )}
       </header>
 
-      {liveSession && liveSession.state === 'capturing' && (
-        <div className="px-4 py-2 bg-green/10 border-b border-green/20 text-sm text-green flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-green pulse-dot" />
-          Capturing in progress. Stop from the popup to review.
+      {selectedSession && (
+        <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.06] px-2 py-1.5">
+          <button
+            type="button"
+            onClick={closeSession}
+            className="icon-btn"
+            aria-label="Back to all sessions"
+            title="All sessions"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <h1 className="min-w-0 truncate text-sm font-semibold text-text">
+            {fmtSessionDate(selectedSession.started_at)}
+          </h1>
+          <span className="shrink-0 text-xs text-text-muted">
+            {selectedSession.outcome.total_steps} steps
+          </span>
         </div>
       )}
 
+      {liveSession && liveSession.state === 'capturing' && (
+        <p className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-4 py-2 text-xs text-text-muted">
+          <span className="h-2 w-2 rounded-full bg-[#FF239B] pulse-dot" />
+          Recording. Stop from the popup to review it here.
+        </p>
+      )}
+
       {!selectedSessionId && (
-        <div className="flex-1 overflow-y-auto p-4">
-          {loading && <div className="text-text-muted text-center py-8">Loading sessions...</div>}
+        <div className="flex-1 overflow-y-auto">
+          {loading && <p className="py-10 text-center text-sm text-text-muted">Loading sessions</p>}
           {!loading && loadError && (
-            <div className="text-center py-8 space-y-3">
-              <div className="text-coral">Couldn't load your sessions.</div>
-              <div className="text-sm text-text-faint">{loadError}</div>
-              <button
-                type="button"
-                onClick={() => loadSessions()}
-                className="rounded-btn border border-white/20 px-4 py-2 text-sm text-text hover:bg-white/5"
-              >
+            <div className="space-y-3 px-4 py-10 text-center">
+              <p className="text-sm text-text">Couldn't load your sessions.</p>
+              <p className="text-xs text-text-faint">{loadError}</p>
+              <button type="button" onClick={() => loadSessions()} className="btn-ghost">
                 Try again
               </button>
             </div>
           )}
           {!loading && !loadError && sessions.length === 0 && (
-            <div className="text-center py-8 space-y-4">
-              <div className="text-text-muted">No sessions recorded yet.</div>
-              <div className="flex items-center justify-center gap-2 text-sm text-text-faint">
-                <Plus size={16} weight="regular" />
-                Start capturing from the popup to create a session
-              </div>
+            <div className="px-6 py-12 text-center">
+              <p className="text-sm font-semibold text-text">No sessions yet</p>
+              <p className="mt-1 text-sm text-text-muted">
+                Start capturing from the popup. Finished sessions show up here.
+              </p>
             </div>
           )}
           {!loading && sessions.length > 0 && (
             <>
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-sm text-text-muted">{sessions.length} sessions</div>
-                <button
-                  type="button"
-                  onClick={handleClearAllSessions}
-                  className="flex items-center gap-2 px-3 py-1.5 text-xs bg-coral/20 text-coral rounded-btn hover:bg-coral/30 transition-colors"
-                >
-                  <Trash size={14} weight="regular" />
-                  Clear all
-                </button>
-              </div>
-              <div className="space-y-2">
+              <ul>
                 {sessions.map((s) => (
-                  <div key={s.id} className="card p-4 flex items-center justify-between gap-3">
+                  <li
+                    key={s.id}
+                    className="group flex items-center gap-2 border-b border-white/[0.06] pr-2"
+                  >
                     <button
                       type="button"
                       onClick={() => handleSessionSelect(s.id)}
-                      className="flex-1 text-left hover:opacity-80 transition-opacity"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
                     >
-                      <div className="font-medium text-text">
-                        {new Date(s.started_at).toLocaleString()}
-                      </div>
-                      <div className="text-sm text-text-muted mt-1">
-                        {s.outcome.total_steps} steps · {s.segments.length} segments
-                      </div>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-text">
+                          {fmtSessionDate(s.started_at)}
+                        </span>
+                        <span className="block text-xs text-text-muted">
+                          {s.outcome.total_steps} steps
+                          {s.segments.length > 0
+                            ? `, ${s.segments.length} ${s.segments.length === 1 ? 'task' : 'tasks'}`
+                            : ''}
+                        </span>
+                      </span>
+                      {s.submission?.drafted_task_id && (
+                        <span className="shrink-0 text-xs text-text-muted">Submitted</span>
+                      )}
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDeleteSession(s.id)}
-                      className="p-2 rounded-btn hover:bg-coral/20 text-text-muted hover:text-coral transition-colors flex-shrink-0"
+                      className="icon-btn text-text-faint hover:text-coral"
+                      aria-label="Delete session"
                       title="Delete session"
                     >
-                      <Trash size={16} weight="regular" />
+                      <Trash size={16} />
                     </button>
-                  </div>
+                  </li>
                 ))}
+              </ul>
+              <div className="px-4 py-4">
+                <button
+                  type="button"
+                  onClick={handleClearAllSessions}
+                  className="text-xs text-text-faint hover:text-coral"
+                >
+                  Delete all sessions
+                </button>
               </div>
             </>
           )}
@@ -231,28 +271,32 @@ export function App() {
       )}
 
       {selectedSessionId && selectedSession && (
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden">
           <SubmitBar session={selectedSession} onSessionUpdate={handleSessionUpdate} />
-          <div className="flex border-b border-white/[0.06]">
+          <nav
+            className="flex shrink-0 gap-1 border-b border-white/[0.06] px-2"
+            aria-label="Session views"
+          >
             {(['timeline', 'replay', 'segments', 'export'] as Tab[]).map((tab) => (
               <button
                 type="button"
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 text-sm font-medium transition-colors capitalize ${
+                aria-current={activeTab === tab ? 'page' : undefined}
+                className={`-mb-px border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                   activeTab === tab
-                    ? 'text-green border-b-2 border-green'
-                    : 'text-text-muted hover:text-text'
+                    ? 'border-text text-text'
+                    : 'border-transparent text-text-muted hover:text-text'
                 }`}
               >
-                {tab}
+                {tabLabels[tab]}
               </button>
             ))}
-          </div>
+          </nav>
 
           <div className="flex-1 overflow-hidden">
             {activeTab === 'timeline' && (
-              <div className="h-full flex flex-col">
+              <div className="flex h-full flex-col">
                 <Timeline
                   session={selectedSession}
                   selectedIndex={selectedStepIndex}
@@ -299,4 +343,14 @@ export function App() {
       )}
     </div>
   );
+}
+
+/** "Nov 4, 2:14 PM" */
+function fmtSessionDate(ts: number): string {
+  return new Date(ts).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
 }

@@ -1,22 +1,15 @@
-import { CloudArrowUp, DownloadSimple, Sparkle, Trash } from '@phosphor-icons/react';
+import { DownloadSimple, Trash } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { sendMessage } from '../shared/hooks';
-import { enrichArchivedSession, submitArchivedSession } from '../shared/submitManager';
 import type { ExportFormatFlags, Session } from '../shared/types';
-import { buildEnrichment } from './enrichment';
 
 interface ExportProps {
   session: Session;
   onDelete: () => void;
 }
 
-interface SubmitOutcome {
-  ok: boolean;
-  reason?: string;
-  draftedTaskId?: string;
-  qualityScore?: number | null;
-}
-
+// Submitting lives in the bar at the top of every session (SubmitBar), so this
+// tab only covers downloading and deleting.
 export function Export({ session, onDelete }: ExportProps) {
   const [formats, setFormats] = useState<ExportFormatFlags>({
     anthropic: true,
@@ -26,31 +19,6 @@ export function Export({ session, onDelete }: ExportProps) {
   });
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitMsg, setSubmitMsg] = useState<string | null>(null);
-  const submitted = Boolean(session.submission?.drafted_task_id);
-
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    setSubmitMsg(null);
-    try {
-      const enrich = buildEnrichment(session);
-      // Runs in the panel (a DOM context) where Firebase auth is reliable.
-      const res: SubmitOutcome = submitted
-        ? await enrichArchivedSession(session.id, enrich)
-        : await submitArchivedSession(session.id, enrich);
-      if (res.ok) {
-        setSubmitMsg(submitted ? 'Record updated on Drafted.' : 'Submitted to Drafted.');
-      } else if (res.reason === 'not_signed_in') {
-        setSubmitMsg('Sign in from the popup to submit.');
-      } else {
-        setSubmitMsg('Submission failed. Try again.');
-      }
-    } catch {
-      setSubmitMsg('Submission failed. Try again.');
-    }
-    setSubmitting(false);
-  };
 
   const toggleFormat = (key: keyof ExportFormatFlags) => {
     setFormats((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -89,85 +57,56 @@ export function Export({ session, onDelete }: ExportProps) {
   };
 
   return (
-    <div className="h-full overflow-y-auto p-4 space-y-4">
-      <div className="card p-4 space-y-3">
-        <div className="flex items-center gap-2">
-          <CloudArrowUp size={18} weight="duotone" className="text-green" />
-          <span className="text-sm font-medium text-text">Drafted training data</span>
+    <div className="h-full space-y-8 overflow-y-auto px-4 py-4">
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-text">Download</h2>
+          <p className="mt-0.5 text-xs text-text-muted">
+            A .zip with the formats you pick and every screenshot.
+          </p>
         </div>
-        {submitted ? (
-          <div className="text-xs text-text-muted">
-            Submitted to your Drafted account
-            {session.submission?.quality_score != null
-              ? ` · quality ${session.submission.quality_score}`
-              : ''}
-            . Label steps in the timeline, then enrich to add your reasoning.
-          </div>
-        ) : (
-          <div className="text-xs text-text-muted">
-            Saves this session to your Drafted account in the same lab format as the browser tasks,
-            with capturedFromExtension set. Sign in from the popup first.
-          </div>
-        )}
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green/20 text-green rounded-btn hover:bg-green/30 transition-colors disabled:opacity-50"
-        >
-          {submitted ? (
-            <Sparkle size={20} weight="regular" />
-          ) : (
-            <CloudArrowUp size={20} weight="regular" />
-          )}
-          {submitting ? 'Working...' : submitted ? 'Enrich with my labels' : 'Submit to Drafted'}
-        </button>
-        {submitMsg && <div className="text-xs text-text-muted">{submitMsg}</div>}
-      </div>
-
-      <div className="card p-4 space-y-3">
-        <div className="text-sm font-medium text-text">Export formats</div>
-        <div className="space-y-2">
+        <fieldset className="space-y-1">
+          <legend className="sr-only">Formats</legend>
           {(Object.keys(formats) as (keyof ExportFormatFlags)[]).map((key) => (
-            <label key={key} className="flex items-center gap-3 cursor-pointer">
+            <label key={key} className="flex cursor-pointer items-center gap-3 py-1.5">
               <input
                 type="checkbox"
                 checked={formats[key]}
                 onChange={() => toggleFormat(key)}
-                className="w-4 h-4 rounded border-white/[0.06] bg-bg-input text-green focus:ring-green/30"
+                className="h-4 w-4 accent-white"
               />
               <span className="text-sm text-text">{formatLabels[key]}</span>
             </label>
           ))}
-        </div>
-
+        </fieldset>
         <button
           type="button"
           onClick={handleExport}
           disabled={exporting || !Object.values(formats).some((v) => v)}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-green/20 text-green rounded-btn hover:bg-green/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-primary w-full"
         >
-          <DownloadSimple size={20} weight="regular" />
-          {exporting ? 'Exporting...' : 'Download .zip'}
+          <DownloadSimple size={16} weight="bold" />
+          {exporting ? 'Preparing download' : 'Download .zip'}
         </button>
-      </div>
+      </section>
 
-      <div className="card p-4 space-y-3">
-        <div className="text-sm font-medium text-coral">Danger zone</div>
-        <div className="text-xs text-text-muted">
-          Deleting this session will remove all steps, segments, and screenshots. This cannot be
-          undone.
+      <section className="space-y-3 border-t border-white/[0.06] pt-6">
+        <div>
+          <h2 className="text-sm font-semibold text-text">Delete session</h2>
+          <p className="mt-0.5 text-xs text-text-muted">
+            Removes every step, task and screenshot from this browser. This cannot be undone.
+          </p>
         </div>
         <button
           type="button"
           onClick={handleDelete}
           disabled={deleting}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-coral/20 text-coral rounded-btn hover:bg-coral/30 transition-colors disabled:opacity-50"
+          className="btn-danger w-full"
         >
-          <Trash size={20} weight="regular" />
-          {deleting ? 'Deleting...' : 'Delete session'}
+          <Trash size={16} />
+          {deleting ? 'Deleting' : 'Delete session'}
         </button>
-      </div>
+      </section>
     </div>
   );
 }

@@ -1,19 +1,11 @@
-import {
-  ArrowsClockwise,
-  ClockCounterClockwise,
-  Gear,
-  Pause,
-  Play,
-  SignOut,
-  Stop,
-  User,
-} from '@phosphor-icons/react';
+import { ClockCounterClockwise, Gear, Pause, Play, SignOut, Stop } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
+import Brand, { setMascotMoment } from '../shared/Brand';
 import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
 import { signOutUser, useAuth } from '../shared/auth';
 import { sendMessage, useLiveSession, useSettings } from '../shared/hooks';
 import { submitLatestUnsubmitted } from '../shared/submitManager';
-import type { CaptureState, CaptureStats, StepSummary } from '../shared/types';
+import type { CaptureState, StepSummary } from '../shared/types';
 import { actionLabel, fmtDuration, hostOf } from '../shared/utils/format';
 import Login from './Login';
 import Onboarding from './Onboarding';
@@ -25,6 +17,7 @@ export default function App() {
   const [showLogin, setShowLogin] = useState(false);
   const [intent, setIntent] = useState('');
   const [showSavedToast, setShowSavedToast] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const prevStateRef = useRef<CaptureState | null>(null);
 
   useEffect(() => {
@@ -39,9 +32,17 @@ export default function App() {
       if (user) {
         // Open the panel first (closest to the Stop gesture), then upload.
         openPanel();
-        submitLatestUnsubmitted().catch(() => {});
+        setUploading(true);
+        setMascotMoment('capturing', 60000);
+        submitLatestUnsubmitted()
+          .catch(() => {})
+          .finally(() => {
+            setUploading(false);
+            setMascotMoment('done');
+          });
       } else {
         setShowLogin(true);
+        setMascotMoment('done');
       }
       setShowSavedToast(true);
       const timer = setTimeout(() => setShowSavedToast(false), 5000);
@@ -56,12 +57,17 @@ export default function App() {
   if (showLogin) {
     return (
       <Login
+        onCancel={() => setShowLogin(false)}
         onSuccess={() => {
           setShowLogin(false);
           // Upload any session captured before signing in, then open to label.
+          setUploading(true);
+          setMascotMoment('capturing', 60000);
           submitLatestUnsubmitted()
             .catch(() => {})
             .finally(() => {
+              setUploading(false);
+              setMascotMoment('done');
               openPanel();
             });
         }}
@@ -73,7 +79,6 @@ export default function App() {
   const isCapturing = state === 'capturing';
   const isPaused = state === 'paused';
   const isIdle = state === 'idle';
-
   const handleToggleCapture = async () => {
     await sendMessage('TOGGLE_CAPTURE', { intent: intent.trim() || undefined });
     setIntent('');
@@ -115,180 +120,162 @@ export default function App() {
     }
   };
 
+  const statusTitle = isCapturing
+    ? 'Recording'
+    : isPaused
+      ? 'Paused'
+      : uploading
+        ? 'Saving your session'
+        : showSavedToast
+          ? 'Session saved'
+          : 'Ready when you are';
+
   return (
-    <div className="p-5 space-y-5 atmosphere min-h-[340px]">
+    <div className="flex flex-col px-5 pb-4 pt-4">
       <header className="flex items-center justify-between">
-        <div className="wordmark text-xl">
-          drafted<span className="dot">.</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {!authLoading &&
-            (user ? (
-              <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-bg-card border border-border">
-                <User size={16} weight="fill" className="text-green" />
-                <span className="text-text-muted text-xs max-w-[120px] truncate">{user.email}</span>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="text-text-muted hover:text-text transition-colors"
-                  title="Sign out"
-                >
-                  <SignOut size={14} weight="bold" />
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setShowLogin(true)}
-                className="text-text-muted hover:text-green text-sm transition-colors"
-              >
-                sign in
-              </button>
-            ))}
+        <Brand size="text-lg" />
+        <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={handleOpenPanel}
-            className="w-8 h-8 flex items-center justify-center text-text-muted hover:text-text transition-colors"
-            title="Open timeline panel"
+            className="icon-btn"
+            title="Review sessions"
+            aria-label="Review sessions"
           >
-            <ClockCounterClockwise size={20} weight="duotone" />
+            <ClockCounterClockwise size={18} />
           </button>
           <button
             type="button"
             onClick={handleOpenOptions}
-            className="w-8 h-8 flex items-center justify-center text-text-muted hover:text-text transition-colors"
+            className="icon-btn"
             title="Settings"
+            aria-label="Settings"
           >
-            <Gear size={20} weight="duotone" />
+            <Gear size={18} />
           </button>
         </div>
       </header>
 
+      <section className="pt-5">
+        <h1 className="text-base font-semibold text-text">{statusTitle}</h1>
+        {(isCapturing || isPaused) && liveSession ? (
+          <LiveTimer startedAt={liveSession.started_at} isPaused={isPaused} />
+        ) : (
+          <p className="mt-1 text-sm text-text-muted">
+            {showSavedToast
+              ? 'Open the review panel to label it.'
+              : 'Sidekick learns from your clicks, typing and pages across tabs.'}
+          </p>
+        )}
+      </section>
+
       {isIdle && (
-        <div className="flex flex-col items-center justify-center py-6 space-y-5">
+        <div className="mt-5 space-y-2.5">
+          {showSavedToast && (
+            <button type="button" onClick={handleOpenPanel} className="btn-primary w-full">
+              Review session
+            </button>
+          )}
+          <label htmlFor="intent" className="sr-only">
+            What are you about to do?
+          </label>
           <textarea
+            id="intent"
             value={intent}
             onChange={(e) => setIntent(e.target.value)}
-            placeholder="what are you about to do? (optional)"
+            placeholder="What are you about to do? (optional)"
             rows={2}
-            className="w-full px-3 py-2 bg-bg-input border border-white/20 rounded-lg text-text text-base placeholder:text-text-faint resize-none focus:border-border-active focus:outline-none transition-colors"
+            className="field resize-none"
           />
           <button
             type="button"
             onClick={handleToggleCapture}
-            className="relative w-24 h-24 rounded-full bg-gradient-to-br from-bg-card to-bg-card-hover border border-border hover:border-green hover:shadow-green-glow transition-all duration-300 flex items-center justify-center group"
+            className={`${showSavedToast ? 'btn-ghost' : 'btn-primary'} w-full`}
           >
-            <div className="w-12 h-12 rounded-full bg-green flex items-center justify-center">
-              <Play className="text-bg" size={24} weight="fill" />
-            </div>
+            <Play size={16} weight="fill" />
+            Start capturing
           </button>
-          <div className="text-center space-y-1">
-            <p className="text-text font-semibold">start capturing</p>
-            <p className="text-text-muted text-sm max-w-[280px] text-balance">
-              everything you do becomes training data. stop anytime.
-            </p>
-          </div>
+          <p className="text-center text-xs text-text-faint">Shortcut: Ctrl or Cmd + Shift + Y</p>
         </div>
       )}
 
       {(isCapturing || isPaused) && liveSession && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {isCapturing && (
-                <div className="relative">
-                  <div className="w-3 h-3 rounded-full bg-green pulse-dot" />
-                  <div className="absolute inset-0 rounded-full ring" />
-                </div>
-              )}
-              {isPaused && <div className="w-3 h-3 rounded-full bg-orange" />}
-              <span className="text-text font-semibold">
-                {isCapturing ? 'capturing' : 'paused'}
-              </span>
-            </div>
-            <LiveTimer startedAt={liveSession.started_at} isPaused={isPaused} />
-          </div>
+        <div className="mt-5 space-y-5">
+          <dl className="grid grid-cols-3 text-center">
+            <Stat label="Steps" value={liveSession.step_count} />
+            <Stat label="Clicks" value={liveSession.stats.clicks} />
+            <Stat label="Keys" value={liveSession.stats.keystrokes} />
+          </dl>
 
-          <StatsGrid stats={liveSession.stats} stepCount={liveSession.step_count} />
-
-          <div className="flex gap-2">
-            {isCapturing && (
+          <div className="grid grid-cols-2 gap-2">
+            {isCapturing ? (
               <>
-                <button
-                  type="button"
-                  onClick={handlePause}
-                  className="flex-1 py-2 px-3 rounded-lg border border-border text-text text-sm font-medium hover:bg-bg-card transition-colors flex items-center justify-center gap-2"
-                >
+                <button type="button" onClick={handlePause} className="btn-ghost">
                   <Pause size={16} weight="fill" />
-                  pause
+                  Pause
                 </button>
-                <button
-                  type="button"
-                  onClick={handleStop}
-                  className="flex-1 py-2 px-3 rounded-lg bg-coral text-text text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                >
+                <button type="button" onClick={handleStop} className="btn-primary">
                   <Stop size={16} weight="fill" />
-                  stop
+                  Stop and save
                 </button>
               </>
-            )}
-            {isPaused && (
+            ) : (
               <>
-                <button
-                  type="button"
-                  onClick={handleResume}
-                  className="flex-1 py-2 px-3 rounded-lg bg-green text-bg text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                >
-                  <ArrowsClockwise size={16} weight="bold" />
-                  resume
+                <button type="button" onClick={handleResume} className="btn-primary">
+                  <Play size={16} weight="fill" />
+                  Resume
                 </button>
-                <button
-                  type="button"
-                  onClick={handleStop}
-                  className="flex-1 py-2 px-3 rounded-lg border border-border text-text text-sm font-medium hover:bg-bg-card transition-colors flex items-center justify-center gap-2"
-                >
+                <button type="button" onClick={handleStop} className="btn-ghost">
                   <Stop size={16} weight="fill" />
-                  stop
+                  Stop and save
                 </button>
               </>
             )}
           </div>
 
           {liveSession.recent.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-text-muted text-xs font-medium uppercase tracking-wider">
-                recent activity
-              </p>
-              <div className="space-y-1 max-h-[160px] overflow-y-auto">
+            <div>
+              <h2 className="mb-1 text-xs font-medium text-text-muted">Latest steps</h2>
+              <ul className="max-h-[132px] overflow-y-auto">
                 {liveSession.recent
                   .slice()
                   .reverse()
-                  .map((step, idx) => (
-                    <StepRow key={`${step.index}-${step.timestamp}`} step={step} delay={idx * 50} />
+                  .map((step) => (
+                    <StepRow key={`${step.index}-${step.timestamp}`} step={step} />
                   ))}
-              </div>
+              </ul>
             </div>
           )}
         </div>
       )}
 
-      {showSavedToast && (
-        <div className="card p-4 space-y-3 rise">
-          <p className="text-text text-sm">session saved. open the panel to review and label.</p>
-          <button
-            type="button"
-            onClick={handleOpenPanel}
-            className="w-full py-2 bg-green text-bg text-sm font-semibold rounded-lg hover:opacity-90 transition-opacity"
-          >
-            open panel
-          </button>
-        </div>
-      )}
-
-      {isIdle && (
-        <p className="text-text-faint text-sm text-center">
-          captures across all tabs · ctrl/cmd+shift+y toggles
-        </p>
+      {!authLoading && (
+        <footer className="mt-6 flex items-center justify-between gap-3 border-t border-white/[0.06] pt-3 text-xs text-text-muted">
+          {user ? (
+            <>
+              <span className="truncate">Signed in as {user.email}</span>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="flex shrink-0 items-center gap-1 hover:text-text"
+              >
+                <SignOut size={14} />
+                Sign out
+              </button>
+            </>
+          ) : (
+            <>
+              <span>Sign in to submit your sessions.</span>
+              <button
+                type="button"
+                onClick={() => setShowLogin(true)}
+                className="shrink-0 font-medium text-text hover:underline"
+              >
+                Sign in
+              </button>
+            </>
+          )}
+        </footer>
       )}
     </div>
   );
@@ -305,44 +292,26 @@ function LiveTimer({ startedAt, isPaused }: { startedAt: number; isPaused: boole
     return () => clearInterval(interval);
   }, [startedAt, isPaused]);
 
-  return <div className="text-text-muted text-sm font-mono">{fmtDuration(elapsed)}</div>;
+  return <p className="mt-1 text-sm tabular-nums text-text-muted">{fmtDuration(elapsed)}</p>;
 }
 
-function StatsGrid({ stats, stepCount }: { stats: CaptureStats; stepCount: number }) {
+function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
-      <StatChip label="steps" value={stepCount} />
-      <StatChip label="clicks" value={stats.clicks} />
-      <StatChip label="keys" value={stats.keystrokes} />
-      <StatChip label="scrolls" value={stats.scrolls} />
-      <StatChip label="nav" value={stats.navigations} />
-      <StatChip label="shots" value={stats.screenshots} />
+    <div>
+      <dd className="text-xl font-semibold tabular-nums text-text">{value}</dd>
+      <dt className="text-xs text-text-muted">{label}</dt>
     </div>
   );
 }
 
-function StatChip({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="px-3 py-2 rounded-lg bg-bg-card border border-border text-center">
-      <div className="text-text font-semibold text-base">{value}</div>
-      <div className="text-text-muted text-xs">{label}</div>
-    </div>
-  );
-}
-
-function StepRow({ step, delay }: { step: StepSummary; delay: number }) {
+function StepRow({ step }: { step: StepSummary }) {
   const IconComponent = ACTION_ICON_COMPONENT[step.type];
 
   return (
-    <div
-      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-card border border-border rise"
-      style={{ animationDelay: `${delay}ms` }}
-    >
-      {IconComponent && (
-        <IconComponent size={16} weight="duotone" className="text-green flex-shrink-0" />
-      )}
-      <span className="text-text text-sm flex-1 truncate">{step.label}</span>
-      <span className="text-text-muted text-xs flex-shrink-0">{hostOf(step.url)}</span>
-    </div>
+    <li className="flex items-center gap-2 border-t border-white/[0.06] py-2 first:border-t-0">
+      {IconComponent && <IconComponent size={16} className="shrink-0 text-text-muted" />}
+      <span className="flex-1 truncate text-sm text-text">{step.label}</span>
+      <span className="shrink-0 text-xs text-text-faint">{hostOf(step.url)}</span>
+    </li>
   );
 }

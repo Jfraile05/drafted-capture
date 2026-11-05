@@ -73,7 +73,7 @@ async function start(streamId: string, sessionId: string): Promise<void> {
           console.error('[offscreen] failed to persist recording', err);
         }
       }
-      stream?.getTracks().forEach((t) => t.stop());
+      for (const t of stream?.getTracks() ?? []) t.stop();
       stream = null;
       recorder = null;
       chunks = [];

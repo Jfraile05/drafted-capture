@@ -1,5 +1,6 @@
-import { Eye, EyeSlash, GearSix, ShieldCheck, UploadSimple } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { Eye, EyeSlash } from '@phosphor-icons/react';
+import { type ReactNode, useState } from 'react';
+import Brand from '../shared/Brand';
 import { useSettings } from '../shared/hooks';
 
 export function Options() {
@@ -24,7 +25,7 @@ export function Options() {
 
   const handleResetOnboarding = () => {
     updateSettings({ onboarding_complete: false });
-    alert('Onboarding reset. Close this page and reopen the extension to see the welcome flow.');
+    alert('Done. Open the Sidekick popup to see the welcome screen.');
   };
 
   const handleOpenPanel = async () => {
@@ -35,400 +36,281 @@ export function Options() {
   };
 
   return (
-    <div className="min-h-screen p-8">
-      <div className="mx-auto max-w-3xl space-y-8">
-        {/* Header */}
-        <header className="space-y-2">
-          <h1 className="wordmark text-3xl">
-            drafted<span className="dot">.</span> Capture
+    <div className="min-h-screen px-6 py-10">
+      <div className="mx-auto max-w-2xl space-y-10">
+        <header className="flex items-end justify-between gap-4">
+          <h1>
+            <Brand size="text-lg" />
           </h1>
-          <p className="text-text-muted">
-            Configure your ambient trajectory recorder. Changes save automatically.
-          </p>
+          <p className="text-xs text-text-muted">Changes save automatically.</p>
         </header>
 
-        {/* Account Section */}
-        <section className="card space-y-6 p-6">
-          <div className="flex items-center gap-3">
-            <ShieldCheck size={24} className="text-green" />
-            <h2 className="text-xl font-semibold">Account</h2>
-          </div>
-
-          <div className="space-y-4">
-            {/* API Key */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-muted">
-                Drafted API Key
-                <div className="relative mt-2">
-                  <input
-                    type={showApiKey ? 'text' : 'password'}
-                    value={settings.drafted_api_key}
-                    onChange={(e) => updateSettings({ drafted_api_key: e.target.value })}
-                    placeholder="sk_..."
-                    className="w-full rounded-input border border-[var(--border)] bg-bg-input px-4 py-2.5 pr-12 font-mono text-sm text-text outline-none transition focus:border-[var(--border-active)] focus:ring-2 focus:ring-green/10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted transition hover:text-text"
-                  >
-                    {showApiKey ? <EyeSlash size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
+        <Section title="Account">
+          <div className="space-y-4 py-4">
+            <div>
+              <label htmlFor="api-key" className="field-label">
+                Drafted API key
               </label>
-            </div>
-
-            {/* Org ID */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-muted">
-                Organization ID
+              <div className="relative">
                 <input
+                  id="api-key"
+                  type={showApiKey ? 'text' : 'password'}
+                  value={settings.drafted_api_key}
+                  onChange={(e) => updateSettings({ drafted_api_key: e.target.value })}
+                  placeholder="sk_..."
+                  className="field pr-11 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="icon-btn absolute right-1 top-1/2 -translate-y-1/2"
+                  aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                >
+                  {showApiKey ? <EyeSlash size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="org-id" className="field-label">
+                  Organization ID
+                </label>
+                <input
+                  id="org-id"
                   type="text"
                   value={settings.drafted_org_id}
                   onChange={(e) => updateSettings({ drafted_org_id: e.target.value })}
                   placeholder="org_..."
-                  className="mt-2 w-full rounded-input border border-[var(--border)] bg-bg-input px-4 py-2.5 font-mono text-sm text-text outline-none transition focus:border-[var(--border-active)] focus:ring-2 focus:ring-green/10"
+                  className="field font-mono"
                 />
-              </label>
-            </div>
-
-            {/* Project ID */}
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-text-muted">
-                Project ID
+              </div>
+              <div>
+                <label htmlFor="project-id" className="field-label">
+                  Project ID
+                </label>
                 <input
+                  id="project-id"
                   type="text"
                   value={settings.drafted_project_id}
                   onChange={(e) => updateSettings({ drafted_project_id: e.target.value })}
                   placeholder="proj_..."
-                  className="mt-2 w-full rounded-input border border-[var(--border)] bg-bg-input px-4 py-2.5 font-mono text-sm text-text outline-none transition focus:border-[var(--border-active)] focus:ring-2 focus:ring-green/10"
+                  className="field font-mono"
                 />
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Capture">
+          <Toggle
+            title="Screenshot on every action"
+            description="Take a screenshot each time you click, type or scroll."
+            checked={settings.screenshot_on_action}
+            onChange={(v) => updateSettings({ screenshot_on_action: v })}
+          />
+          <Toggle
+            title="Record screen video"
+            description="Also record the screen. Chrome asks which screen to share each time you start, and the video uploads with the session."
+            checked={settings.record_video}
+            onChange={(v) => updateSettings({ record_video: v })}
+          />
+          <Toggle
+            title="Mask all input values"
+            description="Hide everything typed into fields, not just passwords."
+            checked={settings.mask_all_inputs}
+            onChange={(v) => updateSettings({ mask_all_inputs: v })}
+          />
+          <div className="py-4">
+            <div className="flex items-baseline justify-between">
+              <label htmlFor="interval" className="text-sm font-medium text-text">
+                Screenshot interval
               </label>
+              <span className="text-sm tabular-nums text-text-muted">
+                {(settings.screenshot_interval_ms / 1000).toFixed(1)} s
+              </span>
             </div>
-          </div>
-        </section>
-
-        {/* Capture Section */}
-        <section className="card space-y-6 p-6">
-          <div className="flex items-center gap-3">
-            <GearSix size={24} className="text-violet" />
-            <h2 className="text-xl font-semibold">Capture</h2>
-          </div>
-
-          <div className="space-y-5">
-            {/* Screenshot on Action */}
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="block font-medium">Screenshot on every action</div>
-                <p className="text-sm text-text-muted">
-                  Capture a screenshot each time you click, type, or scroll.
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={settings.screenshot_on_action}
-                onChange={(e) => updateSettings({ screenshot_on_action: e.target.checked })}
-                className="h-5 w-5 cursor-pointer accent-green"
-                aria-label="Screenshot on every action"
-              />
-            </div>
-
-            {/* Screen recording */}
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="block font-medium">Record screen video</div>
-                <p className="text-sm text-text-muted">
-                  Also capture a full screen recording. Chrome asks which screen to share each time
-                  you start. The video uploads with your trajectory.
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={settings.record_video}
-                onChange={(e) => updateSettings({ record_video: e.target.checked })}
-                className="h-5 w-5 cursor-pointer accent-green"
-                aria-label="Record screen video"
-              />
-            </div>
-
-            {/* Screenshot Interval */}
-            <div className="space-y-2">
-              <div className="block font-medium">
-                Screenshot interval (ms)
-                <span className="ml-2 font-mono text-sm text-text-muted">
-                  {settings.screenshot_interval_ms}
-                </span>
-              </div>
-              <input
-                type="range"
-                min="1000"
-                max="5000"
-                step="100"
-                value={settings.screenshot_interval_ms}
-                onChange={(e) =>
-                  updateSettings({ screenshot_interval_ms: Number.parseInt(e.target.value, 10) })
-                }
-                className="w-full"
-                aria-label="Screenshot interval in milliseconds"
-              />
-              <p className="text-sm text-text-muted">
-                Periodic screenshot cadence to catch passive state changes.
-              </p>
-            </div>
-
-            {/* Mask All Inputs */}
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="block font-medium">Mask all input values</div>
-                <p className="text-sm text-text-muted">
-                  Hide all text input values (not just passwords).
-                </p>
-              </div>
-              <input
-                type="checkbox"
-                checked={settings.mask_all_inputs}
-                onChange={(e) => updateSettings({ mask_all_inputs: e.target.checked })}
-                className="h-5 w-5 cursor-pointer accent-green"
-                aria-label="Mask all input values"
-              />
-            </div>
-
-            {/* Max Steps */}
-            <div className="space-y-2">
-              <label className="block font-medium">
-                Max steps per session
-                <input
-                  type="number"
-                  min="100"
-                  max="100000"
-                  step="1000"
-                  value={settings.max_steps}
-                  onChange={(e) =>
-                    updateSettings({ max_steps: Number.parseInt(e.target.value, 10) })
-                  }
-                  className="mt-2 w-full rounded-input border border-[var(--border)] bg-bg-input px-4 py-2.5 font-mono text-sm text-text outline-none transition focus:border-[var(--border-active)] focus:ring-2 focus:ring-violet/10"
-                />
-              </label>
-              <p className="text-sm text-text-muted">
-                Automatically stop capture after this many steps.
-              </p>
-            </div>
-
-            {/* Max Duration */}
-            <div className="space-y-2">
-              <label className="block font-medium">
-                Max duration (minutes)
-                <input
-                  type="number"
-                  min="10"
-                  max="1440"
-                  step="10"
-                  value={Math.round(settings.max_duration_ms / 60000)}
-                  onChange={(e) =>
-                    updateSettings({ max_duration_ms: Number.parseInt(e.target.value, 10) * 60000 })
-                  }
-                  className="mt-2 w-full rounded-input border border-[var(--border)] bg-bg-input px-4 py-2.5 font-mono text-sm text-text outline-none transition focus:border-[var(--border-active)] focus:ring-2 focus:ring-violet/10"
-                />
-              </label>
-              <p className="text-sm text-text-muted">
-                Automatically stop capture after this many minutes.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        {/* Privacy Section */}
-        <section className="card space-y-6 p-6">
-          <div className="flex items-center gap-3">
-            <ShieldCheck size={24} className="text-orange" />
-            <h2 className="text-xl font-semibold">Privacy</h2>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="block font-medium">Only capture allowed sites</div>
-              <p className="text-sm text-text-muted">
-                Capture nothing except the domains listed below. With the list empty, nothing is
-                captured. Incognito windows are never captured.
-              </p>
-            </div>
+            <p className="mt-0.5 text-xs text-text-muted">
+              How often to take a screenshot between actions, to catch changes on the page.
+            </p>
             <input
-              type="checkbox"
-              checked={settings.allowlist_only}
-              onChange={(e) => updateSettings({ allowlist_only: e.target.checked })}
-              className="h-5 w-5 cursor-pointer accent-green"
-              aria-label="Only capture allowed sites"
+              id="interval"
+              type="range"
+              min="1000"
+              max="5000"
+              step="100"
+              value={settings.screenshot_interval_ms}
+              onChange={(e) =>
+                updateSettings({ screenshot_interval_ms: Number.parseInt(e.target.value, 10) })
+              }
+              className="mt-3 w-full accent-white"
             />
           </div>
+          <div className="grid gap-4 py-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="max-steps" className="field-label">
+                Stop after this many steps
+              </label>
+              <input
+                id="max-steps"
+                type="number"
+                min="100"
+                max="100000"
+                step="1000"
+                value={settings.max_steps}
+                onChange={(e) => updateSettings({ max_steps: Number.parseInt(e.target.value, 10) })}
+                className="field tabular-nums"
+              />
+            </div>
+            <div>
+              <label htmlFor="max-minutes" className="field-label">
+                Stop after this many minutes
+              </label>
+              <input
+                id="max-minutes"
+                type="number"
+                min="10"
+                max="1440"
+                step="10"
+                value={Math.round(settings.max_duration_ms / 60000)}
+                onChange={(e) =>
+                  updateSettings({ max_duration_ms: Number.parseInt(e.target.value, 10) * 60000 })
+                }
+                className="field tabular-nums"
+              />
+            </div>
+          </div>
+        </Section>
 
-          <div className="space-y-2">
-            <label className="block font-medium">
-              Allowed domains
+        <Section title="Privacy">
+          <Toggle
+            title="Only capture allowed sites"
+            description="Capture nothing except the domains listed below. With the list empty, nothing is captured. Incognito windows are never captured."
+            checked={settings.allowlist_only}
+            onChange={(v) => updateSettings({ allowlist_only: v })}
+          />
+          <div className="grid gap-4 py-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="allowlist" className="field-label">
+                Allowed domains
+              </label>
               <textarea
+                id="allowlist"
                 value={settings.domain_allowlist.join('\n')}
                 onChange={(e) => handleDomainAllowlistChange(e.target.value)}
                 placeholder={'crm.example.com\n*.corp.example.com'}
-                rows={5}
-                className="mt-2 w-full rounded-input border border-[var(--border)] bg-bg-input px-4 py-2.5 font-mono text-sm text-text outline-none transition focus:border-[var(--border-active)] focus:ring-2 focus:ring-orange/10"
+                rows={4}
+                className="field font-mono"
               />
-            </label>
-            <p className="text-sm text-text-muted">
-              One domain per line. <span className="font-mono">*.example.com</span> matches
-              subdomains only, so list the bare domain too if you need it. The blocklist below still
-              wins over this list.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="block font-medium">
-              Domain blocklist
+            </div>
+            <div>
+              <label htmlFor="blocklist" className="field-label">
+                Never capture on
+              </label>
               <textarea
+                id="blocklist"
                 value={settings.domain_blocklist.join('\n')}
                 onChange={(e) => handleDomainBlocklistChange(e.target.value)}
                 placeholder={'banking.example.com\nmail.google.com\n*.stripe.com'}
-                rows={5}
-                className="mt-2 w-full rounded-input border border-[var(--border)] bg-bg-input px-4 py-2.5 font-mono text-sm text-text outline-none transition focus:border-[var(--border-active)] focus:ring-2 focus:ring-orange/10"
+                rows={4}
+                className="field font-mono"
               />
-            </label>
-            <p className="text-sm text-text-muted">
-              Domains to never capture on. One pattern per line. Wildcards supported.
-            </p>
-          </div>
-        </section>
-
-        {/* Export Section */}
-        <section className="card space-y-6 p-6">
-          <div className="flex items-center gap-3">
-            <UploadSimple size={24} className="text-coral" />
-            <h2 className="text-xl font-semibold">Export</h2>
-          </div>
-
-          <div className="space-y-4">
-            <p className="text-sm text-text-muted">
-              Choose which formats to include when exporting a session.
-            </p>
-
-            <div className="space-y-3">
-              {/* Anthropic */}
-              <label className="flex cursor-pointer items-center gap-3 rounded-btn border border-[var(--border)] bg-bg-input p-3 transition hover:border-[var(--border-active)]">
-                <input
-                  type="checkbox"
-                  checked={settings.export_formats.anthropic}
-                  onChange={(e) =>
-                    updateSettings({
-                      export_formats: {
-                        ...settings.export_formats,
-                        anthropic: e.target.checked,
-                      },
-                    })
-                  }
-                  className="h-4 w-4 accent-green"
-                />
-                <div>
-                  <div className="font-medium">Anthropic Messages</div>
-                  <div className="text-xs text-text-muted">
-                    Valid POST /v1/messages body with computer tool use
-                  </div>
-                </div>
-              </label>
-
-              {/* OpenAI */}
-              <label className="flex cursor-pointer items-center gap-3 rounded-btn border border-[var(--border)] bg-bg-input p-3 transition hover:border-[var(--border-active)]">
-                <input
-                  type="checkbox"
-                  checked={settings.export_formats.openai}
-                  onChange={(e) =>
-                    updateSettings({
-                      export_formats: {
-                        ...settings.export_formats,
-                        openai: e.target.checked,
-                      },
-                    })
-                  }
-                  className="h-4 w-4 accent-green"
-                />
-                <div>
-                  <div className="font-medium">OpenAI Responses</div>
-                  <div className="text-xs text-text-muted">
-                    Valid POST /v1/responses body with computer tool
-                  </div>
-                </div>
-              </label>
-
-              {/* Universal */}
-              <label className="flex cursor-pointer items-center gap-3 rounded-btn border border-[var(--border)] bg-bg-input p-3 transition hover:border-[var(--border-active)]">
-                <input
-                  type="checkbox"
-                  checked={settings.export_formats.universal}
-                  onChange={(e) =>
-                    updateSettings({
-                      export_formats: {
-                        ...settings.export_formats,
-                        universal: e.target.checked,
-                      },
-                    })
-                  }
-                  className="h-4 w-4 accent-green"
-                />
-                <div>
-                  <div className="font-medium">Drafted Universal</div>
-                  <div className="text-xs text-text-muted">
-                    Full Session JSON with all metadata, DOM, segments
-                  </div>
-                </div>
-              </label>
-
-              {/* Trajectory */}
-              <label className="flex cursor-pointer items-center gap-3 rounded-btn border border-[var(--border)] bg-bg-input p-3 transition hover:border-[var(--border-active)]">
-                <input
-                  type="checkbox"
-                  checked={settings.export_formats.trajectory}
-                  onChange={(e) =>
-                    updateSettings({
-                      export_formats: {
-                        ...settings.export_formats,
-                        trajectory: e.target.checked,
-                      },
-                    })
-                  }
-                  className="h-4 w-4 accent-green"
-                />
-                <div>
-                  <div className="font-medium">Trajectory v1</div>
-                  <div className="text-xs text-text-muted">
-                    Drafted Trajectory Episode Schema (dataset ingest format)
-                  </div>
-                </div>
-              </label>
             </div>
           </div>
-        </section>
-
-        {/* Actions */}
-        <section className="flex gap-4">
-          <button
-            type="button"
-            onClick={handleOpenPanel}
-            className="rounded-btn border border-[var(--border)] bg-bg-card px-4 py-2.5 text-sm font-medium text-text transition hover:border-[var(--border-active)] hover:bg-bg-card-hover"
-          >
-            Open Review Panel
-          </button>
-          <button
-            type="button"
-            onClick={handleResetOnboarding}
-            className="rounded-btn border border-[var(--border)] bg-bg-card px-4 py-2.5 text-sm font-medium text-text-muted transition hover:border-[var(--border-active)] hover:bg-bg-card-hover hover:text-text"
-          >
-            Reset Onboarding
-          </button>
-        </section>
-
-        {/* Footer */}
-        <footer className="border-t border-[var(--border)] pt-6 text-center text-sm text-text-muted">
-          <p>
-            drafted<span className="text-green">.</span> Capture v1.0.0
+          <p className="pb-4 text-xs text-text-muted">
+            One domain per line. <span className="font-mono">*.example.com</span> matches subdomains
+            only, so list the bare domain too if you need it. The never-capture list always wins.
           </p>
+        </Section>
+
+        <Section title="Export formats">
+          <Toggle
+            title="Anthropic Messages"
+            description="A /v1/messages request body with computer tool use."
+            checked={settings.export_formats.anthropic}
+            onChange={(v) =>
+              updateSettings({ export_formats: { ...settings.export_formats, anthropic: v } })
+            }
+          />
+          <Toggle
+            title="OpenAI Responses"
+            description="A /v1/responses request body with the computer tool."
+            checked={settings.export_formats.openai}
+            onChange={(v) =>
+              updateSettings({ export_formats: { ...settings.export_formats, openai: v } })
+            }
+          />
+          <Toggle
+            title="Drafted Universal"
+            description="The full session JSON with metadata, page elements and tasks."
+            checked={settings.export_formats.universal}
+            onChange={(v) =>
+              updateSettings({ export_formats: { ...settings.export_formats, universal: v } })
+            }
+          />
+          <Toggle
+            title="Trajectory v1"
+            description="The Drafted trajectory episode schema used for datasets."
+            checked={settings.export_formats.trajectory}
+            onChange={(v) =>
+              updateSettings({ export_formats: { ...settings.export_formats, trajectory: v } })
+            }
+          />
+        </Section>
+
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-6">
+          <div className="flex gap-2">
+            <button type="button" onClick={handleOpenPanel} className="btn-ghost">
+              Open review panel
+            </button>
+            <button
+              type="button"
+              onClick={handleResetOnboarding}
+              className="btn-ghost text-text-muted"
+            >
+              Show welcome again
+            </button>
+          </div>
+          <p className="text-xs text-text-faint">Sidekick 1.0.0 by Drafted Labs</p>
         </footer>
       </div>
     </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section>
+      <h2 className="text-base font-semibold text-text">{title}</h2>
+      <div className="mt-2 divide-y divide-white/[0.06] border-t border-white/[0.06]">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+function Toggle({
+  title,
+  description,
+  checked,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start justify-between gap-6 py-4">
+      <span>
+        <span className="block text-sm font-medium text-text">{title}</span>
+        <span className="mt-0.5 block text-xs text-text-muted">{description}</span>
+      </span>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-white"
+      />
+    </label>
   );
 }

@@ -248,7 +248,7 @@ chrome.commands.onCommand.addListener((command) => {
 // ── Install handler ───────────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('[bg] drafted. Capture installed');
+  console.log('[bg] Sidekick installed');
   migrateLegacyLimits().catch((err) => console.error('[bg] settings migration error:', err));
 });
 

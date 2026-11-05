@@ -1,12 +1,19 @@
 // ════════════════════════════════════════════════════════════════════════
-//  Login card — matches the deep-space design system.
+//  Login screen. Uses the shared controls defined in styles.css.
 // ════════════════════════════════════════════════════════════════════════
 
 import { Eye, EyeSlash, SignIn } from '@phosphor-icons/react';
 import { useState } from 'react';
+import Brand from '../shared/Brand';
 import { signInEmail } from '../shared/auth';
 
-export default function Login({ onSuccess }: { onSuccess: () => void }) {
+export default function Login({
+  onSuccess,
+  onCancel,
+}: {
+  onSuccess: () => void;
+  onCancel?: () => void;
+}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -33,37 +40,33 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <div className="p-6 space-y-6 atmosphere min-h-[340px] flex flex-col justify-center">
-      <header className="text-center space-y-2">
-        <div className="wordmark text-2xl">
-          drafted<span className="dot">.</span>
-        </div>
-        <p className="text-text-muted text-sm">sign in to submit captures</p>
+    <div className="flex min-h-[440px] flex-col px-5 pb-5 pt-4">
+      <header>
+        <Brand size="text-lg" />
+        <h1 className="mt-6 text-base font-semibold text-text">Sign in to submit sessions</h1>
+        <p className="mt-1 text-sm text-text-muted">Use your Drafted account.</p>
       </header>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <label htmlFor="email" className="text-text text-xs font-medium uppercase tracking-wider">
-            email
+      <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+        <div>
+          <label htmlFor="email" className="field-label">
+            Email
           </label>
           <input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="your.email@example.com"
-            className="w-full px-4 py-2.5 bg-bg-input border border-border rounded-lg text-text placeholder:text-text-faint focus:border-border-active focus:outline-none transition-colors"
+            placeholder="you@example.com"
+            className="field"
             disabled={isLoading}
             autoComplete="email"
           />
         </div>
 
-        <div className="space-y-2">
-          <label
-            htmlFor="password"
-            className="text-text text-xs font-medium uppercase tracking-wider"
-          >
-            password
+        <div>
+          <label htmlFor="password" className="field-label">
+            Password
           </label>
           <div className="relative">
             <input
@@ -71,16 +74,15 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
               type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-4 py-2.5 bg-bg-input border border-border rounded-lg text-text placeholder:text-text-faint focus:border-border-active focus:outline-none transition-colors pr-12"
+              className="field pr-11"
               disabled={isLoading}
               autoComplete="current-password"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text transition-colors"
-              tabIndex={-1}
+              className="absolute right-1 top-1/2 -translate-y-1/2 icon-btn"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? <Eye size={18} /> : <EyeSlash size={18} />}
             </button>
@@ -88,41 +90,51 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
         </div>
 
         {error && (
-          <div className="px-4 py-2.5 bg-coral/10 border border-coral/25 rounded-lg text-coral text-sm">
+          <p role="alert" className="text-sm text-coral">
             {error}
-          </div>
+          </p>
         )}
 
         <button
           type="submit"
           disabled={!email.trim() || !password || isLoading}
-          className="w-full py-3 bg-green text-bg rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          className="btn-primary w-full"
         >
           {isLoading ? (
             <>
-              <div className="w-4 h-4 border-2 border-bg border-t-transparent rounded-full animate-spin" />
-              signing in...
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-bg border-t-transparent" />
+              Signing in
             </>
           ) : (
             <>
-              <SignIn size={18} weight="bold" />
-              sign in
+              <SignIn size={16} weight="bold" />
+              Sign in
             </>
           )}
         </button>
       </form>
 
-      <div className="text-center text-text-muted text-xs">
-        no account?{' '}
+      {onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          className="mt-3 self-center text-sm text-text-muted hover:text-text"
+        >
+          Not now
+        </button>
+      )}
+
+      <p className="mt-auto pt-6 text-center text-xs text-text-muted">
+        No account?{' '}
         <a
           href="https://joindrafted.com/onboarding"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-green hover:underline"
+          className="font-medium text-text hover:underline"
         >
-          sign up on joindrafted.com
+          Sign up on joindrafted.com
         </a>
-      </div>
+      </p>
     </div>
   );
 }
@@ -131,18 +143,18 @@ function getErrorMessage(code?: string): string {
   switch (code) {
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
-      return 'incorrect email or password';
+      return 'Incorrect email or password';
     case 'auth/user-not-found':
-      return 'no account found with this email';
+      return 'No account found with this email';
     case 'auth/invalid-email':
-      return 'invalid email address';
+      return 'Invalid email address';
     case 'auth/user-disabled':
-      return 'account disabled';
+      return 'Account disabled';
     case 'auth/too-many-requests':
-      return 'too many attempts — try again later';
+      return 'Too many attempts. Try again later';
     case 'auth/network-request-failed':
-      return 'network error — check your connection';
+      return 'Network error. Check your connection';
     default:
-      return 'sign in failed — try again';
+      return 'Sign in failed. Try again';
   }
 }

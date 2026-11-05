@@ -1,5 +1,6 @@
 import { Browser, Export, Power } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
+import Brand from '../shared/Brand';
 import { useSettings } from '../shared/hooks';
 
 export default function Onboarding() {
@@ -16,77 +17,60 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="p-5 space-y-6 atmosphere">
-      <header className="text-center">
-        <h1 className="wordmark text-2xl mb-2">
-          drafted<span className="dot">.</span>
-        </h1>
-        <p className="text-text-muted text-sm">ambient trajectory capture</p>
+    <div className="flex flex-col px-5 pb-5 pt-4">
+      <header>
+        <Brand size="text-lg" />
+        <h1 className="mt-6 text-base font-semibold text-text">How Sidekick works</h1>
       </header>
 
-      <div className="card p-5 space-y-5">
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-dim flex items-center justify-center">
-            <Power className="text-green" size={20} weight="duotone" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-text font-semibold mb-1">flip it on</h3>
-            <p className="text-text-muted text-xs leading-relaxed">
-              one tap starts capturing everything across all your tabs
-            </p>
-          </div>
-        </div>
+      <ol className="mt-5 space-y-4">
+        <Step icon={<Power size={18} />} title="Turn it on">
+          One click starts recording across all your tabs.
+        </Step>
+        <Step icon={<Browser size={18} />} title="Work as usual">
+          Every click, keystroke, scroll and page becomes a step.
+        </Step>
+        <Step icon={<Export size={18} />} title="Review and label">
+          Name the tasks you did, then submit or export them.
+        </Step>
+      </ol>
 
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-dim flex items-center justify-center">
-            <Browser className="text-green" size={20} weight="duotone" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-text font-semibold mb-1">do anything</h3>
-            <p className="text-text-muted text-xs leading-relaxed">
-              browse, type, click, scroll. every action becomes a step
-            </p>
-          </div>
-        </div>
+      <label className="mt-6 flex cursor-pointer items-start gap-3 border-t border-white/[0.06] pt-4">
+        <input
+          type="checkbox"
+          checked={consented}
+          onChange={(e) => setConsented(e.target.checked)}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-white"
+        />
+        <span className="text-xs leading-relaxed text-text-muted">
+          I understand this records my browser activity (clicks, keystrokes, scrolls, navigation and
+          screenshots) while capture is on, and I consent to submitting it as training data to my
+          Drafted account. I will only capture work I am authorized to share.
+        </span>
+      </label>
 
-        <div className="flex items-start gap-3">
-          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-dim flex items-center justify-center">
-            <Export className="text-green" size={20} weight="duotone" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-text font-semibold mb-1">review and label later</h3>
-            <p className="text-text-muted text-xs leading-relaxed">
-              segment the timeline, annotate steps, export lab-ready JSON
-            </p>
-          </div>
-        </div>
-
-        <div className="pt-3 border-t border-border space-y-3">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={consented}
-              onChange={(e) => setConsented(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded border-border bg-bg-input text-green focus:ring-green/30"
-            />
-            <span className="text-text-muted text-xs leading-relaxed">
-              I understand this records my browser activity (clicks, keystrokes, scrolls,
-              navigation, and screenshots) while capture is on, and I consent to submitting it as
-              training data to my Drafted account. I will only capture work I am authorized to
-              share.
-            </span>
-          </label>
-
-          <button
-            type="button"
-            onClick={handleGetStarted}
-            disabled={!consented}
-            className="w-full py-3 bg-green text-bg font-semibold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            agree and get started
-          </button>
-        </div>
-      </div>
+      <button
+        type="button"
+        onClick={handleGetStarted}
+        disabled={!consented}
+        className="btn-primary mt-4 w-full"
+      >
+        Agree and get started
+      </button>
     </div>
+  );
+}
+
+function Step({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <li className="flex items-start gap-3">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-text">
+        {icon}
+      </span>
+      <div>
+        <p className="text-sm font-semibold text-text">{title}</p>
+        <p className="text-sm text-text-muted">{children}</p>
+      </div>
+    </li>
   );
 }

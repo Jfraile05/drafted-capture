@@ -74,197 +74,147 @@ export function Inspector({
   }
 
   return (
-    <div className="border-t border-white/[0.06] overflow-y-auto p-4 space-y-4 max-h-[60vh]">
+    <div className="max-h-[60vh] shrink-0 space-y-5 overflow-y-auto border-t border-white/[0.08] bg-bg-input px-4 py-4">
       {rangeStart !== null && (
-        <div className="card p-3 flex items-center justify-between">
-          <div className="text-sm text-text-muted">
+        <div className="flex items-center justify-between gap-2 text-xs text-text-muted">
+          <span>
             {rangeEnd === null
-              ? `Range start: Step ${rangeStart}`
-              : `Range: ${Math.min(rangeStart, rangeEnd)} to ${Math.max(rangeStart, rangeEnd)}`}
-          </div>
-          <div className="flex gap-2">
+              ? `Task starts at step ${rangeStart}`
+              : `Steps ${Math.min(rangeStart, rangeEnd)} to ${Math.max(rangeStart, rangeEnd)} selected`}
+          </span>
+          <span className="flex gap-1">
             {rangeEnd === null && (
-              <button
-                type="button"
-                onClick={onSetRangeEnd}
-                className="text-xs px-3 py-1 bg-violet/20 text-violet rounded-btn hover:bg-violet/30 transition-colors"
-              >
-                Set end
+              <button type="button" onClick={onSetRangeEnd} className="chip">
+                End task here
               </button>
             )}
-            <button
-              type="button"
-              onClick={onClearRange}
-              className="text-xs px-3 py-1 bg-text-faint/20 text-text-muted rounded-btn hover:bg-text-faint/30 transition-colors"
-            >
+            <button type="button" onClick={onClearRange} className="chip">
               Clear
             </button>
-          </div>
+          </span>
         </div>
       )}
 
-      <div className="card p-4">
-        <div className="text-xs text-text-muted mb-2">Screenshot</div>
-        {screenshotUrl ? (
-          <div className="relative w-full">
-            <img
-              src={screenshotUrl}
-              alt="Step screenshot"
-              className="w-full h-auto rounded-btn border border-white/[0.06]"
-            />
-            {coord && (
-              <div
-                className="absolute"
-                style={{ ...crosshairStyle, transform: 'translate(-50%, -50%)' }}
-              >
-                <Target size={24} weight="bold" className="text-green ring animate-pulse" />
-                <div
-                  className="absolute inset-0 rounded-full ring"
-                  style={{ boxShadow: '0 0 0 0 rgba(77,255,160,0.45)' }}
-                />
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="w-full h-32 bg-bg-input rounded-btn border border-white/[0.06] flex items-center justify-center text-text-faint text-sm">
-            No screenshot
-          </div>
-        )}
-      </div>
-
-      <div className="card p-4 space-y-3">
-        <div className="text-xs text-text-muted">Action</div>
-        <div className="text-sm text-text">
-          <span className="font-medium capitalize">{step.action.type.replace('_', ' ')}</span>
-        </div>
-        {coord && (
-          <div className="text-xs text-text-muted">
-            Coordinate: ({Math.round(coord[0])}, {Math.round(coord[1])})
-          </div>
-        )}
-        {step.action.text && (
-          <div className="text-xs bg-bg-input px-3 py-2 rounded-btn font-mono break-words">
-            {truncate(step.action.text, 200)}
-          </div>
-        )}
-        {step.action.key && (
-          <div className="text-xs bg-bg-input px-3 py-2 rounded-btn font-mono">
-            {step.action.key}
-          </div>
-        )}
-        {step.action.modifier_keys && step.action.modifier_keys.length > 0 && (
-          <div className="flex gap-2">
-            {step.action.modifier_keys.map((mod) => (
-              <span key={mod} className="text-xs px-2 py-1 bg-violet/20 text-violet rounded-btn">
-                {mod}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {step.dom && (
-        <div className="card p-4 space-y-2">
-          <div className="text-xs text-text-muted">DOM Context</div>
-          <div className="text-xs">
-            <span className="text-text-muted">Tag:</span>{' '}
-            <span className="text-text font-mono">&lt;{step.dom.tag}&gt;</span>
-          </div>
-          <div className="text-xs font-mono text-text-muted break-all">
-            {truncate(step.dom.selector, 150)}
-          </div>
-          {step.dom.aria_role && (
-            <div className="text-xs">
-              <span className="text-text-muted">Role:</span>{' '}
-              <span className="text-text">{step.dom.aria_role}</span>
-            </div>
-          )}
-          {step.dom.aria_label && (
-            <div className="text-xs">
-              <span className="text-text-muted">Label:</span>{' '}
-              <span className="text-text">{truncate(step.dom.aria_label, 80)}</span>
-            </div>
-          )}
-          <div className="flex gap-3 text-xs">
-            <div className="flex items-center gap-1">
-              <div
-                className={`w-2 h-2 rounded-full ${step.dom.visible ? 'bg-green' : 'bg-text-faint'}`}
-              />
-              <span className="text-text-muted">Visible</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div
-                className={`w-2 h-2 rounded-full ${step.dom.interactive ? 'bg-green' : 'bg-text-faint'}`}
-              />
-              <span className="text-text-muted">Interactive</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="card p-4 space-y-3">
-        <div className="text-xs text-text-muted">Annotation</div>
-        <div>
-          <div className="text-xs text-text-muted mb-2">Rating</div>
-          <div className="flex gap-2">
-            {(['correct', 'suboptimal', 'incorrect', 'unclear'] as AnnotationRating[]).map((r) => (
-              <button
-                type="button"
-                key={r}
-                onClick={() => setRating(r)}
-                className={`text-xs px-3 py-1 rounded-btn capitalize transition-colors ${
-                  rating === r
-                    ? 'bg-green/20 text-green border border-green/30'
-                    : 'bg-bg-input text-text-muted hover:bg-bg-card'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-xs text-text-muted mb-2">Tags</div>
-          <div className="flex flex-wrap gap-2">
-            {ANNOTATION_TAGS.map((t) => (
-              <button
-                type="button"
-                key={t.value}
-                onClick={() => toggleTag(t.value)}
-                className={`text-xs px-3 py-1 rounded-btn transition-colors ${
-                  tags.includes(t.value)
-                    ? 'bg-violet/20 text-violet border border-violet/30'
-                    : 'bg-bg-input text-text-muted hover:bg-bg-card'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div>
-          <div className="text-xs text-text-muted mb-2">Notes</div>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Optional notes..."
-            className="w-full bg-bg-input text-sm text-text px-3 py-2 rounded-btn border border-white/[0.06] focus:border-green/30 outline-none resize-none"
-            rows={3}
+      {screenshotUrl ? (
+        <div className="relative w-full">
+          <img
+            src={screenshotUrl}
+            alt={`Screenshot of step ${stepIndex}`}
+            className="h-auto w-full rounded-btn border border-white/[0.06]"
           />
+          {coord && (
+            <div
+              className="absolute"
+              style={{ ...crosshairStyle, transform: 'translate(-50%, -50%)' }}
+            >
+              <Target size={24} weight="bold" className="text-white drop-shadow" />
+            </div>
+          )}
         </div>
+      ) : (
+        <p className="flex h-24 items-center justify-center rounded-btn border border-dashed border-white/10 text-xs text-text-faint">
+          No screenshot for this step
+        </p>
+      )}
 
+      <section>
+        <h2 className="mb-2 text-xs font-medium text-text-muted">Details</h2>
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-xs">
+          <dt className="text-text-faint">Action</dt>
+          <dd className="capitalize text-text">{step.action.type.replace('_', ' ')}</dd>
+          {coord && (
+            <>
+              <dt className="text-text-faint">Position</dt>
+              <dd className="tabular-nums text-text">
+                {Math.round(coord[0])}, {Math.round(coord[1])}
+              </dd>
+            </>
+          )}
+          {step.action.text && (
+            <>
+              <dt className="text-text-faint">Text</dt>
+              <dd className="break-words font-mono text-text">{truncate(step.action.text, 200)}</dd>
+            </>
+          )}
+          {step.action.key && (
+            <>
+              <dt className="text-text-faint">Key</dt>
+              <dd className="font-mono text-text">
+                {[...(step.action.modifier_keys ?? []), step.action.key].join(' + ')}
+              </dd>
+            </>
+          )}
+          {step.dom && (
+            <>
+              <dt className="text-text-faint">Element</dt>
+              <dd className="text-text">
+                <span className="font-mono">&lt;{step.dom.tag}&gt;</span>
+                {step.dom.aria_label ? ` "${truncate(step.dom.aria_label, 60)}"` : ''}
+                {step.dom.aria_role ? `, ${step.dom.aria_role}` : ''}
+              </dd>
+              <dt className="text-text-faint">Selector</dt>
+              <dd className="break-all font-mono text-text-muted">
+                {truncate(step.dom.selector, 150)}
+              </dd>
+              <dt className="text-text-faint">State</dt>
+              <dd className="text-text-muted">
+                {step.dom.visible ? 'Visible' : 'Hidden'},{' '}
+                {step.dom.interactive ? 'interactive' : 'not interactive'}
+              </dd>
+            </>
+          )}
+        </dl>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xs font-medium text-text-muted">Was this step right?</h2>
+        <div className="flex flex-wrap gap-1.5">
+          {(['correct', 'suboptimal', 'incorrect', 'unclear'] as AnnotationRating[]).map((r) => (
+            <button
+              type="button"
+              key={r}
+              onClick={() => setRating(r)}
+              aria-pressed={rating === r}
+              className={`chip capitalize ${rating === r ? 'chip-on' : ''}`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {ANNOTATION_TAGS.map((t) => (
+            <button
+              type="button"
+              key={t.value}
+              onClick={() => toggleTag(t.value)}
+              aria-pressed={tags.includes(t.value)}
+              className={`chip ${tags.includes(t.value) ? 'chip-on' : ''}`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <label htmlFor="step-notes" className="sr-only">
+          Notes
+        </label>
+        <textarea
+          id="step-notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Notes (optional)"
+          className="field resize-none"
+          rows={2}
+        />
         <button
           type="button"
           onClick={handleSaveAnnotation}
           disabled={saving}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green/20 text-green rounded-btn hover:bg-green/30 transition-colors disabled:opacity-50"
+          className="btn-primary w-full"
         >
-          <CheckCircle size={18} weight="regular" />
-          {saving ? 'Saving...' : 'Save annotation'}
+          <CheckCircle size={16} />
+          {saving ? 'Saving' : 'Save label'}
         </button>
-      </div>
+      </section>
     </div>
   );
 }

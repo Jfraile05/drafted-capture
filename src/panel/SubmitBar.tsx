@@ -34,9 +34,7 @@ function shortReason(raw: string | undefined): string | undefined {
 
 function Card({ children }: { children: ReactNode }) {
   return (
-    <div className="border-b border-white/[0.06] px-4 py-3">
-      <div className="card space-y-3 p-4">{children}</div>
-    </div>
+    <div className="shrink-0 space-y-2 border-b border-white/[0.06] px-4 py-3">{children}</div>
   );
 }
 
@@ -45,10 +43,10 @@ function NoticeLine({ notice }: { notice: Notice }) {
     notice.tone === 'error'
       ? 'text-coral'
       : notice.tone === 'ok'
-        ? 'text-green'
+        ? 'text-[#00CA78]'
         : 'text-text-muted';
   return (
-    <output className={`flex items-start gap-2 text-sm ${color}`}>
+    <output className={`flex items-start gap-2 text-xs ${color}`}>
       {notice.tone === 'error' ? (
         <WarningCircle size={16} weight="fill" className="mt-0.5 shrink-0" />
       ) : (
@@ -117,15 +115,10 @@ export function SubmitBar({ session, onSessionUpdate }: SubmitBarProps) {
   if (!user) {
     return (
       <Card>
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/[0.06]">
-            <SignIn size={18} weight="duotone" className="text-text-muted" />
-          </div>
-          <div>
-            <div className="font-semibold">Sign in to submit</div>
-            <div className="text-sm text-text-muted">Open the popup and sign in to Drafted.</div>
-          </div>
-        </div>
+        <p className="flex items-center gap-2 text-xs text-text-muted">
+          <SignIn size={16} className="shrink-0" />
+          Sign in from the popup to submit this session.
+        </p>
       </Card>
     );
   }
@@ -134,31 +127,25 @@ export function SubmitBar({ session, onSessionUpdate }: SubmitBarProps) {
     return (
       <Card>
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green/15">
-            <CheckCircle size={20} weight="fill" className="text-green" />
-          </div>
+          <CheckCircle size={18} weight="fill" className="shrink-0 text-[#00CA78]" />
           <div className="min-w-0 flex-1">
-            <div className="font-semibold">Submitted to Drafted</div>
-            <div className="text-sm text-text-muted">
-              {enrichedAt ? 'Labels added to the record' : 'Add your labels to improve it'}
-            </div>
+            <p className="text-sm font-medium text-text">
+              Submitted{score != null ? `, quality ${score}` : ''}
+            </p>
+            <p className="text-xs text-text-muted">
+              {enrichedAt ? 'Your labels are on the record.' : 'Add your labels to improve it.'}
+            </p>
           </div>
-          {score != null && (
-            <div className="shrink-0 rounded-pill bg-green/15 px-3 py-1 text-center">
-              <div className="text-base font-semibold leading-tight text-green">{score}</div>
-              <div className="text-[10px] uppercase tracking-wide text-green/80">quality</div>
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={submitting}
+            className="btn-ghost shrink-0 px-3 py-1.5 text-xs"
+          >
+            <Sparkle size={14} weight="fill" />
+            {submitting ? 'Adding' : 'Add labels'}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="flex w-full items-center justify-center gap-2 rounded-btn border border-violet/30 bg-violet/15 px-4 py-2.5 text-sm font-medium text-violet transition-colors hover:bg-violet/25 disabled:opacity-50"
-        >
-          <Sparkle size={16} weight="fill" />
-          {submitting ? 'Enriching...' : 'Enrich with my labels'}
-        </button>
         {notice && <NoticeLine notice={notice} />}
       </Card>
     );
@@ -167,23 +154,20 @@ export function SubmitBar({ session, onSessionUpdate }: SubmitBarProps) {
   return (
     <Card>
       <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green/15">
-          <CloudArrowUp size={20} weight="duotone" className="text-green" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-text">Not submitted yet</p>
+          <p className="text-xs text-text-muted">Send this session to your Drafted account.</p>
         </div>
-        <div>
-          <div className="font-semibold">Ready to submit</div>
-          <div className="text-sm text-text-muted">Send this capture to Drafted.</div>
-        </div>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting}
+          className="btn-primary shrink-0 px-3 py-1.5 text-xs"
+        >
+          <CloudArrowUp size={14} weight="bold" />
+          {submitting ? 'Submitting' : 'Submit'}
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={handleSubmit}
-        disabled={submitting}
-        className="flex w-full items-center justify-center gap-2 rounded-btn bg-green px-4 py-2.5 text-sm font-semibold text-bg transition-opacity hover:opacity-90 disabled:opacity-50"
-      >
-        <CloudArrowUp size={16} weight="bold" />
-        {submitting ? 'Submitting...' : 'Submit to Drafted'}
-      </button>
       {notice && <NoticeLine notice={notice} />}
     </Card>
   );

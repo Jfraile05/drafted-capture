@@ -40,7 +40,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* drafted. wordmark — Poppins 800, green dot. Used nowhere else. */
+/* Sidekick wordmark: Poppins 800 with a muted dot. */
 .wordmark {
   font-family: "Poppins", sans-serif;
   font-weight: 800;
@@ -48,32 +48,49 @@ body {
   color: var(--text);
 }
 .wordmark .dot {
-  color: var(--green);
+  color: var(--text-muted);
 }
 
-/* Film-grain overlay for atmosphere — layered over the deep-space bg. */
-.grain::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.04;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-/* Radial atmosphere behind cards. */
+/* Plain background. The mascot carries the color; surfaces stay quiet. */
 .atmosphere {
-  background: radial-gradient(ellipse 80% 60% at 15% 0%, rgba(155, 127, 255, 0.08), transparent 60%),
-    radial-gradient(ellipse 70% 50% at 100% 100%, rgba(77, 255, 160, 0.06), transparent 55%),
-    var(--bg);
+  background: var(--bg);
 }
 
 .card {
-  background: radial-gradient(ellipse at 20% 20%, rgba(155, 127, 255, 0.05) 0%, transparent 60%),
-    var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  background: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 12px;
+}
+
+/* Shared controls so every screen uses the same buttons and fields. */
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-btn px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply btn bg-text text-bg hover:bg-white;
+  }
+  .btn-ghost {
+    @apply btn border border-white/10 text-text hover:bg-white/[0.06];
+  }
+  .btn-danger {
+    @apply btn border border-coral/30 text-coral hover:bg-coral/10;
+  }
+  .icon-btn {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-btn text-text-muted transition-colors hover:bg-white/[0.06] hover:text-text;
+  }
+  .field {
+    @apply w-full rounded-btn border border-white/10 bg-bg-input px-3 py-2.5 text-sm text-text placeholder:text-text-faint outline-none transition-colors focus:border-white/30;
+  }
+  .field-label {
+    @apply mb-1.5 block text-xs font-medium text-text-muted;
+  }
+  .chip {
+    @apply rounded-pill border border-white/10 px-3 py-1 text-xs text-text-muted transition-colors hover:text-text;
+  }
+  .chip-on {
+    @apply border-white/40 bg-white/10 text-text;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -127,4 +144,246 @@ body {
 }
 .rise {
   animation: rise 0.35s ease both;
+}
+
+/* Sidekick brand byline: small and thin under the wordmark. */
+.byline {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 10px;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  color: var(--text-muted, #b8aee0);
+  margin-top: 3px;
+}
+
+/* Sidekick mascot, ported from the character playground. */
+.mascot {
+  --look-x: 0px;
+  --look-y: 0px;
+  --tilt: 0deg;
+  position: relative;
+  display: block;
+}
+.mascot-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.ms-entrance {
+  animation: sk-arrive 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: 160px 150px;
+}
+.ms-motion {
+  transform-origin: 160px 180px;
+  animation: sk-float 5.4s ease-in-out infinite;
+}
+.ms-react {
+  transform-origin: 160px 180px;
+}
+.ms-tilt {
+  transform-origin: 160px 150px;
+  transform: rotate(var(--tilt));
+}
+.ms-character {
+  transform-origin: 160px 150px;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ms-gaze {
+  transform: translate(var(--look-x), var(--look-y));
+}
+.ms-ack {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ms-eyes {
+  transform-origin: 160px 145px;
+}
+.ms-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: sk-blink 6.8s infinite;
+}
+.mascot[data-state="waiting"] .ms-character {
+  transform: rotate(-8deg);
+}
+.mascot[data-state="watching"] .ms-motion {
+  animation: sk-watch 5.2s ease-in-out infinite;
+}
+.mascot[data-state="watching"] .ms-blink {
+  animation-delay: -2.3s;
+}
+.mascot[data-state="capturing"] .ms-character {
+  transform: rotate(5deg);
+}
+.mascot[data-state="capturing"] .ms-motion {
+  animation: sk-processing 3.6s ease-in-out infinite;
+}
+.mascot[data-state="capturing"] .ms-eyes {
+  animation: sk-focus 2.4s ease-in-out infinite;
+}
+.mascot[data-state="capturing"] .ms-blink {
+  animation-delay: -4s;
+}
+.mascot[data-state="paused"] .ms-character {
+  transform: rotate(-5deg);
+}
+.mascot[data-state="paused"] .ms-motion {
+  animation: sk-standby 7s ease-in-out infinite;
+}
+.mascot[data-state="paused"] .ms-blink {
+  animation: none;
+}
+.mascot[data-state="done"] .ms-motion {
+  animation: sk-done 5.2s ease-in-out infinite;
+}
+.mascot[data-state="done"] .ms-character {
+  transform: rotate(-4deg);
+}
+.mascot[data-state="done"] .ms-blink {
+  animation-delay: -1.5s;
+}
+.mascot.is-petting .ms-react {
+  animation: sk-pet 0.85s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.mascot.is-petting .ms-ack {
+  animation: sk-acknowledge 0.85s ease-in-out both;
+}
+.mascot.is-celebrating .ms-react {
+  animation: sk-celebrate 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.mascot.is-celebrating .ms-ack {
+  animation: sk-acknowledge 1.1s ease-in-out both;
+}
+@keyframes sk-pet {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0) scale(1);
+  }
+  30% {
+    transform: translateY(3px) rotate(-3deg) scale(1.045, 0.955);
+  }
+  62% {
+    transform: translateY(-6px) rotate(1deg) scale(0.985, 1.015);
+  }
+}
+@keyframes sk-celebrate {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  18% {
+    transform: translateY(3px) scale(1.03, 0.97);
+  }
+  45% {
+    transform: translateY(-16px) scale(0.99, 1.01);
+  }
+  75% {
+    transform: translateY(-4px) scale(1);
+  }
+}
+@keyframes sk-acknowledge {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  35% {
+    transform: scaleY(0.65);
+  }
+  65% {
+    transform: scaleY(1);
+  }
+}
+@keyframes sk-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes sk-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(1.5deg);
+  }
+}
+@keyframes sk-blink {
+  0%,
+  44%,
+  48%,
+  100% {
+    transform: scaleY(1);
+  }
+  46% {
+    transform: scaleY(0.08);
+  }
+}
+@keyframes sk-watch {
+  0%,
+  100% {
+    transform: translateY(-1px) rotate(-2deg);
+  }
+  45%,
+  65% {
+    transform: translateY(-5px) rotate(3deg);
+  }
+}
+@keyframes sk-processing {
+  0%,
+  100% {
+    transform: translateY(-1px) rotate(-1.5deg) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1.5deg) scale(1.015, 0.985);
+  }
+}
+@keyframes sk-focus {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.82);
+  }
+}
+@keyframes sk-standby {
+  0%,
+  100% {
+    transform: translateY(3px) rotate(-1deg);
+  }
+  50% {
+    transform: translateY(0) rotate(1deg);
+  }
+}
+@keyframes sk-done {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  12% {
+    transform: translateY(2px) scale(1.035, 0.965);
+  }
+  28% {
+    transform: translateY(-10px) scale(0.985, 1.015);
+  }
+  47% {
+    transform: translateY(-4px) scale(1);
+  }
+  73% {
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mascot *,
+  .mascot {
+    animation: none !important;
+    transition: none !important;
+  }
 }
