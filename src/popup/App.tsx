@@ -1,6 +1,14 @@
-import { ClockCounterClockwise, Gear, Pause, Play, SignOut, Stop } from '@phosphor-icons/react';
+import {
+  ClockCounterClockwise,
+  Gear,
+  Pause,
+  Play,
+  Plus,
+  SignOut,
+  Stop,
+} from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
-import Brand, { setMascotMoment } from '../shared/Brand';
+import Brand, { setMascotMoment, useMascotState } from '../shared/Brand';
 import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
 import { signOutUser, useAuth } from '../shared/auth';
 import { sendMessage, useLiveSession, useSettings } from '../shared/hooks';
@@ -12,14 +20,51 @@ import Onboarding from './Onboarding';
 
 export default function App() {
   const liveSession = useLiveSession();
+  const mascotState = useMascotState();
   const [settings] = useSettings();
   const { user, loading: authLoading } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
   const [intent, setIntent] = useState('');
-  const [showSavedToast, setShowSavedToast] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [submitFailed, setSubmitFailed] = useState(false);
+  const resumedRef = useRef(false);
   const prevStateRef = useRef<CaptureState | null>(null);
+  // Known before any click: Chrome only opens the side panel when open() is
+  // called right inside the click, with no await before it.
+  const windowIdRef = useRef<number | null>(null);
 
+  useEffect(() => {
+    chrome.windows.getCurrent().then((win) => {
+      windowIdRef.current = win.id ?? null;
+    });
+  }, []);
+
+  // Uploads the newest session. The session is already stored on this device,
+  // so the saved screen shows either way; a failed upload is called out there.
+  function uploadLatest() {
+    setUploading(true);
+    setSubmitFailed(false);
+    setMascotMoment('capturing', 60000);
+    submitLatestUnsubmitted()
+      .then((res) => setSubmitFailed(!res.ok))
+      .catch(() => setSubmitFailed(true))
+      .finally(() => {
+        setUploading(false);
+        setMascotMoment('done', null);
+      });
+  }
+
+  // If the popup closed mid-upload, that upload stopped with it. Pick it up
+  // again the next time the popup opens instead of staying on "Saving".
+  useEffect(() => {
+    if (resumedRef.current || authLoading || !user || uploading) return;
+    if (mascotState === 'capturing' && !liveSession) {
+      resumedRef.current = true;
+      uploadLatest();
+    }
+  });
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: uploadLatest only calls state setters and module functions, so a stale copy behaves the same
   useEffect(() => {
     const prevState = prevStateRef.current;
     const currentState = liveSession?.state ?? null;
@@ -27,26 +72,15 @@ export default function App() {
 
     if ((prevState === 'capturing' || prevState === 'paused') && currentState === null) {
       // A capture just stopped and archived. Two paths:
-      //  - signed in  -> upload now, then open the panel to label/enrich.
+      //  - signed in  -> upload now, then show the saved screen.
       //  - signed out -> keep the data locally, prompt login; upload on login.
+      // The saved screen offers "Review session" so the panel opens on a click.
       if (user) {
-        // Open the panel first (closest to the Stop gesture), then upload.
-        openPanel();
-        setUploading(true);
-        setMascotMoment('capturing', 60000);
-        submitLatestUnsubmitted()
-          .catch(() => {})
-          .finally(() => {
-            setUploading(false);
-            setMascotMoment('done');
-          });
+        uploadLatest();
       } else {
         setShowLogin(true);
-        setMascotMoment('done');
+        setMascotMoment('done', null);
       }
-      setShowSavedToast(true);
-      const timer = setTimeout(() => setShowSavedToast(false), 5000);
-      return () => clearTimeout(timer);
     }
   }, [liveSession?.state, user]);
 
@@ -60,16 +94,8 @@ export default function App() {
         onCancel={() => setShowLogin(false)}
         onSuccess={() => {
           setShowLogin(false);
-          // Upload any session captured before signing in, then open to label.
-          setUploading(true);
-          setMascotMoment('capturing', 60000);
-          submitLatestUnsubmitted()
-            .catch(() => {})
-            .finally(() => {
-              setUploading(false);
-              setMascotMoment('done');
-              openPanel();
-            });
+          // Upload any session captured before signing in, then show the saved screen.
+          uploadLatest();
         }}
       />
     );
@@ -79,6 +105,9 @@ export default function App() {
   const isCapturing = state === 'capturing';
   const isPaused = state === 'paused';
   const isIdle = state === 'idle';
+  // The saved screen stays until the user picks what to do next.
+  const isSaving = isIdle && (uploading || mascotState === 'capturing');
+  const isSaved = isIdle && !isSaving && mascotState === 'done';
   const handleToggleCapture = async () => {
     await sendMessage('TOGGLE_CAPTURE', { intent: intent.trim() || undefined });
     setIntent('');
@@ -96,15 +125,14 @@ export default function App() {
     await sendMessage('STOP_CAPTURE');
   };
 
-  async function openPanel() {
-    try {
-      const win = await chrome.windows.getCurrent();
-      if (win.id !== undefined) {
-        await chrome.sidePanel.open({ windowId: win.id });
-      }
-    } catch (err) {
-      console.error('Failed to open side panel:', err);
-    }
+  /** Opens the review side panel, then closes the popup so the panel has the screen. */
+  function openPanel() {
+    const windowId = windowIdRef.current;
+    if (windowId === null) return;
+    chrome.sidePanel
+      .open({ windowId })
+      .then(() => window.close())
+      .catch((err) => console.error('Failed to open side panel:', err));
   }
   const handleOpenPanel = openPanel;
 
@@ -124,16 +152,16 @@ export default function App() {
     ? 'Recording'
     : isPaused
       ? 'Paused'
-      : uploading
+      : isSaving
         ? 'Saving your session'
-        : showSavedToast
+        : isSaved
           ? 'Session saved'
           : 'Ready when you are';
 
   return (
     <div className="flex flex-col px-5 pb-4 pt-4">
       <header className="flex items-center justify-between">
-        <Brand size="text-lg" />
+        <Brand size="text-2xl" />
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -157,25 +185,36 @@ export default function App() {
       </header>
 
       <section className="pt-5">
-        <h1 className="text-base font-semibold text-text">{statusTitle}</h1>
+        <h1 className="text-xl font-semibold text-text">{statusTitle}</h1>
         {(isCapturing || isPaused) && liveSession ? (
           <LiveTimer startedAt={liveSession.started_at} isPaused={isPaused} />
         ) : (
-          <p className="mt-1 text-sm text-text-muted">
-            {showSavedToast
-              ? 'Open the review panel to label it.'
-              : 'Sidekick learns from your clicks, typing and pages across tabs.'}
+          <p className="mt-1 text-[15px] leading-snug text-text/80">
+            {isSaving
+              ? 'Hang on, this takes a few seconds.'
+              : isSaved
+                ? submitFailed
+                  ? "Saved on this device, but it didn't upload. Submit it from the review panel."
+                  : 'Open the review panel to label it.'
+                : 'Sidekick learns from your clicks, typing and pages across tabs.'}
           </p>
         )}
       </section>
 
-      {isIdle && (
+      {isSaved && (
         <div className="mt-5 space-y-2.5">
-          {showSavedToast && (
-            <button type="button" onClick={handleOpenPanel} className="btn-primary w-full">
-              Review session
-            </button>
-          )}
+          <button type="button" onClick={handleOpenPanel} className="btn-primary w-full">
+            Review session
+          </button>
+          <button type="button" onClick={() => setMascotMoment(null)} className="btn-ghost w-full">
+            <Plus size={16} weight="bold" />
+            Start a new session
+          </button>
+        </div>
+      )}
+
+      {isIdle && !isSaving && !isSaved && (
+        <div className="mt-5 space-y-2.5">
           <label htmlFor="intent" className="sr-only">
             What are you about to do?
           </label>
@@ -187,11 +226,7 @@ export default function App() {
             rows={2}
             className="field resize-none"
           />
-          <button
-            type="button"
-            onClick={handleToggleCapture}
-            className={`${showSavedToast ? 'btn-ghost' : 'btn-primary'} w-full`}
-          >
+          <button type="button" onClick={handleToggleCapture} className="btn-primary w-full">
             <Play size={16} weight="fill" />
             Start capturing
           </button>
@@ -292,7 +327,7 @@ function LiveTimer({ startedAt, isPaused }: { startedAt: number; isPaused: boole
     return () => clearInterval(interval);
   }, [startedAt, isPaused]);
 
-  return <p className="mt-1 text-sm tabular-nums text-text-muted">{fmtDuration(elapsed)}</p>;
+  return <p className="mt-1 text-[15px] tabular-nums text-text/80">{fmtDuration(elapsed)}</p>;
 }
 
 function Stat({ label, value }: { label: string; value: number }) {

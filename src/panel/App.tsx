@@ -154,8 +154,8 @@ export function App() {
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-bg">
-      <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] px-3">
-        <Brand size="text-lg" className="pl-1" />
+      <header className="flex h-[72px] shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] px-3">
+        <Brand size="text-2xl" className="pl-1" />
         {!selectedSession && (
           <button
             type="button"
@@ -272,7 +272,14 @@ export function App() {
 
       {selectedSessionId && selectedSession && (
         <div className="flex flex-1 flex-col overflow-hidden">
-          <SubmitBar session={selectedSession} onSessionUpdate={handleSessionUpdate} />
+          <SubmitBar
+            session={selectedSession}
+            onSessionUpdate={handleSessionUpdate}
+            onStartLabeling={() => {
+              setActiveTab('timeline');
+              setSelectedStepIndex(0);
+            }}
+          />
           <nav
             className="flex shrink-0 gap-1 border-b border-white/[0.06] px-2"
             aria-label="Session views"

@@ -1,11 +1,20 @@
 import { Eye, EyeSlash } from '@phosphor-icons/react';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import Brand from '../shared/Brand';
 import { useSettings } from '../shared/hooks';
 
 export function Options() {
   const [settings, updateSettings] = useSettings();
   const [showApiKey, setShowApiKey] = useState(false);
+  // Chrome only opens the side panel when open() runs right inside the click,
+  // so the window id is looked up ahead of time.
+  const windowIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    chrome.windows.getCurrent().then((win) => {
+      windowIdRef.current = win.id ?? null;
+    });
+  }, []);
 
   const handleDomainBlocklistChange = (value: string) => {
     const domains = value
@@ -28,11 +37,12 @@ export function Options() {
     alert('Done. Open the Sidekick popup to see the welcome screen.');
   };
 
-  const handleOpenPanel = async () => {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab?.id) {
-      chrome.sidePanel?.open({ windowId: tab.windowId });
-    }
+  const handleOpenPanel = () => {
+    const windowId = windowIdRef.current;
+    if (windowId === null) return;
+    chrome.sidePanel
+      .open({ windowId })
+      .catch((err) => console.error('Failed to open side panel:', err));
   };
 
   return (
@@ -40,7 +50,7 @@ export function Options() {
       <div className="mx-auto max-w-2xl space-y-10">
         <header className="flex items-end justify-between gap-4">
           <h1>
-            <Brand size="text-lg" />
+            <Brand size="text-2xl" />
           </h1>
           <p className="text-xs text-text-muted">Changes save automatically.</p>
         </header>

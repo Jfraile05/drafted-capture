@@ -102,13 +102,62 @@ export function playReaction(el: HTMLElement | null, kind: 'petting' | 'celebrat
   el.querySelector('.ms-react')?.addEventListener('animationend', done, { once: true });
 }
 
+const CONFETTI_COLORS = ['#00CA78', '#FF239B', '#1286FF', '#FFAE00', '#FFFFFF'];
+
+/** A short confetti burst from the mascot, drawn above the page and then removed. */
+function burstConfetti(from: HTMLElement | null) {
+  if (!from || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const r = from.getBoundingClientRect();
+  const layer = document.createElement('div');
+  layer.setAttribute('aria-hidden', 'true');
+  layer.style.cssText = 'position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:50';
+  document.body.append(layer);
+  let longest = 0;
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement('span');
+    const w = 5 + Math.random() * 4;
+    piece.style.cssText = `position:absolute;left:${r.left + r.width / 2}px;top:${r.top + r.height / 2}px;width:${w}px;height:${w * (Math.random() < 0.5 ? 1 : 1.8)}px;border-radius:${Math.random() < 0.3 ? '50%' : '2px'};background:${CONFETTI_COLORS[i % CONFETTI_COLORS.length]}`;
+    layer.append(piece);
+    // Pop out to the right and down, then drift slowly down with a sway and fade.
+    const angle = (-35 + Math.random() * 125) * (Math.PI / 180);
+    const reach = 60 + Math.random() * 170;
+    const dx = Math.cos(angle) * reach;
+    const dy = Math.sin(angle) * reach - 30;
+    const sway = (Math.random() < 0.5 ? -1 : 1) * (12 + Math.random() * 18);
+    const fall = 200 + Math.random() * 160;
+    const spin = (Math.random() < 0.5 ? -1 : 1) * (240 + Math.random() * 360);
+    const duration = 3000 + Math.random() * 1500;
+    longest = Math.max(longest, duration);
+    const at = (x: number, y: number, deg: number) =>
+      `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) rotate(${deg}deg)`;
+    piece.animate(
+      [
+        { transform: at(0, 0, 0), opacity: 1, easing: 'cubic-bezier(.15,.8,.3,1)' },
+        { transform: at(dx, dy, spin * 0.25), opacity: 1, offset: 0.15, easing: 'ease-in-out' },
+        {
+          transform: at(dx + sway, dy + fall * 0.4, spin * 0.5),
+          offset: 0.45,
+          easing: 'ease-in-out',
+        },
+        { transform: at(dx - sway, dy + fall * 0.75, spin * 0.75), opacity: 1, offset: 0.75 },
+        { transform: at(dx, dy + fall, spin), opacity: 0 },
+      ],
+      { duration, fill: 'forwards' },
+    );
+  }
+  setTimeout(() => layer.remove(), longest + 100);
+}
+
 // Short-lived moods that every extension page should show, not only the page
 // that caused them: saving a session (blue) and a session just saved (green).
 const MOMENT_KEY = 'mascot_moment';
-type Moment = { state: 'capturing' | 'done'; until: number };
+/** `until` null means it lasts until cleared. */
+type Moment = { state: 'capturing' | 'done'; until: number | null; at: number };
 
-export function setMascotMoment(state: Moment['state'] | null, ms = 6000) {
-  const value: Moment | null = state ? { state, until: Date.now() + ms } : null;
+export function setMascotMoment(state: Moment['state'] | null, ms: number | null = 6000) {
+  const value: Moment | null = state
+    ? { state, until: ms === null ? null : Date.now() + ms, at: Date.now() }
+    : null;
   chrome.storage.session.set({ [MOMENT_KEY]: value }).catch(() => {});
 }
 
@@ -130,67 +179,117 @@ export function useMascotState(): MascotState {
 
   // Re-render once the moment expires so the mascot goes back to waiting.
   useEffect(() => {
-    if (!moment) return;
+    if (!moment || moment.until === null) return;
     const t = setTimeout(() => setNow(Date.now()), Math.max(0, moment.until - Date.now()) + 50);
     return () => clearTimeout(t);
   }, [moment]);
 
   if (live?.state === 'capturing') return 'watching';
   if (live?.state === 'paused') return 'paused';
-  if (moment && moment.until > Date.now()) return moment.state;
+  if (moment && (moment.until === null || moment.until > Date.now())) return moment.state;
   return 'waiting';
 }
 
-// The cursor over the web page, relayed by the content script, so the eyes
-// follow it outside the popup or side panel too. One port shared by all mascots.
-type PageCursor = { sx: number; sy: number; ox: number; oy: number; w: number };
+// The cursor over the web page, so the eyes follow it outside the popup or
+// side panel too. A tiny relay is injected into every frame of the active tab
+// (it works in tabs opened before the extension was reloaded) and streams the
+// cursor back over a port. Each extension page gets its own port, named with
+// its id; the relay removes itself when that page closes.
+type PageCursor = { sx: number; sy: number; ox: number; oy: number; w: number; top: boolean };
 const cursorListeners = new Set<(c: PageCursor) => void>();
-let cursorPort: chrome.runtime.Port | null = null;
+const PAGE_ID = crypto.randomUUID();
+const PORT_NAME = `sidekick-cursor:${PAGE_ID}`;
 
-function connectActiveTab() {
-  cursorPort?.disconnect();
-  cursorPort = null;
-  chrome.tabs?.query({ active: true, currentWindow: true }, ([tab]) => {
-    if (chrome.runtime.lastError || tab?.id === undefined || !cursorListeners.size) return;
+/** Runs inside the web page. Must be self-contained: it is serialized by chrome.scripting. */
+function cursorRelay(portName: string) {
+  const w = window as unknown as { __sidekickRelays?: Record<string, boolean> };
+  if (!w.__sidekickRelays) w.__sidekickRelays = {};
+  const relays = w.__sidekickRelays;
+  if (relays[portName]) return;
+  let port: chrome.runtime.Port;
+  try {
+    port = chrome.runtime.connect({ name: portName });
+  } catch {
+    return;
+  }
+  relays[portName] = true;
+  let frame = 0;
+  let last: PointerEvent | null = null;
+  const send = () => {
+    frame = 0;
+    if (!last) return;
     try {
-      const port = chrome.tabs.connect(tab.id, { name: 'sidekick-cursor', frameId: 0 });
-      port.onMessage.addListener((c: PageCursor) => {
-        for (const fn of cursorListeners) fn(c);
+      port.postMessage({
+        sx: last.screenX,
+        sy: last.screenY,
+        ox: last.screenX - last.clientX,
+        oy: last.screenY - last.clientY,
+        w: window.innerWidth,
+        top: window === window.top,
       });
-      port.onDisconnect.addListener(() => {
-        void chrome.runtime.lastError; // pages without the content script, like chrome://
-        if (cursorPort === port) cursorPort = null;
-      });
-      cursorPort = port;
     } catch {
-      // No content script in this tab.
+      // The extension page closed between frames.
     }
+  };
+  const onMove = (e: PointerEvent) => {
+    last = e;
+    if (!frame) frame = requestAnimationFrame(send);
+  };
+  window.addEventListener('pointermove', onMove, { capture: true, passive: true });
+  port.onDisconnect.addListener(() => {
+    window.removeEventListener('pointermove', onMove, { capture: true });
+    cancelAnimationFrame(frame);
+    delete relays[portName];
   });
 }
 
-function onTabActivated() {
-  connectActiveTab();
+function onCursorPort(port: chrome.runtime.Port) {
+  if (!port.name.startsWith('sidekick-cursor:')) return;
+  // Another extension page's relay: let it go so it closes with that page.
+  if (port.name !== PORT_NAME) return port.disconnect();
+  port.onMessage.addListener((c: PageCursor) => {
+    for (const fn of cursorListeners) fn(c);
+  });
 }
+
+function injectActiveTab() {
+  chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+    if (chrome.runtime.lastError || tab?.id === undefined || !cursorListeners.size) return;
+    chrome.scripting
+      .executeScript({
+        target: { tabId: tab.id, allFrames: true },
+        func: cursorRelay,
+        args: [PORT_NAME],
+      })
+      .catch(() => {
+        // Chrome blocks scripts on its own pages (chrome://, the new tab page, the Web Store).
+      });
+  });
+}
+
 function onTabUpdated(_id: number, info: chrome.tabs.TabChangeInfo, tab: chrome.tabs.Tab) {
-  if (info.status === 'complete' && tab.active) connectActiveTab();
+  if (info.status === 'complete' && tab.active) injectActiveTab();
 }
 
 function subscribePageCursor(fn: (c: PageCursor) => void) {
   cursorListeners.add(fn);
-  if (cursorListeners.size === 1 && chrome.tabs) {
-    connectActiveTab();
-    chrome.tabs.onActivated.addListener(onTabActivated);
+  if (cursorListeners.size === 1 && chrome.scripting) {
+    chrome.runtime.onConnect.addListener(onCursorPort);
+    chrome.tabs.onActivated.addListener(injectActiveTab);
     chrome.tabs.onUpdated.addListener(onTabUpdated);
+    injectActiveTab();
   }
   return () => {
     cursorListeners.delete(fn);
-    if (cursorListeners.size) return;
-    chrome.tabs?.onActivated.removeListener(onTabActivated);
-    chrome.tabs?.onUpdated.removeListener(onTabUpdated);
-    cursorPort?.disconnect();
-    cursorPort = null;
+    if (cursorListeners.size || !chrome.scripting) return;
+    chrome.runtime.onConnect.removeListener(onCursorPort);
+    chrome.tabs.onActivated.removeListener(injectActiveTab);
+    chrome.tabs.onUpdated.removeListener(onTabUpdated);
   };
 }
+
+// The web page's visible area on screen, from the top frame's last report.
+let pageViewport: { x: number; y: number; w: number } | null = null;
 
 // Where this extension page sits on screen. Learned from the first pointer
 // event inside it; until then, a side panel is assumed to sit right of the
@@ -243,9 +342,11 @@ function useFollowCursor(elRef: RefObject<HTMLSpanElement | null>, enabled: bool
       aim(e.clientX, e.clientY);
     };
     const onPageCursor = (c: PageCursor) => {
+      if (c.top) pageViewport = { x: c.ox, y: c.oy, w: c.w };
+      const page = pageViewport ?? { x: c.ox, y: c.oy, w: c.w };
       const origin = selfOrigin ?? {
-        x: location.pathname.includes('panel') ? c.ox + c.w : c.ox + c.w - innerWidth,
-        y: c.oy,
+        x: location.pathname.includes('panel') ? page.x + page.w : page.x + page.w - innerWidth,
+        y: page.y,
       };
       aim(c.sx - origin.x, c.sy - origin.y);
     };
@@ -274,15 +375,23 @@ export default function Brand({
   const ref = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    if (state === 'done') playReaction(ref.current, 'celebrating');
+    if (state !== 'done') return;
+    playReaction(ref.current, 'celebrating');
+    // Confetti only in the popup, and only right after a save, not when it
+    // opens already green. The side panel and settings just hop.
+    if (!location.pathname.includes('/popup/')) return;
+    chrome.storage.session.get(MOMENT_KEY, (r) => {
+      const at = (r[MOMENT_KEY] as Moment | null)?.at ?? 0;
+      if (Date.now() - at < 2500) burstConfetti(ref.current);
+    });
   }, [state]);
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={`flex items-center gap-2.5 ${className}`}>
       <button
         type="button"
         onClick={() => playReaction(ref.current, 'petting')}
-        className="h-9 w-10 shrink-0 cursor-pointer"
+        className="h-12 w-[52px] shrink-0 cursor-pointer"
         aria-label="Sidekick"
       >
         <Mascot ref={ref} state={state} className="h-full w-full" />

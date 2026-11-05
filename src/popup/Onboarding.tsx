@@ -19,7 +19,7 @@ export default function Onboarding() {
   return (
     <div className="flex flex-col px-5 pb-5 pt-4">
       <header>
-        <Brand size="text-lg" />
+        <Brand size="text-2xl" />
         <h1 className="mt-6 text-base font-semibold text-text">How Sidekick works</h1>
       </header>
 

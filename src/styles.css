@@ -149,11 +149,12 @@ body {
 /* Sidekick brand byline: small and thin under the wordmark. */
 .byline {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 10px;
-  font-weight: 300;
-  letter-spacing: 0.02em;
-  color: var(--text-muted, #b8aee0);
-  margin-top: 3px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--text);
+  opacity: 0.8;
+  margin-top: 4px;
 }
 
 /* Sidekick mascot, ported from the character playground. */

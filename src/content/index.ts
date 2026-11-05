@@ -62,34 +62,6 @@ function initContentScript(): void {
       return false;
     });
 
-    // While the popup or side panel is open, it asks for the cursor position
-    // here so the Sidekick mascot's eyes can follow it across the page.
-    chrome.runtime.onConnect.addListener((port) => {
-      if (port.name !== 'sidekick-cursor') return;
-      let frame = 0;
-      let last: PointerEvent | null = null;
-      const send = () => {
-        frame = 0;
-        if (!last) return;
-        port.postMessage({
-          sx: last.screenX,
-          sy: last.screenY,
-          ox: last.screenX - last.clientX,
-          oy: last.screenY - last.clientY,
-          w: window.innerWidth,
-        });
-      };
-      const onMove = (e: PointerEvent) => {
-        last = e;
-        if (!frame) frame = requestAnimationFrame(send);
-      };
-      window.addEventListener('pointermove', onMove, { capture: true, passive: true });
-      port.onDisconnect.addListener(() => {
-        window.removeEventListener('pointermove', onMove, { capture: true });
-        cancelAnimationFrame(frame);
-      });
-    });
-
     // The worker replies with a CaptureState string ('idle' | 'capturing' |
     // 'paused'). If this page loaded while capture is already running, self
     // start so capture stays continuous across every tab.

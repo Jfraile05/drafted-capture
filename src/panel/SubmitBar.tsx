@@ -9,6 +9,8 @@ import { buildEnrichment } from './enrichment';
 interface SubmitBarProps {
   session: Session;
   onSessionUpdate: (session: Session) => void;
+  /** Opens the first step so the user can write labels. */
+  onStartLabeling: () => void;
 }
 
 interface SubmitOutcome {
@@ -60,13 +62,14 @@ function NoticeLine({ notice }: { notice: Notice }) {
   );
 }
 
-export function SubmitBar({ session, onSessionUpdate }: SubmitBarProps) {
+export function SubmitBar({ session, onSessionUpdate, onStartLabeling }: SubmitBarProps) {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
   const submitted = Boolean(session.submission?.drafted_task_id);
   const score = session.submission?.quality_score;
   const enrichedAt = session.submission?.last_enriched_at;
+  const labelCount = Object.keys(buildEnrichment(session)).length;
 
   const handleSubmit = async () => {
     setSubmitting(true);
@@ -115,7 +118,7 @@ export function SubmitBar({ session, onSessionUpdate }: SubmitBarProps) {
   if (!user) {
     return (
       <Card>
-        <p className="flex items-center gap-2 text-xs text-text-muted">
+        <p className="flex items-center gap-2 text-sm text-text/80">
           <SignIn size={16} className="shrink-0" />
           Sign in from the popup to submit this session.
         </p>
@@ -129,22 +132,37 @@ export function SubmitBar({ session, onSessionUpdate }: SubmitBarProps) {
         <div className="flex items-center gap-3">
           <CheckCircle size={18} weight="fill" className="shrink-0 text-[#00CA78]" />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-text">
+            <p className="text-base font-semibold text-text">
               Submitted{score != null ? `, quality ${score}` : ''}
             </p>
-            <p className="text-xs text-text-muted">
-              {enrichedAt ? 'Your labels are on the record.' : 'Add your labels to improve it.'}
+            <p className="text-sm text-text/80">
+              {labelCount === 0
+                ? 'Pick a step and note what you were doing.'
+                : enrichedAt
+                  ? 'Your labels are on the record.'
+                  : `${labelCount} ${labelCount === 1 ? 'label' : 'labels'} ready to send.`}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="btn-ghost shrink-0 px-3 py-1.5 text-xs"
-          >
-            <Sparkle size={14} weight="fill" />
-            {submitting ? 'Adding' : 'Add labels'}
-          </button>
+          {labelCount === 0 ? (
+            <button
+              type="button"
+              onClick={onStartLabeling}
+              className="btn-ghost shrink-0 px-3 py-1.5 text-xs"
+            >
+              <Sparkle size={14} weight="fill" />
+              Add labels
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="btn-ghost shrink-0 px-3 py-1.5 text-xs"
+            >
+              <Sparkle size={14} weight="fill" />
+              {submitting ? 'Sending' : 'Send labels'}
+            </button>
+          )}
         </div>
         {notice && <NoticeLine notice={notice} />}
       </Card>
@@ -155,8 +173,8 @@ export function SubmitBar({ session, onSessionUpdate }: SubmitBarProps) {
     <Card>
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-text">Not submitted yet</p>
-          <p className="text-xs text-text-muted">Send this session to your Drafted account.</p>
+          <p className="text-base font-semibold text-text">Not submitted yet</p>
+          <p className="text-sm text-text/80">Send this session to your Drafted account.</p>
         </div>
         <button
           type="button"

@@ -56,7 +56,19 @@ export function useSettings(): [Settings, (patch: Partial<Settings>) => void] {
   return [settings, update];
 }
 
-/** Tiny typed wrapper around chrome.runtime.sendMessage. */
-export function sendMessage<R = unknown>(type: string, payload?: unknown): Promise<R> {
-  return chrome.runtime.sendMessage({ type, payload });
+/** Tiny typed wrapper around chrome.runtime.sendMessage. The worker answers a
+ *  failure with `{ error }` instead of rejecting; that is turned into a thrown
+ *  error so callers never treat it as a real result. */
+export async function sendMessage<R = unknown>(type: string, payload?: unknown): Promise<R> {
+  const res = await chrome.runtime.sendMessage({ type, payload });
+  if (
+    res &&
+    typeof res === 'object' &&
+    !Array.isArray(res) &&
+    Object.keys(res).length === 1 &&
+    'error' in res
+  ) {
+    throw new Error(String((res as { error: unknown }).error));
+  }
+  return res as R;
 }
