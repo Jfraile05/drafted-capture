@@ -114,14 +114,24 @@ folder of PNGs named by content hash:
 | `session.json` | Drafted Universal (superset: DOM, segments, annotations, origins) | Drafted Labs, custom pipelines |
 | `trajectory.json` | Drafted Trajectory v1 episode schema | Drafted dataset ingestion |
 
-Everything runs locally. No account or key is required to record and export.
+Recording, review, and export run locally and need no account or key. Submitting
+a session to Drafted requires signing in with a Drafted account. When you submit,
+the steps, screenshots, and optional screen recording are uploaded to Drafted.
 
 ## Privacy
 
-Password fields are masked. A domain blocklist in settings skips capture on
-sensitive sites entirely. Protected pages (`chrome://`, the Web Store) cannot be
-captured by Chrome and are recorded without screenshots. Lab API keys, if set,
-go directly to the lab endpoint and never touch Drafted servers.
+Redaction runs in the extension before anything is stored. Emails, card numbers,
+SSNs, API keys, tokens, and sensitive URL parameters are replaced with
+placeholders such as `[email]`. Typed text in password, card, and one-time-code
+fields is never stored, and "Mask all input values" hides every typed value.
+Screenshots are not redacted, so use the allowlist or blocklist for sensitive sites.
+
+Capture can be limited to an allowlist of domains ("Only capture allowed sites",
+which captures nothing until you add a domain). A domain blocklist always wins
+over the allowlist. Incognito windows are never captured. Protected pages
+(`chrome://`, the Web Store) cannot be captured by Chrome and are recorded without
+screenshots. Lab API keys, if set, go directly to the lab endpoint and never touch
+Drafted servers.
 
 ## Known limits (v1)
 
