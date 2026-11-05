@@ -1,13 +1,10 @@
 // ════════════════════════════════════════════════════════════════════════
 //  Login card — matches the deep-space design system.
-//
-//  If trySeekerBridge finds a seeker session, we show "continue as X" and
-//  pre-fill the email. User still enters password (see auth.ts for why).
 // ════════════════════════════════════════════════════════════════════════
 
 import { Eye, EyeSlash, SignIn } from '@phosphor-icons/react';
-import { useEffect, useState } from 'react';
-import { signInEmail, trySeekerBridge } from '../shared/auth';
+import { useState } from 'react';
+import { signInEmail } from '../shared/auth';
 
 export default function Login({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState('');
@@ -15,21 +12,6 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [seekerEmail, setSeekerEmail] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Best-effort seeker bridge on mount.
-    trySeekerBridge()
-      .then((result) => {
-        if (result?.email) {
-          setSeekerEmail(result.email);
-          setEmail(result.email);
-        }
-      })
-      .catch(() => {
-        // Silent fail — bridge is best-effort.
-      });
-  }, []);
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -56,9 +38,7 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
         <div className="wordmark text-2xl">
           drafted<span className="dot">.</span>
         </div>
-        <p className="text-text-muted text-sm">
-          {seekerEmail ? `signed into joindrafted as ${seekerEmail}` : 'sign in to submit captures'}
-        </p>
+        <p className="text-text-muted text-sm">sign in to submit captures</p>
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -126,7 +106,7 @@ export default function Login({ onSuccess }: { onSuccess: () => void }) {
           ) : (
             <>
               <SignIn size={18} weight="bold" />
-              {seekerEmail ? 'continue' : 'sign in'}
+              sign in
             </>
           )}
         </button>
