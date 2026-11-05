@@ -16,9 +16,11 @@
 
 import { SCREENSHOT_MIN_INTERVAL_MS } from '../constants';
 import { putScreenshot } from '../storage/db';
+import { getSettings } from '../storage/live';
 import type { ScreenshotRef } from '../types';
 import { sha256 } from './crypto';
 import { getImageDimensions } from './screenshot';
+import { type Rect, maskScreenshotBlob } from './screenshotMask';
 
 let lastCaptureAt = 0;
 let inFlight: Promise<ScreenshotRef | null> | null = null;
@@ -32,6 +34,31 @@ interface CaptureOpts {
   windowId?: number;
   /** devicePixelRatio reported by the source frame. */
   dpr: number;
+  /** The tab being captured. When set, sensitive regions on its page are masked
+   *  first, and the screenshot is dropped if they cannot be determined. */
+  tabId?: number;
+}
+
+/** Ask the page which regions to mask. Null when the page does not answer, so
+ *  the caller can drop the screenshot instead of storing it unmasked. */
+async function getSensitiveRegions(
+  tabId: number,
+): Promise<{ rects: Rect[]; viewportWidth: number } | null> {
+  const { mask_all_inputs } = await getSettings();
+  try {
+    const answer = (await Promise.race([
+      chrome.tabs.sendMessage(
+        tabId,
+        { type: 'GET_SENSITIVE_REGIONS', payload: { maskAllInputs: mask_all_inputs } },
+        { frameId: 0 },
+      ),
+      sleep(1000).then(() => null),
+    ])) as { rects?: Rect[]; viewportWidth?: number } | null;
+    if (!answer || !Array.isArray(answer.rects) || !answer.viewportWidth) return null;
+    return { rects: answer.rects, viewportWidth: answer.viewportWidth };
+  } catch {
+    return null;
+  }
 }
 
 /** Capture the visible tab, rate-limited and deduplicated. Resolves to a
@@ -47,6 +74,10 @@ export async function captureVisible(opts: CaptureOpts): Promise<ScreenshotRef |
       const wait = SCREENSHOT_MIN_INTERVAL_MS - (Date.now() - lastCaptureAt);
       if (wait > 0) await sleep(wait);
 
+      // Ask first, capture right after, so the regions match what is on screen.
+      const regions = opts.tabId !== undefined ? await getSensitiveRegions(opts.tabId) : null;
+      if (opts.tabId !== undefined && !regions) return null;
+
       const dataUrl =
         opts.windowId !== undefined
           ? await chrome.tabs.captureVisibleTab(opts.windowId, { format: 'png' })
@@ -55,7 +86,8 @@ export async function captureVisible(opts: CaptureOpts): Promise<ScreenshotRef |
 
       if (!dataUrl) return null;
 
-      const blob = await (await fetch(dataUrl)).blob();
+      let blob = await (await fetch(dataUrl)).blob();
+      if (regions) blob = await maskScreenshotBlob(blob, regions.rects, regions.viewportWidth);
       const buffer = await blob.arrayBuffer();
       const hash = await sha256(buffer);
 

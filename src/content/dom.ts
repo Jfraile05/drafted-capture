@@ -6,7 +6,10 @@ const SENSITIVE_AUTOCOMPLETE =
 const SENSITIVE_NAME = /passw|pwd|card.?(num|no)|cvv|cvc|security.?code|ssn|social.?sec/i;
 
 /** Password, card, one-time-code, and similar fields: typed text is never stored. */
-function isSensitiveField(el: HTMLInputElement | HTMLTextAreaElement, inputType: string): boolean {
+export function isSensitiveField(
+  el: HTMLInputElement | HTMLTextAreaElement,
+  inputType: string,
+): boolean {
   if (inputType === 'password') return true;
   if (SENSITIVE_AUTOCOMPLETE.test(el.getAttribute('autocomplete') ?? '')) return true;
   return SENSITIVE_NAME.test(`${el.name} ${el.id}`);

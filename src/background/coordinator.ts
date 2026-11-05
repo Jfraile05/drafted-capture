@@ -102,7 +102,11 @@ export async function handleCaptureEvent(
   // Capture screenshot if settings demand it.
   const screenshot =
     settings.screenshot_on_action && sender.tab?.windowId !== undefined
-      ? await captureVisible({ windowId: sender.tab.windowId, dpr: payload.dpr })
+      ? await captureVisible({
+          windowId: sender.tab.windowId,
+          dpr: payload.dpr,
+          tabId: sender.tab.id,
+        })
       : null;
 
   // Build the action from the raw event.
@@ -147,7 +151,11 @@ export async function handleIntervalScreenshot(): Promise<void> {
   const url = activeTab.url ?? '';
   if (!siteAllowed(url, settings, { incognito: activeTab.incognito })) return;
 
-  const screenshot = await captureVisible({ windowId: activeTab.windowId, dpr: 1 });
+  const screenshot = await captureVisible({
+    windowId: activeTab.windowId,
+    dpr: 1,
+    tabId: activeTab.id,
+  });
   if (!screenshot) return;
 
   const action: Action = { type: 'screenshot' };
@@ -191,7 +199,7 @@ export async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo):
 
   const screenshot =
     activeInfo.windowId !== undefined
-      ? await captureVisible({ windowId: activeInfo.windowId, dpr: 1 })
+      ? await captureVisible({ windowId: activeInfo.windowId, dpr: 1, tabId: activeInfo.tabId })
       : null;
 
   const action: Action = { type: 'tab_switch', url: tab.url };
@@ -231,7 +239,9 @@ export async function handleTabUpdated(
   if (!siteAllowed(changeInfo.url, settings, { incognito: tab.incognito })) return;
 
   const screenshot =
-    tab.windowId !== undefined ? await captureVisible({ windowId: tab.windowId, dpr: 1 }) : null;
+    tab.windowId !== undefined
+      ? await captureVisible({ windowId: tab.windowId, dpr: 1, tabId })
+      : null;
 
   const action: Action = { type: 'navigate', url: changeInfo.url };
   const origin: StepOrigin = {

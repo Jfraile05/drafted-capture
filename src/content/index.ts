@@ -1,5 +1,6 @@
 import { startCapture } from './capture';
 import { createOverlay, destroyOverlay } from './overlay';
+import { findSensitiveRegions } from './sensitiveRegions';
 
 type CleanupFn = () => void;
 
@@ -43,6 +44,11 @@ function initContentScript(): void {
         if (message?.type === 'SET_CAPTURE') {
           handleSetCapture(Boolean(message.payload?.capturing));
           sendResponse({ ok: true });
+          return true;
+        }
+
+        if (message?.type === 'GET_SENSITIVE_REGIONS') {
+          sendResponse(findSensitiveRegions(Boolean(message.payload?.maskAllInputs)));
           return true;
         }
 

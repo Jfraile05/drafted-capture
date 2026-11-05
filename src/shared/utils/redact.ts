@@ -46,6 +46,22 @@ export function redactText(text: string): string {
   return out;
 }
 
+/** [start, end) positions of the text `redactText` would replace, so the same
+ *  text can be masked where it appears in a screenshot. */
+export function findSensitiveSpans(text: string): Array<[number, number]> {
+  const spans: Array<[number, number]> = [];
+  for (const p of [...SECRET_PATTERNS, EMAIL, SSN]) {
+    for (const m of text.matchAll(p)) spans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+  }
+  for (const m of text.matchAll(CARD_CANDIDATE)) {
+    const digits = m[0].replace(/[ -]/g, '');
+    if (digits.length >= 13 && digits.length <= 19 && luhn(digits)) {
+      spans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+    }
+  }
+  return spans;
+}
+
 export function redactUrl(url: string): string {
   if (!url) return url;
   return redactText(url.replace(SENSITIVE_PARAM, '$1$2=[redacted]'));
