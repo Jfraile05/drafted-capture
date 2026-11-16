@@ -260,11 +260,6 @@ export default function App() {
                   : 'Sign in to see your assigned workflows.'}
           </p>
         )}
-        {user && (
-          <div className="mt-2">
-            <SyncStatus uid={user.uid} localOnly={localOnly} />
-          </div>
-        )}
       </section>
       {controlError && (
         <p className="mt-3 text-sm text-coral" role="alert">
@@ -402,14 +397,17 @@ export default function App() {
           {user ? (
             <>
               <span className="truncate">Signed in as {user.email}</span>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="flex shrink-0 items-center gap-1 hover:text-text"
-              >
-                <SignOut size={14} />
-                Sign out
-              </button>
+              <span className="flex shrink-0 items-center gap-3">
+                <SyncStatus uid={user.uid} localOnly={localOnly} />
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="flex items-center gap-1 hover:text-text"
+                >
+                  <SignOut size={14} />
+                  Sign out
+                </button>
+              </span>
             </>
           ) : (
             <>
