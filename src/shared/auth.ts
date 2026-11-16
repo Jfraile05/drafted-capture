@@ -32,6 +32,7 @@ export async function getCurrentUser(): Promise<User | null> {
 /** Sign in with email/password. */
 export async function signInEmail(email: string, password: string): Promise<User> {
   const cred = await signInWithEmailAndPassword(auth, email, password);
+  void chrome.runtime.sendMessage({ type: 'WAKE_SYNC' }).catch(() => {});
   return cred.user;
 }
 

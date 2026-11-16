@@ -1,4 +1,3 @@
-import { Browser, Export, Power } from '@phosphor-icons/react';
 import { type ReactNode, useState } from 'react';
 import Brand from '../shared/Brand';
 import { useSettings } from '../shared/hooks';
@@ -19,19 +18,19 @@ export default function Onboarding() {
   return (
     <div className="flex flex-col px-5 pb-5 pt-4">
       <header>
-        <Brand size="text-2xl" />
+        <Brand size="text-[32px]" />
         <h1 className="mt-6 text-base font-semibold text-text">How Sidekick works</h1>
       </header>
 
       <ol className="mt-5 space-y-4">
-        <Step icon={<Power size={18} />} title="Turn it on">
-          One click starts recording across all your tabs.
+        <Step n={1} title="Start a task">
+          Choose a workflow, then start your task.
         </Step>
-        <Step icon={<Browser size={18} />} title="Work as usual">
-          Every click, keystroke, scroll and page becomes a step.
+        <Step n={2} title="Work as usual">
+          Each click, keystroke, scroll and page becomes a step.
         </Step>
-        <Step icon={<Export size={18} />} title="Review and label">
-          Name the tasks you did, then submit or export them.
+        <Step n={3} title="Sync automatically">
+          Sessions upload to your Drafted project automatically. Review and label them anytime.
         </Step>
       </ol>
 
@@ -44,8 +43,8 @@ export default function Onboarding() {
         />
         <span className="text-xs leading-relaxed text-text-muted">
           I understand this records my browser activity (clicks, keystrokes, scrolls, navigation and
-          screenshots) while capture is on, and I consent to submitting it as training data to my
-          Drafted account. I will only capture work I am authorized to share.
+          screenshots) while capture is on, and I consent to automatically uploading it as training
+          data to my Drafted account. I will only capture work I am authorized to share.
         </span>
       </label>
 
@@ -61,11 +60,11 @@ export default function Onboarding() {
   );
 }
 
-function Step({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
     <li className="flex items-start gap-3">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-text">
-        {icon}
+      <span className="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/15 text-xs font-semibold tabular-nums text-text-muted">
+        {n}
       </span>
       <div>
         <p className="text-sm font-semibold text-text">{title}</p>

@@ -4,7 +4,10 @@ import { describe, it } from 'node:test';
 import { DEFAULT_SETTINGS } from '../src/shared/constants';
 import { hostMatches, siteAllowed } from '../src/shared/utils/siteAccess';
 
-const settings = (patch: Partial<typeof DEFAULT_SETTINGS> = {}) => ({ ...DEFAULT_SETTINGS, ...patch });
+const settings = (patch: Partial<typeof DEFAULT_SETTINGS> = {}) => ({
+  ...DEFAULT_SETTINGS,
+  ...patch,
+});
 
 describe('hostMatches', () => {
   it('matches an exact host, case-insensitively', () => {
@@ -33,30 +36,21 @@ describe('siteAllowed', () => {
     assert.equal(siteAllowed('https://example.com/', settings()), true);
   });
 
-  it('keeps the existing blocklist behavior', () => {
-    assert.equal(siteAllowed('https://bank.example.com/', settings({ domain_blocklist: ['bank.example.com'] })), false);
-  });
 
   it('allowlist mode with an empty list captures nothing', () => {
     assert.equal(siteAllowed('https://example.com/', settings({ allowlist_only: true })), false);
   });
 
   it('allowlist mode captures only listed hosts', () => {
-    const s = settings({ allowlist_only: true, domain_allowlist: ['crm.example.com', '*.corp.io'] });
+    const s = settings({
+      allowlist_only: true,
+      domain_allowlist: ['crm.example.com', '*.corp.io'],
+    });
     assert.equal(siteAllowed('https://crm.example.com/deals', s), true);
     assert.equal(siteAllowed('https://a.corp.io/', s), true);
     assert.equal(siteAllowed('https://mail.google.com/', s), false);
   });
 
-  it('blocklist wins over allowlist', () => {
-    const s = settings({
-      allowlist_only: true,
-      domain_allowlist: ['*.example.com'],
-      domain_blocklist: ['pay.example.com'],
-    });
-    assert.equal(siteAllowed('https://pay.example.com/', s), false);
-    assert.equal(siteAllowed('https://crm.example.com/', s), true);
-  });
 
   it('never captures incognito tabs', () => {
     assert.equal(siteAllowed('https://example.com/', settings(), { incognito: true }), false);

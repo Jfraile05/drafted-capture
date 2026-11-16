@@ -1,12 +1,13 @@
+// Muted so task colors mark ranges without competing with the content.
 export const SEGMENT_COLORS = [
-  '#4DFFA0', // green
-  '#9B7FFF', // violet
-  '#F5A623', // orange
-  '#FF6B8A', // coral
-  '#4DA6FF', // blue
-  '#FFD84D', // yellow
-  '#FF4D9E', // pink
-  '#4DFFEF', // cyan
+  '#5FBF8A', // green
+  '#8F85D6', // violet
+  '#D2A04A', // amber
+  '#D27585', // rose
+  '#5F9BD2', // blue
+  '#BFAF5A', // olive
+  '#B86FA0', // plum
+  '#57B3AC', // teal
 ];
 
 export function getSegmentColor(index: number): string {

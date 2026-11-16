@@ -1,3 +1,6 @@
+import { SCREENSHOT_INTERVAL_MS } from '../shared/constants';
+import { earningsClock } from '../shared/liveEarnings';
+import { checkInputIdle } from './idle';
 // ════════════════════════════════════════════════════════════════════════
 //  Coordinator — capture event handling, screenshots, tab events.
 //
@@ -7,6 +10,7 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import { LIVE_RECENT_LIMIT } from '../shared/constants';
+import type { PrivacyPermit } from '../shared/privacy';
 import { appendStep } from '../shared/storage/db';
 import { getLiveSession, getSettings, setLiveSession, withLiveLock } from '../shared/storage/live';
 import type {
@@ -18,10 +22,12 @@ import type {
   Step,
   StepOrigin,
 } from '../shared/types';
+import { classifyUrl } from '../shared/urlCategories';
 import { captureVisible } from '../shared/utils/captureQueue';
 import { actionLabel } from '../shared/utils/format';
 import { redactStep } from '../shared/utils/redact';
 import { siteAllowed } from '../shared/utils/siteAccess';
+import { capturePermit, checkCurrentScreen, validatePermit } from './privacy';
 import { sessionCapMs, stopCapture } from './session';
 
 // ── Commit a step ─────────────────────────────────────────────────────────
@@ -34,17 +40,21 @@ import { sessionCapMs, stopCapture } from './session';
 async function commitStep(
   liveId: string,
   step: Step,
-  opts: { label?: string; bump?: (live: LiveSession) => void },
+  opts: { label?: string; bump?: (live: LiveSession) => void; permit?: PrivacyPermit },
 ): Promise<boolean> {
+  if (opts.permit && !(await validatePermit(opts.permit))) return false;
   // Redact before anything is stored or shown. The label is derived from the
   // redacted action so typed text never reaches the live feed either.
   const settings = await getSettings();
   redactStep(step, { maskAllInputs: settings.mask_all_inputs });
-  const label = opts.label ?? actionLabel(step.action);
+  step.origin.site = classifyUrl(step.origin.url);
+  const label = opts.label ?? actionLabel(step.action, step.dom);
 
   return withLiveLock(async () => {
     const cur = await getLiveSession();
     if (!cur || cur.id !== liveId || cur.state !== 'capturing') return false;
+    if (cur.privacy_gate || (opts.permit && (cur.privacy_epoch ?? 0) !== opts.permit.epoch))
+      return false;
 
     step.index = cur.step_count;
     const newCount = await appendStep(cur.id, step);
@@ -99,6 +109,10 @@ export async function handleCaptureEvent(
     return { ok: false };
   }
 
+  await checkInputIdle();
+  if (payload.event.timestamp < (live.pauses?.at(-1)?.[1] ?? 0)) return { ok: false };
+  const permit = await capturePermit(sender.tab?.id, url);
+  if (!permit) return { ok: false };
   // Capture screenshot if settings demand it.
   const screenshot =
     settings.screenshot_on_action && sender.tab?.windowId !== undefined
@@ -106,6 +120,9 @@ export async function handleCaptureEvent(
           windowId: sender.tab.windowId,
           dpr: payload.dpr,
           tabId: sender.tab.id,
+          url,
+          privacyPermit: permit,
+          validate: () => validatePermit(permit),
         })
       : null;
 
@@ -132,6 +149,7 @@ export async function handleCaptureEvent(
   };
 
   const ok = await commitStep(live.id, step, {
+    permit,
     bump: (cur) => incrementStats(cur, action.type),
   });
   return { ok };
@@ -139,55 +157,97 @@ export async function handleCaptureEvent(
 
 // ── Interval screenshot ───────────────────────────────────────────────────
 
-export async function handleIntervalScreenshot(): Promise<void> {
-  const live = await getLiveSession();
-  if (!live || live.state !== 'capturing') return;
+let intervalInFlight = false;
+let lastInterval: { sessionId: string; timestamp: number } | null = null;
 
-  const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  const activeTab = tabs[0];
-  if (!activeTab?.id || !activeTab.windowId) return;
-
+export async function handleIntervalScreenshot(
+  sender?: chrome.runtime.MessageSender,
+): Promise<{ interval_ms: number; next_capture_at?: number }> {
   const settings = await getSettings();
-  const url = activeTab.url ?? '';
-  if (!siteAllowed(url, settings, { incognito: activeTab.incognito })) return;
-
-  const screenshot = await captureVisible({
-    windowId: activeTab.windowId,
-    dpr: 1,
-    tabId: activeTab.id,
-  });
-  if (!screenshot) return;
-
-  const action: Action = { type: 'screenshot' };
-  const origin: StepOrigin = {
-    tab_id: activeTab.id,
-    frame_id: 0,
-    url: activeTab.url ?? '',
-    title: activeTab.title ?? '',
+  const response: { interval_ms: number; next_capture_at?: number } = {
+    interval_ms: SCREENSHOT_INTERVAL_MS,
   };
+  if (sender && (sender.frameId !== 0 || sender.tab?.id === undefined)) return response;
+  if (intervalInFlight) return response;
+  intervalInFlight = true;
+  try {
+    const live = await getLiveSession();
+    if (!live || live.state !== 'capturing') return response;
 
-  const step: Step = {
-    index: live.step_count,
-    timestamp: Date.now(),
-    duration_to_next: null,
-    action,
-    screenshot,
-    dom: null,
-    origin,
-    annotation: null,
-  };
+    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const activeTab = tabs[0];
+    if (activeTab?.id === undefined || activeTab.windowId === undefined) return response;
+    if (sender && sender.tab?.id !== activeTab.id) return response;
 
-  await commitStep(live.id, step, {
-    label: 'Screen state',
-    bump: (cur) => {
-      cur.stats.screenshots++;
-    },
-  });
+    const url = activeTab.url ?? '';
+    if (!siteAllowed(url, settings, { incognito: activeTab.incognito })) return response;
+    if (
+      live.step_count >= settings.max_steps ||
+      Date.now() - live.started_at >= sessionCapMs(settings)
+    ) {
+      await stopCapture();
+      return response;
+    }
+
+    // Heartbeats from different tabs and the recovery alarm can land together.
+    // Only one periodic screenshot may start per configured interval.
+    await checkInputIdle();
+    const now = Date.now();
+    if (lastInterval?.sessionId === live.id) {
+      response.next_capture_at = lastInterval.timestamp + SCREENSHOT_INTERVAL_MS;
+      if (now < response.next_capture_at) return response;
+    }
+    lastInterval = { sessionId: live.id, timestamp: now };
+    response.next_capture_at = now + SCREENSHOT_INTERVAL_MS;
+
+    const permit = await capturePermit(activeTab.id, url);
+    if (!permit) return response;
+    const screenshot = await captureVisible({
+      windowId: activeTab.windowId,
+      dpr: 1,
+      tabId: activeTab.id,
+      url,
+      privacyPermit: permit,
+      validate: () => validatePermit(permit),
+    });
+    if (!screenshot) return response;
+
+    const action: Action = { type: 'screenshot' };
+    const origin: StepOrigin = {
+      tab_id: activeTab.id,
+      frame_id: 0,
+      url: activeTab.url ?? '',
+      title: activeTab.title ?? '',
+    };
+
+    const step: Step = {
+      index: live.step_count,
+      timestamp: Date.now(),
+      duration_to_next: null,
+      action,
+      screenshot,
+      dom: null,
+      origin,
+      annotation: null,
+    };
+
+    await commitStep(live.id, step, {
+      permit,
+      label: 'Screen state',
+      bump: (cur) => {
+        cur.stats.screenshots++;
+      },
+    });
+    return response;
+  } finally {
+    intervalInFlight = false;
+  }
 }
 
 // ── Tab events ────────────────────────────────────────────────────────────
 
 export async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): Promise<void> {
+  await checkCurrentScreen(activeInfo.tabId);
   const live = await getLiveSession();
   if (!live || live.state !== 'capturing') return;
 
@@ -196,10 +256,19 @@ export async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo):
 
   const settings = await getSettings();
   if (!siteAllowed(tab.url, settings, { incognito: tab.incognito })) return;
+  const permit = await capturePermit(activeInfo.tabId, tab.url);
+  if (!permit) return;
 
   const screenshot =
     activeInfo.windowId !== undefined
-      ? await captureVisible({ windowId: activeInfo.windowId, dpr: 1, tabId: activeInfo.tabId })
+      ? await captureVisible({
+          windowId: activeInfo.windowId,
+          dpr: 1,
+          tabId: activeInfo.tabId,
+          url: tab.url,
+          privacyPermit: permit,
+          validate: () => validatePermit(permit),
+        })
       : null;
 
   const action: Action = { type: 'tab_switch', url: tab.url };
@@ -221,7 +290,7 @@ export async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo):
     annotation: null,
   };
 
-  await commitStep(live.id, step, {});
+  await commitStep(live.id, step, { permit });
 }
 
 export async function handleTabUpdated(
@@ -229,25 +298,49 @@ export async function handleTabUpdated(
   changeInfo: chrome.tabs.TabChangeInfo,
   tab: chrome.tabs.Tab,
 ): Promise<void> {
+  await checkCurrentScreen(changeInfo.url || changeInfo.status === 'complete' ? tabId : undefined);
   const live = await getLiveSession();
   if (!live || live.state !== 'capturing') return;
 
-  // Fire navigate step only when the page is fully loaded and URL changed.
-  if (changeInfo.status !== 'complete' || !changeInfo.url) return;
-
+  const url = changeInfo.url ?? tab.url ?? '';
   const settings = await getSettings();
-  if (!siteAllowed(changeInfo.url, settings, { incognito: tab.incognito })) return;
+  if (!siteAllowed(url, settings, { incognito: tab.incognito })) return;
+
+  // Completion often arrives separately from the URL change.
+  if (changeInfo.status === 'complete') {
+    await withLiveLock(async () => {
+      const current = await getLiveSession();
+      if (current?.id !== live.id || current.state !== 'capturing') return;
+      // Dispatch in state order without waiting on a page while holding the lock.
+      void chrome.tabs
+        .sendMessage(tabId, {
+          type: 'SET_CAPTURE',
+          payload: { capturing: true, clock: earningsClock(current) },
+        })
+        .catch(() => {});
+    });
+  }
+  if (!changeInfo.url) return;
+  const permit = await capturePermit(tabId, url);
+  if (!permit) return;
 
   const screenshot =
-    tab.windowId !== undefined
-      ? await captureVisible({ windowId: tab.windowId, dpr: 1, tabId })
+    tab.windowId !== undefined && (changeInfo.status ?? tab.status) === 'complete'
+      ? await captureVisible({
+          windowId: tab.windowId,
+          dpr: 1,
+          tabId,
+          url,
+          privacyPermit: permit,
+          validate: () => validatePermit(permit),
+        })
       : null;
 
   const action: Action = { type: 'navigate', url: changeInfo.url };
   const origin: StepOrigin = {
     tab_id: tabId,
     frame_id: 0,
-    url: tab.url ?? changeInfo.url,
+    url,
     title: tab.title ?? '',
   };
 
@@ -262,26 +355,22 @@ export async function handleTabUpdated(
     annotation: null,
   };
 
-  const ok = await commitStep(live.id, step, {
+  await commitStep(live.id, step, {
+    permit,
     bump: (cur) => incrementStats(cur, 'navigate'),
   });
-  if (!ok) return;
-
-  // Re-send capture state to newly loaded tab.
-  if (tab.id !== undefined) {
-    chrome.tabs
-      .sendMessage(tab.id, { type: 'SET_CAPTURE', payload: { capturing: true } })
-      .catch(() => {});
-  }
 }
 
 export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
+  await checkCurrentScreen(tab.active ? tab.id : undefined);
   const live = await getLiveSession();
   if (!live || live.state !== 'capturing') return;
 
   const url = tab.url ?? tab.pendingUrl ?? '';
   const settings = await getSettings();
   if (!siteAllowed(url, settings, { incognito: tab.incognito })) return;
+  const permit = await capturePermit(tab.id, url);
+  if (!permit) return;
 
   const action: Action = { type: 'tab_open', url };
   const origin: StepOrigin = {
@@ -302,7 +391,7 @@ export async function handleTabCreated(tab: chrome.tabs.Tab): Promise<void> {
     annotation: null,
   };
 
-  await commitStep(live.id, step, {});
+  await commitStep(live.id, step, { permit });
 }
 
 export async function handleTabRemoved(

@@ -27,7 +27,7 @@ beforeEach(() => {
 describe('capture gate', () => {
   it('drops events from sites outside the allowlist', async () => {
     await setSettings({ allowlist_only: true, domain_allowlist: ['crm.example.com'] });
-    const live = await startCapture();
+    const live = await startCapture(undefined, 'productivity');
     const r = await handleCaptureEvent(typed('x'), sender('https://mail.google.com/'));
     assert.equal(r.ok, false);
     assert.equal(stubDb.__steps.get(live.id)?.length ?? 0, 0);
@@ -35,14 +35,14 @@ describe('capture gate', () => {
 
   it('stores events from allowed sites', async () => {
     await setSettings({ allowlist_only: true, domain_allowlist: ['crm.example.com'] });
-    const live = await startCapture();
+    const live = await startCapture(undefined, 'productivity');
     const r = await handleCaptureEvent(typed('x'), sender('https://crm.example.com/'));
     assert.equal(r.ok, true);
     assert.equal(stubDb.__steps.get(live.id)?.length, 1);
   });
 
   it('drops incognito events', async () => {
-    const live = await startCapture();
+    const live = await startCapture(undefined, 'productivity');
     const r = await handleCaptureEvent(typed('x'), sender('https://example.com/', true));
     assert.equal(r.ok, false);
     assert.equal(stubDb.__steps.get(live.id)?.length ?? 0, 0);
@@ -50,7 +50,7 @@ describe('capture gate', () => {
 
   it('drops new tabs on blocked or non-allowlisted urls', async () => {
     await setSettings({ allowlist_only: true, domain_allowlist: ['crm.example.com'] });
-    const live = await startCapture();
+    const live = await startCapture(undefined, 'productivity');
     await handleTabCreated({ id: 9, url: 'https://mail.google.com/' } as any);
     assert.equal(stubDb.__steps.get(live.id)?.length ?? 0, 0);
   });
@@ -58,11 +58,19 @@ describe('capture gate', () => {
 
 describe('redaction in storage and the live feed', () => {
   it('stores a password as [redacted] and keeps it out of the recent label', async () => {
-    const live = await startCapture();
+    const live = await startCapture(undefined, 'productivity');
     const dom = {
-      selector: 'input', xpath: '/input', tag: 'input', text: null, aria_role: null,
-      aria_label: null, rect: { x: 0, y: 0, width: 1, height: 1 }, visible: true,
-      interactive: true, input_type: 'password', input_value: '•••••••',
+      selector: 'input',
+      xpath: '/input',
+      tag: 'input',
+      text: null,
+      aria_role: null,
+      aria_label: null,
+      rect: { x: 0, y: 0, width: 1, height: 1 },
+      visible: true,
+      interactive: true,
+      input_type: 'password',
+      input_value: '•••••••',
     };
     await handleCaptureEvent(typed('hunter2', dom), sender('https://example.com/'));
     const stored = stubDb.__steps.get(live.id)?.[0];
@@ -72,7 +80,7 @@ describe('redaction in storage and the live feed', () => {
   });
 
   it('stores an email as [email] and keeps it out of the recent label', async () => {
-    const live = await startCapture();
+    const live = await startCapture(undefined, 'productivity');
     await handleCaptureEvent(typed('me@corp.com'), sender('https://example.com/?token=abc'));
     const stored = stubDb.__steps.get(live.id)?.[0];
     assert.equal(stored?.action.text, '[email]');

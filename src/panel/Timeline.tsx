@@ -1,5 +1,7 @@
 import { Info, TagSimple } from '@phosphor-icons/react';
+import { useEffect, useRef } from 'react';
 import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
+import { activeOffset } from '../shared/activeTime';
 import type { Session } from '../shared/types';
 import { actionLabel, fmtDuration, hostOf } from '../shared/utils/format';
 import { getSegmentColor } from './palette';
@@ -23,6 +25,16 @@ export function Timeline({
   onShiftStepSelect,
   onLabelRange,
 }: TimelineProps) {
+  const listRef = useRef<HTMLOListElement>(null);
+
+  // Coming back from a step's details: show that step instead of the top.
+  useEffect(() => {
+    if (selectedIndex === null) return;
+    listRef.current
+      ?.querySelector(`[data-step="${selectedIndex}"]`)
+      ?.scrollIntoView({ block: 'center' });
+  }, [selectedIndex]);
+
   const handleClick = (index: number, e: React.MouseEvent) => {
     if (e.shiftKey && rangeStart !== null) {
       onShiftStepSelect(index);
@@ -54,7 +66,8 @@ export function Timeline({
       {hasNoSegments && !hasRange && (
         <p className="flex items-start gap-2 px-4 pb-2 pt-1 text-xs text-text-muted">
           <Info size={14} className="mt-0.5 shrink-0" />
-          Click a step, then shift+click another to mark the steps between them as a task.
+          Click a step to see its screenshot. Shift-click a second step to group the steps between
+          them into a task.
         </p>
       )}
       {hasRange && onLabelRange && (
@@ -65,7 +78,7 @@ export function Timeline({
           </button>
         </div>
       )}
-      <ol>
+      <ol ref={listRef}>
         {session.steps.map((step) => {
           const idx = step.index;
           const Icon = ACTION_ICON_COMPONENT[step.action.type];
@@ -73,17 +86,25 @@ export function Timeline({
           const gap = prevStep ? step.timestamp - prevStep.timestamp : 0;
           // Only mark real pauses, so the list isn't broken up between every step.
           const showDivider = gap > 30000;
+          // Name the site once when it changes, not on every row.
+          const host = hostOf(step.origin.url);
+          const hostChanged = !prevStep || hostOf(prevStep.origin.url) !== host;
+          const showHost = hostChanged;
           const segColor = getSegmentColorForStep(idx);
           const inRange = isInRange(idx);
           const selected = selectedIndex === idx;
 
           return (
             <li key={step.index}>
-              {showDivider && (
-                <p className="px-4 pb-1 pt-3 text-xs text-text-faint">{fmtDuration(gap)} later</p>
+              {(showDivider || showHost) && (
+                <p className="flex items-center gap-2 px-4 pb-1 pt-3 text-xs text-text-faint">
+                  {showHost && <span className="truncate font-medium text-text-muted">{host}</span>}
+                  {showDivider && <span className="shrink-0">{fmtDuration(gap)} later</span>}
+                </p>
               )}
               <button
                 type="button"
+                data-step={idx}
                 onClick={(e) => handleClick(idx, e)}
                 aria-pressed={selected}
                 className={`flex w-full items-center gap-3 border-l-2 py-2 pl-3.5 pr-4 text-left transition-colors ${
@@ -98,14 +119,11 @@ export function Timeline({
                 {Icon && <Icon size={16} className="shrink-0 text-text-muted" />}
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm text-text">
-                    {actionLabel(step.action)}
-                  </span>
-                  <span className="block truncate text-xs text-text-faint">
-                    {hostOf(step.origin.url)}
+                    {actionLabel(step.action, step.dom)}
                   </span>
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-text-faint">
-                  {fmtDuration(step.timestamp - session.started_at)}
+                  {fmtDuration(activeOffset(session.started_at, session.pauses, step.timestamp))}
                 </span>
               </button>
             </li>

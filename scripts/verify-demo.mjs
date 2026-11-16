@@ -1,0 +1,11 @@
+import { readFileSync, readdirSync } from 'node:fs';
+import { resolve, join } from 'node:path';
+const root=resolve('dist-demo');
+const manifest=JSON.parse(readFileSync(join(root,'manifest.json'),'utf8'));
+if(manifest.name!=='Sidekick Synthetic Lab')throw new Error('Wrong demo manifest');
+if(!manifest.permissions.includes('activeTab'))throw new Error('Screenshots need temporary active-tab permission');
+if(manifest.host_permissions.some(p=>!/^http:\/\/(localhost|\*\.localhost|127\.0\.0\.1)\/\*$/.test(p)))throw new Error('Demo granted nonlocal capture');
+const js=readdirSync(join(root,'assets')).filter(f=>f.endsWith('.js')).map(f=>readFileSync(join(root,'assets',f),'utf8')).join('\n');
+for(const forbidden of ['firestore.googleapis.com','identitytoolkit.googleapis.com','securetoken.googleapis.com','firebaseapp.com','storage.googleapis.com'])if(js.includes(forbidden))throw new Error(`Real backend bundled: ${forbidden}`);
+for(const required of ['synthetic-receipt:','Synthetic project','Simulated sync','synthetic-student'])if(!js.includes(required))throw new Error(`Missing demo adapter: ${required}`);
+console.log('Demo verified: local-only permissions, simulated auth/receipts, no production backend endpoints.');

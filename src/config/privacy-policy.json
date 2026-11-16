@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "domains": {
+    "banking": [
+      "chase.com",
+      "bankofamerica.com",
+      "wellsfargo.com",
+      "citi.com",
+      "capitalone.com",
+      "usbank.com",
+      "pnc.com",
+      "td.com",
+      "tdbank.com",
+      "ally.com",
+      "schwab.com",
+      "fidelity.com",
+      "vanguard.com",
+      "robinhood.com",
+      "coinbase.com",
+      "hsbc.com",
+      "barclays.co.uk",
+      "santander.co.uk",
+      "americanexpress.com",
+      "discover.com"
+    ],
+    "payment": [
+      "paypal.com",
+      "venmo.com",
+      "cash.app",
+      "checkout.stripe.com",
+      "billing.stripe.com",
+      "js.stripe.com",
+      "adyen.com",
+      "klarna.com",
+      "afterpay.com",
+      "affirm.com",
+      "pay.google.com",
+      "payments.google.com",
+      "pay.apple.com",
+      "squareup.com"
+    ],
+    "messaging": [
+      "mail.google.com",
+      "mail.yahoo.com",
+      "outlook.live.com",
+      "outlook.office.com",
+      "outlook.office365.com",
+      "mail.proton.me",
+      "mail.protonmail.com",
+      "icloud.com",
+      "web.whatsapp.com",
+      "web.telegram.org",
+      "messenger.com",
+      "discord.com",
+      "slack.com",
+      "teams.microsoft.com",
+      "teams.live.com"
+    ],
+    "healthcare": [
+      "mychart.com",
+      "epic.com",
+      "myhealth.va.gov",
+      "patientportal.com",
+      "athenahealth.com",
+      "followmyhealth.com",
+      "myuhc.com",
+      "cigna.com",
+      "aetna.com",
+      "kp.org",
+      "teladoc.com"
+    ],
+    "government": [
+      "login.gov",
+      "id.me",
+      "irs.gov",
+      "ssa.gov",
+      "uscis.gov",
+      "healthcare.gov",
+      "studentaid.gov",
+      "gov.uk"
+    ],
+    "passwords": [
+      "1password.com",
+      "bitwarden.com",
+      "lastpass.com",
+      "dashlane.com",
+      "keepersecurity.com",
+      "pass.proton.me",
+      "passwords.google.com"
+    ],
+    "login": [
+      "accounts.google.com",
+      "login.microsoftonline.com",
+      "login.live.com",
+      "appleid.apple.com",
+      "account.apple.com",
+      "auth0.com",
+      "okta.com"
+    ]
+  },
+  "paths": {
+    "payment": ["checkout", "payment", "payments", "billing", "pago", "pagar", "paiement", "kasse"],
+    "login": [
+      "login",
+      "log-in",
+      "signin",
+      "sign-in",
+      "signup",
+      "sign-up",
+      "authenticate",
+      "oauth",
+      "sso",
+      "password",
+      "reset-password"
+    ],
+    "messaging": ["inbox", "webmail", "messages", "direct-messages"],
+    "healthcare": ["mychart", "patient-portal", "medical-records"]
+  }
+}

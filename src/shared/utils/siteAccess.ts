@@ -22,14 +22,7 @@ export function hostMatches(pattern: string, hostname: string): boolean {
   return h === p;
 }
 
-// The blocklist keeps its original (unanchored, regex) matching so existing
-// user patterns behave exactly as before.
-function isBlocklisted(hostname: string, blocklist: string[]): boolean {
-  return blocklist.some((pattern) => new RegExp(pattern.replace(/\*/g, '.*')).test(hostname));
-}
-
-/** Whether capture may record anything for this page. The blocklist always wins,
- *  incognito is never captured, and in allowlist mode only listed hosts pass. */
+/** Personal allowlists can further restrict capture. Managed privacy is enforced separately. */
 export function siteAllowed(
   url: string,
   settings: Settings,
@@ -48,7 +41,6 @@ export function siteAllowed(
     return !settings.allowlist_only;
   }
 
-  if (isBlocklisted(hostname, settings.domain_blocklist)) return false;
   if (!settings.allowlist_only) return true;
   if (protocol !== 'http:' && protocol !== 'https:') return false;
   return settings.domain_allowlist.some((pattern) => hostMatches(pattern, hostname));

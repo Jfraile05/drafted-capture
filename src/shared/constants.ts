@@ -1,6 +1,8 @@
 import type { AnnotationTag, Settings, TaskCategory } from './types';
 
-export const EXTENSION_VERSION = '1.0.0';
+import { IDLE_CONFIG } from '../config/idle';
+
+export const EXTENSION_VERSION = '1.0.15';
 
 // ── Storage keys ──────────────────────────────────────────────────────────
 
@@ -30,10 +32,7 @@ export const DB_SESSIONS = 'drafted-capture-sessions';
 export const SCREENSHOT_MIN_INTERVAL_MS = 520;
 
 /** Default periodic screenshot cadence (catches passive state changes). */
-export const SCREENSHOT_INTERVAL_MS = 2500;
-
-/** Longest edge a stored/exported screenshot may have (Anthropic's limit). */
-export const SCREENSHOT_MAX_DIMENSION = 1568;
+export const SCREENSHOT_INTERVAL_MS = 2000;
 
 /** Collapse rapid keystrokes into one `type` action after this idle gap. */
 export const KEYSTROKE_DEBOUNCE_MS = 600;
@@ -44,7 +43,7 @@ export const SCROLL_THROTTLE_MS = 150;
 /** How many recent step summaries to keep on the live session for the popup. */
 export const LIVE_RECENT_LIMIT = 8;
 
-/** Alarm name for the periodic screenshot tick. */
+/** Recovery tick when no visible page can send screenshot heartbeats. */
 export const ALARM_SCREENSHOT = 'screenshot-tick';
 
 /** Alarm that force-stops a session at its time limit. Wall clock, so it also
@@ -67,26 +66,19 @@ export const BADGE_PAUSED_COLOR = '#F5A623';
 // ── Defaults ──────────────────────────────────────────────────────────────
 
 export const DEFAULT_SETTINGS: Settings = {
-  drafted_api_key: '',
   screenshot_on_action: true,
-  record_video: false,
-  screenshot_interval_ms: SCREENSHOT_INTERVAL_MS,
-  domain_blocklist: [],
   allowlist_only: false,
   domain_allowlist: [],
   mask_all_inputs: false,
-  // A full day at the 2.5s interval screenshot is about 35,000 steps by itself.
+  // A full day of 2s interval screenshots is 43,200 steps by itself.
   max_steps: 50_000,
   max_duration_ms: MAX_SESSION_MS,
-  idle_timeout_ms: 5 * 60 * 1000,
+  idle_timeout_ms: IDLE_CONFIG.defaultMs,
+  show_page_earnings: true,
+  celebrate_saves: true,
+  start_nudges: true,
   drafted_org_id: '',
   drafted_project_id: '',
-  export_formats: {
-    anthropic: true,
-    openai: true,
-    universal: true,
-    trajectory: true,
-  },
   onboarding_complete: false,
   consent_accepted: false,
   consent_accepted_at: null,
@@ -96,12 +88,12 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export const TASK_CATEGORIES: { value: TaskCategory; label: string }[] = [
   { value: 'browse', label: 'Browse' },
-  { value: 'form_fill', label: 'Form Fill' },
+  { value: 'form_fill', label: 'Form fill' },
   { value: 'research', label: 'Research' },
   { value: 'purchase', label: 'Purchase' },
   { value: 'workflow', label: 'Workflow' },
   { value: 'communication', label: 'Communication' },
-  { value: 'data_entry', label: 'Data Entry' },
+  { value: 'data_entry', label: 'Data entry' },
   { value: 'other', label: 'Other' },
 ];
 

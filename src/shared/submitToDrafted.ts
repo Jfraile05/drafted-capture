@@ -11,14 +11,19 @@
 //  -> data_format 'screenshot_action_pairs_v2'.
 // ════════════════════════════════════════════════════════════════════════
 
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDocFromServer, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 // @ts-expect-error - vendored JS module, no types
 import { auth, db, storage } from '../vendor/seeker/firebaseInit.js';
 // @ts-expect-error - vendored JS module, no types
 import { submitTaskCore } from '../vendor/seeker/submitTaskCore.js';
+import { activeOffset } from './activeTime';
+import { earningsForSession } from './earnings';
+import { buildEnrichment } from './enrichment';
 import { getRecording, getScreenshot } from './storage/db';
+import { patchStepThoughts, submissionLabelFields } from './submissionLabels';
 import type { Action, Session, Step } from './types';
+import { siteForOrigin, tagSegment } from './urlCategories';
 import { blobToBase64 } from './utils/screenshot';
 
 // ── Action mapping: extension ActionType -> seeker action.action_type ────────
@@ -83,7 +88,7 @@ function mapAction(action: Action): SeekerAction {
 async function screenshotDataUrl(step: Step): Promise<string | null> {
   if (!step.screenshot) return null;
   const blob = await getScreenshot(step.screenshot.hash);
-  if (!blob) return null;
+  if (!blob) throw new Error(`Captured screenshot is missing: ${step.screenshot.hash}`);
   // Service-worker-safe (no FileReader): arrayBuffer + btoa via blobToBase64.
   const base64 = await blobToBase64(blob);
   const type = blob.type || 'image/png';
@@ -104,10 +109,12 @@ async function buildTaskData(
   recordingUrl?: string | null,
 ) {
   // Map each captured step to a seeker trajectory step.
+  const segments = session.segments.map((segment) => tagSegment(segment, session.steps));
   const steps = await Promise.all(
     session.steps.map(async (step, i) => {
       const action = mapAction(step.action);
       const thought = enrich?.[step.index]?.thought?.trim() ?? '';
+      const next = session.steps[i + 1];
       return {
         step_index: i,
         timestamp_ms: step.timestamp,
@@ -117,7 +124,16 @@ async function buildTaskData(
           : null,
         thought,
         action,
-        duration_ms: step.duration_to_next ?? 0,
+        captured_action: step.action,
+        segments: segments.filter((segment) => segment.start_index === step.index),
+        dom: step.dom ?? null,
+        origin: step.origin ? { ...step.origin, site: siteForOrigin(step.origin) } : null,
+        annotation: step.annotation ?? null,
+        // Time to the next step, minus any pause in between.
+        duration_ms: next
+          ? activeOffset(session.started_at, session.pauses, next.timestamp) -
+            activeOffset(session.started_at, session.pauses, step.timestamp)
+          : 0,
       };
     }),
   );
@@ -128,17 +144,15 @@ async function buildTaskData(
 
   // Derive a goal/instruction: a labeled segment wins, else the pre-capture
   // intent the user declared, else a neutral ambient-capture instruction.
-  const firstSegment = session.segments?.[0];
-  const instructionText =
-    firstSegment?.label?.trim() || session.intent?.trim() || 'Ambient browser capture (unlabeled)';
-  const category = firstSegment?.category ?? null;
+  const labels = submissionLabelFields(session);
 
   const env = session.environment;
+  const earnings = earningsForSession(session);
 
   return {
     instruction: {
-      text: instructionText,
-      category,
+      text: labels.instruction,
+      category: labels.category,
       difficulty: null,
       instruction_id: null,
       expected_outcome: null,
@@ -147,7 +161,7 @@ async function buildTaskData(
       steps,
       total_steps: steps.length,
       total_frames_captured: steps.length,
-      total_duration_ms: session.ended_at - session.started_at,
+      total_duration_ms: activeOffset(session.started_at, session.pauses, session.ended_at),
       urls_visited: urlsVisited,
       recording_url: recordingUrl ?? null,
       recording_size_bytes: 0,
@@ -155,7 +169,7 @@ async function buildTaskData(
     },
     completion: {
       status: 'completed',
-      summary: firstSegment?.notes?.trim() || '',
+      summary: labels.summary,
     },
     environment: {
       os: env.os,
@@ -168,6 +182,11 @@ async function buildTaskData(
       user_agent: env.user_agent,
     },
     session_id: session.id,
+    drafted_project_id: session.metadata.drafted_project_id,
+    drafted_org_id: session.metadata.drafted_org_id,
+    capture_metadata: session.metadata,
+    ...(earnings ? { capture_earnings_estimate: earnings } : {}),
+    capture_revision: session.sync?.revision ?? 1,
     // The one spec-mandated difference from the web flow.
     capturedFromExtension: true,
   };
@@ -178,7 +197,7 @@ async function buildTaskData(
 // the pipeline reads, from real capture stats.
 
 function buildBehavioralData(session: Session) {
-  const totalMs = session.ended_at - session.started_at;
+  const totalMs = activeOffset(session.started_at, session.pauses, session.ended_at);
   const keystrokes = session.steps.filter(
     (s) => s.action.type === 'type' || s.action.type === 'key',
   ).length;
@@ -210,6 +229,17 @@ export interface SubmitResult {
   qualityScore: number;
   badgeEarned: boolean;
   badgeLevel: string | null;
+  captureRevision?: number;
+}
+
+/** Older local archives have no owner. Only a matching server receipt can supply it. */
+export async function submittedSessionOwner(session: Session): Promise<string | null> {
+  const taskId = session.submission?.drafted_task_id;
+  if (!taskId) return null;
+  const snapshot = await getDocFromServer(doc(db, 'credential_tasks', taskId));
+  const record = snapshot.data();
+  if (record?.session_id !== session.id || record?.task_id !== taskId) return null;
+  return typeof record.annotator?.annotator_id === 'string' ? record.annotator.annotator_id : null;
 }
 
 /**
@@ -221,36 +251,35 @@ export async function submitSessionToDrafted(
   session: Session,
   enrich?: EnrichmentMap,
 ): Promise<SubmitResult> {
-  // Upload the screen recording (if one was captured) to the same Storage
-  // path the seeker uses: trajectories/{uid}/{sessionId}.webm. Best-effort:
-  // a video failure must not block the trajectory submission.
-  const recordingUrl = await uploadRecordingIfAny(session.id);
+  if (session.metadata.workflow?.local_only)
+    throw new Error('This session is saved only on this device.');
+  const owner = session.metadata.owner_uid;
+  if (!owner || auth.currentUser?.uid !== owner) throw new Error('Account changed during upload.');
+  const recordingUrl = await uploadRecordingIfAny(session.id, owner);
   const taskData = await buildTaskData(session, enrich, recordingUrl);
   const behavioralData = buildBehavioralData(session);
-  return (await submitTaskCore(
+  if (auth.currentUser?.uid !== owner) throw new Error('Account changed during upload.');
+  const result = (await submitTaskCore(
     'computer_use_trajectory',
     taskData,
     behavioralData,
+    session.id,
   )) as SubmitResult;
+  if ((result.captureRevision ?? 0) < (session.sync?.revision ?? 1)) {
+    await enrichSubmittedSession(session, result.taskId, enrich ?? buildEnrichment(session));
+  }
+  return result;
 }
 
-async function uploadRecordingIfAny(sessionId: string): Promise<string | null> {
-  try {
-    const blob = await getRecording(sessionId);
-    if (!blob || blob.size === 0) return null;
-    const uid = auth.currentUser?.uid;
-    if (!uid) return null;
-    const path = `trajectories/${uid}/${sessionId}.webm`;
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, blob, {
-      contentType: 'video/webm',
-      customMetadata: { owner: uid, session_id: sessionId },
-    });
-    return await getDownloadURL(storageRef);
-  } catch (err) {
-    console.warn('[submit] recording upload failed (non-blocking):', err);
-    return null;
-  }
+async function uploadRecordingIfAny(sessionId: string, uid: string): Promise<string | null> {
+  const blob = await getRecording(sessionId);
+  if (!blob || blob.size === 0) return null;
+  const storageRef = ref(storage, `trajectories/${uid}/${sessionId}.webm`);
+  await uploadBytes(storageRef, blob, {
+    contentType: 'video/webm',
+    customMetadata: { owner: uid, session_id: sessionId },
+  });
+  return getDownloadURL(storageRef);
 }
 
 /**
@@ -266,33 +295,38 @@ export async function enrichSubmittedSession(
   draftedTaskId: string,
   enrich: EnrichmentMap,
 ): Promise<void> {
+  if (session.metadata.workflow?.local_only)
+    throw new Error('This session is saved only on this device.');
   const taskRef = doc(db, 'credential_tasks', draftedTaskId);
-  const snap = await getDoc(taskRef);
+  const snap = await getDocFromServer(taskRef);
   if (!snap.exists()) throw new Error('Submitted record not found');
   const existing = snap.data() as {
     trajectory?: { steps?: Array<{ step_index: number; screenshot?: unknown }> };
   };
   const existingSteps = existing.trajectory?.steps ?? [];
+  const segments = session.segments.map((segment) => tagSegment(segment, session.steps));
 
   // Patch thoughts onto the existing steps in place (keep their uploaded
   // screenshot Storage paths untouched).
-  const patchedSteps = existingSteps.map((s) => {
-    const thought = enrich[s.step_index]?.thought?.trim();
-    return thought ? { ...s, thought } : s;
+  const patchedSteps = patchStepThoughts(existingSteps, session, enrich).map((step) => {
+    const captured = session.steps.find((item) => item.index === step.step_index);
+    return captured
+      ? {
+          ...step,
+          annotation: captured.annotation ?? null,
+          segments: segments.filter((segment) => segment.start_index === captured.index),
+        }
+      : step;
   });
 
-  const firstSegment = session.segments?.[0];
+  const labels = submissionLabelFields(session);
   const now = new Date().toISOString();
 
   await updateDoc(taskRef, {
     'trajectory.steps': patchedSteps,
-    ...(firstSegment?.label
-      ? {
-          'instruction.text': firstSegment.label.trim(),
-          'instruction.category': firstSegment.category ?? null,
-        }
-      : {}),
-    ...(firstSegment?.notes ? { 'completion.summary': firstSegment.notes.trim() } : {}),
+    'instruction.text': labels.instruction,
+    'instruction.category': labels.category,
+    'completion.summary': labels.summary,
     enriched_at: now,
     enriched_from_extension: true,
   });

@@ -16,9 +16,11 @@ import {
   get as idbGet,
   keys as idbKeys,
   set as idbSet,
+  update as idbUpdate,
 } from 'idb-keyval';
 import { DB_RECORDINGS, DB_SCREENSHOTS, DB_SESSIONS, DB_STEPS } from '../constants';
 import type { Session, Step } from '../types';
+import { notifySessionUpdate } from './sessionUpdates';
 
 const screenshotStore = createStore(`drafted-capture-${DB_SCREENSHOTS}`, DB_SCREENSHOTS);
 const stepsStore = createStore(`drafted-capture-${DB_STEPS}`, DB_STEPS);
@@ -81,8 +83,28 @@ export function clearSteps(sessionId: string): Promise<void> {
 
 // ── Archived sessions (sessionId -> Session) ────────────────────────────────
 
-export function putSession(session: Session): Promise<void> {
-  return idbSet(session.id, session, sessionsStore);
+export async function putSession(session: Session): Promise<void> {
+  await idbSet(session.id, session, sessionsStore);
+  await notifySessionUpdate(session.id);
+}
+
+/** Keep edits and submission receipts in the same atomic archive update. */
+export async function updateSession(
+  sessionId: string,
+  updater: (session: Session) => Session,
+): Promise<Session> {
+  let updated!: Session;
+  await idbUpdate<Session>(
+    sessionId,
+    (current) => {
+      if (!current) throw new Error('Session not found');
+      updated = updater(current);
+      return updated;
+    },
+    sessionsStore,
+  );
+  await notifySessionUpdate(sessionId);
+  return updated;
 }
 
 export function getSession(sessionId: string): Promise<Session | undefined> {
@@ -100,6 +122,7 @@ export async function listSessions(): Promise<Session[]> {
 export async function deleteSession(sessionId: string): Promise<void> {
   const session = await getSession(sessionId);
   await idbDel(sessionId, sessionsStore);
+  await notifySessionUpdate(sessionId);
   // Best-effort: drop screenshots referenced only by this session.
   if (session) {
     const used = new Set(session.steps.map((s) => s.screenshot?.hash).filter(Boolean));
