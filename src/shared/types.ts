@@ -293,6 +293,12 @@ export interface Settings {
   max_duration_ms: number;
   /** Pause capture after this long with no keyboard or mouse input. */
   idle_timeout_ms: number;
+  /** Show live earnings in the on-page pill while recording. */
+  show_page_earnings: boolean;
+  /** Confetti and a mascot hop after a session is saved. */
+  celebrate_saves: boolean;
+  /** "Get paid for this?" notification while browsing without recording. */
+  start_nudges: boolean;
   drafted_org_id: string;
   drafted_project_id: string;
   onboarding_complete: boolean;

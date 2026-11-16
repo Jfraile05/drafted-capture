@@ -37,7 +37,8 @@ export async function noteBrowsing(url: string, incognito?: boolean): Promise<vo
     return;
   }
   const settings = await getSettings();
-  if (!settings.consent_accepted || !siteAllowed(url, settings, { incognito })) return;
+  if (!settings.consent_accepted || !settings.start_nudges) return;
+  if (!siteAllowed(url, settings, { incognito })) return;
 
   const now = Date.now();
   const state = await readState();

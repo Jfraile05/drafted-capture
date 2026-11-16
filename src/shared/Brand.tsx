@@ -3,7 +3,9 @@
 // their animation CSS lives in styles.css under `.mascot`.
 
 import { type Ref, type RefObject, useEffect, useRef, useState } from 'react';
+import { STORAGE_KEYS } from './constants';
 import { useLiveSession } from './hooks';
+import type { Settings } from './types';
 
 export type MascotState = 'waiting' | 'watching' | 'capturing' | 'paused' | 'done';
 
@@ -379,13 +381,19 @@ export default function Brand({
 
   useEffect(() => {
     if (state !== 'done') return;
-    playReaction(ref.current, 'celebrating');
-    // Confetti only in the popup, and only right after a save, not when it
-    // opens already green. The side panel and settings just hop.
-    if (!location.pathname.includes('/popup/')) return;
-    chrome.storage.session.get(MOMENT_KEY, (r) => {
-      const at = (r[MOMENT_KEY] as Moment | null)?.at ?? 0;
-      if (Date.now() - at < 2500) burstConfetti(ref.current);
+    chrome.storage.local.get(STORAGE_KEYS.SETTINGS, (saved) => {
+      if (
+        (saved[STORAGE_KEYS.SETTINGS] as Partial<Settings> | undefined)?.celebrate_saves === false
+      )
+        return;
+      playReaction(ref.current, 'celebrating');
+      // Confetti only in the popup, and only right after a save, not when it
+      // opens already green. The side panel and settings just hop.
+      if (!location.pathname.includes('/popup/')) return;
+      chrome.storage.session.get(MOMENT_KEY, (r) => {
+        const at = (r[MOMENT_KEY] as Moment | null)?.at ?? 0;
+        if (Date.now() - at < 2500) burstConfetti(ref.current);
+      });
     });
   }, [state]);
 

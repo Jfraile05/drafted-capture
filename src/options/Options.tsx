@@ -38,91 +38,128 @@ export function Options() {
 
   return (
     <div className="min-h-screen px-6 py-10">
-      <div className="mx-auto max-w-2xl space-y-10">
-        <header className="flex items-end justify-between gap-4">
+      <div className="mx-auto max-w-xl space-y-10">
+        <header className="space-y-3">
           <h1>
             <Brand size="text-[32px]" />
           </h1>
-          <p className="text-xs text-text-muted">Changes save automatically.</p>
+          <p className="text-sm text-text-muted">
+            Make Sidekick yours. Changes save as soon as you make them.
+          </p>
         </header>
 
-        <Section title="Capture">
+        <Section title="While you record">
           <Toggle
-            title="Screenshot on every action"
-            description="Take a screenshot each time you click, type or scroll."
-            checked={settings.screenshot_on_action}
-            onChange={(v) => updateSettings({ screenshot_on_action: v })}
+            title="Show my earnings on the page"
+            description="Watch your total tick up in the corner while you work. The timer stays either way."
+            checked={settings.show_page_earnings}
+            onChange={(v) => updateSettings({ show_page_earnings: v })}
           />
           <Toggle
-            title="Mask all input values"
-            description="Hide everything typed into fields, not just passwords."
-            checked={settings.mask_all_inputs}
-            onChange={(v) => updateSettings({ mask_all_inputs: v })}
+            title="Celebrate every save"
+            description="Confetti and a happy hop from Sidekick when a session is saved."
+            checked={settings.celebrate_saves}
+            onChange={(v) => updateSettings({ celebrate_saves: v })}
           />
-          <div className="grid gap-4 py-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="max-steps" className="field-label">
-                Stop after this many steps
-              </label>
-              <input
-                id="max-steps"
-                type="number"
-                min="100"
-                max="100000"
-                step="1000"
-                value={settings.max_steps}
-                onChange={(e) => updateSettings({ max_steps: Number.parseInt(e.target.value, 10) })}
-                className="field tabular-nums"
-              />
-            </div>
-            <div>
-              <label htmlFor="max-minutes" className="field-label">
-                Stop after this many minutes
-              </label>
-              <input
-                id="max-minutes"
-                type="number"
-                min="10"
-                max="1440"
-                step="10"
-                value={Math.round(settings.max_duration_ms / 60000)}
-                onChange={(e) =>
-                  updateSettings({ max_duration_ms: Number.parseInt(e.target.value, 10) * 60000 })
-                }
-                className="field tabular-nums"
-              />
-            </div>
-          </div>
+        </Section>
+
+        <Section title="Reminders">
+          <Toggle
+            title="Nudge me when I could be earning"
+            description="If you browse for a few minutes without recording, Sidekick asks if you want to get paid for it. At most once every two hours."
+            checked={settings.start_nudges}
+            onChange={(v) => updateSettings({ start_nudges: v })}
+          />
         </Section>
 
         <Section title="Privacy">
           <Toggle
-            title="Only capture allowed sites"
-            description="Capture nothing except the domains listed below. With the list empty, nothing is captured. Incognito windows are never captured."
+            title="Hide everything I type"
+            description="Passwords are always hidden. Turn this on to hide all other typing too."
+            checked={settings.mask_all_inputs}
+            onChange={(v) => updateSettings({ mask_all_inputs: v })}
+          />
+          <Toggle
+            title="Only record sites I pick"
+            description="Sidekick ignores every other site. Incognito windows are never recorded."
             checked={settings.allowlist_only}
             onChange={(v) => updateSettings({ allowlist_only: v })}
           />
-          <div className="grid gap-4 py-4 sm:grid-cols-2">
-            <div>
+          {settings.allowlist_only && (
+            <div className="py-4">
               <label htmlFor="allowlist" className="field-label">
-                Allowed domains
+                Sites to record, one per line
               </label>
               <textarea
                 id="allowlist"
                 value={settings.domain_allowlist.join('\n')}
                 onChange={(e) => handleDomainAllowlistChange(e.target.value)}
-                placeholder={'crm.example.com\n*.corp.example.com'}
+                placeholder={'notion.so\n*.salesforce.com'}
                 rows={4}
                 className="field font-mono"
               />
+              <p className="mt-2 text-xs text-text-muted">
+                <span className="font-mono">*.example.com</span> covers subdomains only, so add{' '}
+                <span className="font-mono">example.com</span> too if you need it.
+                {settings.domain_allowlist.length === 0 &&
+                  ' With no sites listed, nothing is recorded.'}
+              </p>
+            </div>
+          )}
+        </Section>
+
+        <details className="group">
+          <summary className="cursor-pointer list-none text-sm text-text-muted hover:text-text">
+            <span className="inline-block transition-transform group-open:rotate-90">›</span>{' '}
+            Advanced
+          </summary>
+          <div className="mt-2 divide-y divide-white/[0.06] border-t border-white/[0.06]">
+            <Toggle
+              title="Screenshot on every action"
+              description="Take a screenshot each time you click, type or scroll."
+              checked={settings.screenshot_on_action}
+              onChange={(v) => updateSettings({ screenshot_on_action: v })}
+            />
+            <div className="grid gap-4 py-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="max-steps" className="field-label">
+                  Stop after this many steps
+                </label>
+                <input
+                  id="max-steps"
+                  type="number"
+                  min="100"
+                  max="100000"
+                  step="1000"
+                  value={settings.max_steps}
+                  onChange={(e) =>
+                    updateSettings({ max_steps: Number.parseInt(e.target.value, 10) })
+                  }
+                  className="field tabular-nums"
+                />
+              </div>
+              <div>
+                <label htmlFor="max-minutes" className="field-label">
+                  Stop after this many minutes
+                </label>
+                <input
+                  id="max-minutes"
+                  type="number"
+                  min="10"
+                  max="1440"
+                  step="10"
+                  value={Math.round(settings.max_duration_ms / 60000)}
+                  onChange={(e) =>
+                    updateSettings({
+                      max_duration_ms: Number.parseInt(e.target.value, 10) * 60000,
+                    })
+                  }
+                  className="field tabular-nums"
+                />
+              </div>
             </div>
           </div>
-          <p className="pb-4 text-xs text-text-muted">
-            One domain per line. <span className="font-mono">*.example.com</span> matches subdomains
-            only, so list the bare domain too if you need it. Drafted manages sensitive-screen
-            protection.
-          </p>
-        </Section>
+        </details>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-6">
           <div className="flex gap-2">
@@ -174,9 +211,15 @@ function Toggle({
       </span>
       <input
         type="checkbox"
+        role="switch"
+        aria-checked={checked}
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-white"
+        className="peer sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className="relative mt-0.5 h-5 w-9 shrink-0 rounded-pill bg-white/15 transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-green peer-checked:after:translate-x-4 peer-checked:after:bg-bg peer-focus-visible:ring-2 peer-focus-visible:ring-green/60 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg motion-reduce:transition-none motion-reduce:after:transition-none"
       />
     </label>
   );

@@ -40,6 +40,12 @@ describe('start recording prompt', () => {
     assert.deepEqual(notice.buttons?.map((b) => b.title), ['Start recording', 'Not now']);
   });
 
+  it('stays quiet when the student turned nudges off in settings', async () => {
+    local.data[STORAGE_KEYS.SETTINGS] = { ...DEFAULT_SETTINGS, consent_accepted: true, start_nudges: false };
+    await browse(START_PROMPT.pageLoads * 2);
+    assert.equal(notices.size, 0);
+  });
+
   it('asks at most once per cooldown', async () => {
     await browse(START_PROMPT.pageLoads);
     notices.clear();

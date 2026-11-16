@@ -1,7 +1,9 @@
 import { IDLE_CONFIG } from '../config/idle';
 import { activeElapsed, nextTimerTick } from '../shared/activeTime';
+import { STORAGE_KEYS } from '../shared/constants';
 import { formatEarnings } from '../shared/earnings';
 import { type EarningsClock, liveEarnings } from '../shared/liveEarnings';
+import type { Settings } from '../shared/types';
 import { fmtDuration } from '../shared/utils/format';
 
 let overlayContainer: HTMLDivElement | null = null;
@@ -11,6 +13,22 @@ let amount: HTMLSpanElement | null = null;
 let elapsed: HTMLSpanElement | null = null;
 let dot: HTMLSpanElement | null = null;
 let idleNotice: HTMLDivElement | null = null;
+let showEarnings = true;
+
+// The student can hide the money from the pill. The timer and dot always stay,
+// so it is still obvious that recording is on.
+function readEarningsSetting(saved: unknown): void {
+  showEarnings = (saved as Partial<Settings> | undefined)?.show_page_earnings !== false;
+}
+chrome.storage?.local.get(STORAGE_KEYS.SETTINGS, (r) => {
+  readEarningsSetting(r?.[STORAGE_KEYS.SETTINGS]);
+  paint();
+});
+chrome.storage?.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes[STORAGE_KEYS.SETTINGS]) return;
+  readEarningsSetting(changes[STORAGE_KEYS.SETTINGS].newValue);
+  paint();
+});
 
 function paint(): void {
   clearTimeout(timer);
@@ -27,6 +45,7 @@ function paint(): void {
   const now = Date.now();
   const activeMs = activeElapsed(clock, now);
   const earnings = liveEarnings(clock, now);
+  amount.hidden = !showEarnings;
   amount.textContent = earnings
     ? formatEarnings(earnings.total_earnings_micro_usd ?? earnings.base_earnings_micro_usd)
     : 'N/A';
