@@ -2,9 +2,8 @@
 
 Ambient computer-use trajectory recorder. Flip it on, do anything across any
 tab, and every click, keystroke, scroll, navigation, and screen state becomes
-structured training data. Label it into tasks afterward, or never. Export
-lab-ready JSON for Anthropic, OpenAI, the Drafted Universal format, and the
-Trajectory v1 schema.
+structured training data. Sessions sync automatically to the selected Drafted
+project. Label tasks afterward in the review panel.
 
 This is the ambient sibling of `drafted-computer-use`. Where that one is
 task-first (describe a task, then do it), this one is capture-first: there is no
@@ -47,21 +46,21 @@ src/
     index.ts         message router, tab listeners, alarm, command, recovery
     session.ts       start / pause / resume / stop lifecycle + archive
     coordinator.ts   event -> Step assembly, screenshots, tab events, guards
-    exporter.ts      Session -> converters -> ZIP -> download
+    sync.ts          background queue wakeups and recovery alarms
   content/           injected into all frames, dormant until SET_CAPTURE
     index.ts         lifecycle, message listener
     capture.ts       passive event listeners, keystroke buffering, scroll throttle
     dom.ts           DOM context extraction (selector, xpath, aria, masking)
     overlay.ts       shadow-DOM recording badge (top frame only)
   popup/             one-flip on/off control + live stats + recent feed
-  panel/             review timeline, inspector, replay, task segmentation, export
+  panel/             review timeline, inspector, replay, task segmentation
   options/           settings
   shared/
     types.ts         the frozen contract every context imports
     constants.ts     defaults, tuning, storage keys
     storage/         IndexedDB layer + live session / settings accessors
     utils/           captureQueue, screenshot, selector, crypto, format
-    converters/      anthropic, openai, universal, trajectory
+    syncQueue.ts     durable automatic uploads and retry backoff
     hooks.ts         useLiveSession, useSettings, sendMessage
     actionIcons.ts   ActionType -> Phosphor component (tree-shaken)
 ```
@@ -100,23 +99,87 @@ options pages, and auto-generated web-accessible resources.
 4. Press Stop. The session is archived locally.
 5. Open the review panel (clock icon). Step through the timeline, inspect any
    step with its screenshot and crosshair, draw segments over spans of steps to
-   label them as tasks after the fact, annotate, replay, and export a ZIP.
+   label them as tasks after the fact, annotate, and replay.
 
-## Output
+## Earnings dashboard
 
-Export produces a ZIP with one JSON per selected format plus a `screenshots/`
-folder of PNGs named by content hash:
+The main menu shows estimated earnings and active hours above the workflow
+picker. Totals refresh after a session is saved, edited, or removed and when
+the popup opens. Only retained sessions owned by the signed-in account with
+a saved workflow rate are included. Generalist practice totals stay separate
+from assigned-project totals; legacy sessions without a rate are excluded.
 
-| File | Format | Used by |
-|---|---|---|
-| `anthropic.json` | Anthropic Messages, `computer_20251124` tool | Claude training pipelines |
-| `openai.json` | OpenAI Responses, `computer_use_preview` tool | GPT training pipelines |
-| `session.json` | Drafted Universal (superset: DOM, segments, annotations, origins) | Drafted Labs, custom pipelines |
-| `trajectory.json` | Drafted Trajectory v1 episode schema | Drafted dataset ingestion |
+The calculation uses active milliseconds with pauses removed, multiplied by
+the hourly rate saved when recording started. Estimates retain microdollars
+so short sessions are not rounded away before the total is displayed in cents.
+New project uploads include the same `capture_earnings_estimate` calculation.
 
-Recording, review, and export run locally and need no account or key. Submitting
-a session to Drafted requires signing in with a Drafted account. When you submit,
-the steps, screenshots, and optional screen recording are uploaded to Drafted.
+These are device-local estimates, not confirmed payouts or a cross-device
+earnings balance. Backend ledger reconciliation remains pending the real
+project and earnings backend. Transport tests verify identical estimate values
+against an isolated backend stub, not the deployed service.
+
+## Live earnings ticker
+
+The existing on-page bubble shows estimated earnings for the current session
+and its active recording time. It uses the same pinned workflow rate, pause
+intervals, and microdollar calculation as saved sessions and the dashboard.
+The timer updates on second boundaries; dollar amounts display cents, so at
+$1/hour the amount changes roughly every 36 seconds. These remain estimates.
+
+Manual and privacy pauses freeze both values. Navigation restores the clock
+from the worker, and returning to a hidden tab catches up from timestamps.
+The paused ticker sits above a privacy prompt. Stop removes it and clears its
+timer. A missing legacy workflow rate displays N/A instead of invented earnings.
+Tests verify that the final estimate equals the saved session's contribution
+to the dashboard, including stopping while paused.
+
+## URL categories
+
+Captured steps store `origin.site` with a normalized domain and automatic category.
+The rules live in `src/config/url-categories.json`. Add domains or a path prefix
+there to extend the map. Subdomains match on a dot boundary, with more specific
+hosts and paths taking precedence. Unknown sites retain their domain and use
+`uncategorized`; invalid or browser-internal URLs have an empty domain.
+
+URL changes, tab switches, actions, and periodic screenshots all use the same
+classifier. Screenshot capture checks the active tab and URL before and after
+capture and discards mismatched frames. New and edited task segments store a
+deduplicated `sites` list for their inclusive step range. Manual task categories
+and labels remain separate. The review panel shows the step's site category;
+task site lists stay collapsed until opened.
+
+Older sessions derive missing tags when reviewed or uploaded, without rewriting
+archives. Existing saved tags remain stable when rules change. Initial uploads
+and subsequent task-label updates include segment tags. This map categorizes
+sites; it does not grant permission to capture them or replace privacy gates.
+
+## Automatic sync
+
+This build enables the local Generalist workflow for trying the recording flow
+without backend assignments. Generalist recordings stay on the device and show
+"On this device". Disable `src/config/local-workflow.json` before switching to
+the real project workflow flow below.
+
+Sign in, choose an assigned workflow, and select Start a task. Workflows and
+rates are defined in `src/config/workflows.json`; Drafted controls student
+assignments. See [workflow assignment setup](docs/workflow-assignments.md) for
+the backend contract and deployment prerequisites. Start checks access against
+the server, including starts from the keyboard shortcut.
+
+Stopped sessions are archived in IndexedDB with their account, assigned project,
+workflow rate and sync revision. A hidden offscreen page
+uploads independently of the popup; a Chrome alarm retries after failures and
+browser restarts. The interface shows only Uploading or Synced. Synced requires
+a server acknowledgement of every captured screenshot and the session record.
+
+New sessions require an assigned project. Older sessions without a project
+remain on the device until their destination is configured.
+Existing archives with no recorded owner are never assigned to another account.
+The stable session ID prevents duplicate task creation after a lost receipt.
+
+The interval between periodic screenshots is fixed at two seconds in config.
+Action-triggered screenshots retain their existing capture behavior.
 
 ## Privacy
 
@@ -124,17 +187,37 @@ Redaction runs in the extension before anything is stored. Emails, card numbers,
 SSNs, API keys, tokens, and sensitive URL parameters are replaced with
 placeholders such as `[email]`. Typed text in password, card, and one-time-code
 fields is never stored, and "Mask all input values" hides every typed value.
-Screenshots are not redacted, so use the allowlist or blocklist for sensitive sites.
+Screenshots mask detected sensitive regions before storage. Managed privacy gates
+inspect the active page, including accessible frames and open shadow roots,
+before actions and screenshots, and again before persisting a screenshot.
+Banking, checkout, inboxes, login screens, and detected sensitive fields pause
+capture and require an explicit choice. Approval applies to that screen only;
+navigation, a new document, or a policy revision requires a fresh check.
 
-Capture can be limited to an allowlist of domains ("Only capture allowed sites",
-which captures nothing until you add a domain). A domain blocklist always wins
-over the allowlist. Incognito windows are never captured. Protected pages
-(`chrome://`, the Web Store) cannot be captured by Chrome and are recorded without
-screenshots. Lab API keys, if set, go directly to the lab endpoint and never touch
-Drafted servers.
+The popup and on-page prompt offer "Resume recording" and "Keep paused".
+The pause survives closing the popup and service worker restarts. A gate or
+Pause invalidates in-flight capture permits. Sensitive-domain settings and the
+continuous-video option have been removed. Continuous desktop video bypasses
+page inspection, so new video recording is disabled; existing archives remain
+readable. The optional personal allowlist can only restrict capture further.
+Incognito and uninspectable screens produce no saved frames.
+
+Built-in domain and route rules live in `src/config/privacy-policy.json`.
+The extension checks for a newer managed policy on worker startup and hourly,
+retains the last valid version offline, and falls back to the bundled policy.
+No student UI or message writes the managed policy. See
+[privacy policy deployment](docs/privacy-policy.md) for the backend setup still
+required to publish live updates and for the detection limitations.
 
 ## Known limits (v1)
 
+- The current backend stores trajectory steps in a single Firestore document.
+  Long sessions can exceed Firestore's [1 MiB document limit](https://firebase.google.com/docs/firestore/quotas#collections_documents_and_fields).
+  They remain queued locally, but need a chunked storage contract and matching
+  backend reader before long-session uploads can be signed off.
+- Item 1's live project upload acceptance check is pending a real project
+  destination. Queue and transport tests use an isolated backend stub, not the
+  deployed Firestore rules.
 - Step appends and live-session updates are read-modify-write. Under extreme
   concurrent event bursts a step could in theory interleave. The capture queue
   serializes the slow path, so in practice this is rare. A future pass can move

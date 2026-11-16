@@ -1,0 +1,20 @@
+{
+  "uid": "synthetic-student",
+  "email": "student@example.invalid",
+  "orgId": "synthetic-team",
+  "port": 38425,
+  "hosts": [
+    "localhost",
+    "127.0.0.1",
+    "flights.localhost",
+    "shop.localhost",
+    "work.localhost",
+    "bank.localhost",
+    "mail.localhost",
+    "unknown.localhost"
+  ],
+  "latencyMs": 1500,
+  "offlineKey": "synthetic_offline",
+  "ledgerKey": "synthetic_receipts",
+  "seedKey": "synthetic_seed_v1"
+}

@@ -6,6 +6,7 @@
 //  via chrome.storage.onChanged. Full steps live in IndexedDB (see db.ts).
 // ════════════════════════════════════════════════════════════════════════
 
+import { idleThreshold } from '../../config/idle';
 import {
   DEFAULT_SETTINGS,
   LEGACY_MAX_DURATION_MS,
@@ -46,13 +47,12 @@ export function withLiveLock<T>(fn: () => Promise<T>): Promise<T> {
 
 export async function getSettings(): Promise<Settings> {
   const r = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
-  return { ...DEFAULT_SETTINGS, ...(r[STORAGE_KEYS.SETTINGS] ?? {}) };
+  return currentSettings(r[STORAGE_KEYS.SETTINGS]);
 }
 
-/** Installs that saved the old defaults (5,000 steps, 4 hours) never chose them:
- *  the settings screen writes every field on any change. Move those to the new
- *  defaults on update so the 24 hour limit applies to them too. A value anyone
- *  set to something else is left alone. */
+/** Move saved legacy defaults to current defaults. The settings screen writes
+ *  every field on any change, so old defaults persist even on unrelated edits.
+ *  Custom values are left alone. */
 export async function migrateLegacyLimits(): Promise<void> {
   const key = STORAGE_KEYS.SETTINGS;
   const raw = (await chrome.storage.local.get(key))[key] as Partial<Settings> | undefined;
@@ -62,13 +62,24 @@ export async function migrateLegacyLimits(): Promise<void> {
   if (raw.max_duration_ms === LEGACY_MAX_DURATION_MS) {
     patch.max_duration_ms = DEFAULT_SETTINGS.max_duration_ms;
   }
-  if (Object.keys(patch).length > 0) {
-    await chrome.storage.local.set({ [key]: { ...raw, ...patch } });
-  }
+
+  await chrome.storage.local.set({ [key]: currentSettings({ ...raw, ...patch }) });
 }
 
 export async function setSettings(patch: Partial<Settings>): Promise<Settings> {
-  const next = { ...(await getSettings()), ...patch };
+  const next = currentSettings({ ...(await getSettings()), ...patch });
   await chrome.storage.local.set({ [STORAGE_KEYS.SETTINGS]: next });
   return next;
+}
+
+/** Ignore removed settings on every read, including before an update migration runs. */
+export function currentSettings(raw: Partial<Settings> = {}): Settings {
+  return Object.fromEntries(
+    Object.entries(DEFAULT_SETTINGS).map(([key, fallback]) => [
+      key,
+      key === 'idle_timeout_ms'
+        ? idleThreshold(Number(raw.idle_timeout_ms ?? fallback))
+        : (raw[key as keyof Settings] ?? fallback),
+    ]),
+  ) as unknown as Settings;
 }

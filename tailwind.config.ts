@@ -5,17 +5,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        bg: '#0A0518',
-        'bg-card': '#150D2E',
-        'bg-card-hover': '#1E1248',
-        'bg-input': '#110B25',
+        bg: '#0B0D0C',
+        'bg-card': '#141716',
+        'bg-card-hover': '#1B1F1D',
+        'bg-input': '#101312',
         green: '#4DFFA0',
         violet: '#9B7FFF',
         orange: '#F5A623',
         coral: '#FF6B8A',
-        text: '#EEF0FF',
-        'text-muted': '#B8AEE0',
-        'text-faint': '#8E83BF',
+        text: '#F2F4F3',
+        'text-muted': '#A6ACA9',
+        'text-faint': '#7D8380',
       },
       fontFamily: {
         poppins: ['Poppins', 'sans-serif'],

@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "upload": true,
+  "workflow": {
+    "id": "generalist",
+    "name": "Generalist",
+    "hourly_rate_cents": 100,
+    "annotation_enabled": false,
+    "annotation_rate_cents": 0
+  }
+}

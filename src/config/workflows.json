@@ -1,0 +1,23 @@
+[
+  {
+    "id": "flight-booking",
+    "name": "Flight Booking",
+    "hourly_rate_cents": 100,
+    "annotation_enabled": false,
+    "annotation_rate_cents": 0
+  },
+  {
+    "id": "online-shopping",
+    "name": "Online Shopping",
+    "hourly_rate_cents": 100,
+    "annotation_enabled": false,
+    "annotation_rate_cents": 0
+  },
+  {
+    "id": "productivity",
+    "name": "Productivity",
+    "hourly_rate_cents": 100,
+    "annotation_enabled": false,
+    "annotation_rate_cents": 0
+  }
+]

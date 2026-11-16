@@ -27,10 +27,7 @@ describe('redactText', () => {
     assert.equal(redactText('sk-abcdefghijklmnopqrstuvwx'), '[secret]');
     assert.equal(redactText(`ghp_${'a'.repeat(36)}`), '[secret]');
     assert.equal(redactText('Bearer abc.def-ghi_123'), '[secret]');
-    assert.equal(
-      redactText('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJl'),
-      '[secret]',
-    );
+    assert.equal(redactText('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2lnbmF0dXJl'), '[secret]');
   });
 
   it('leaves ordinary text alone', () => {
@@ -141,7 +138,10 @@ describe('redactStep', () => {
   });
 
   it('does not touch clicks and plain text', () => {
-    const s = step({ action: { type: 'click', coordinate: [1, 2] }, dom: { ...baseDom, text: 'Save' } });
+    const s = step({
+      action: { type: 'click', coordinate: [1, 2] },
+      dom: { ...baseDom, text: 'Save' },
+    });
     redactStep(s, opts);
     assert.deepEqual(s.action, { type: 'click', coordinate: [1, 2] });
     assert.equal(s.dom?.text, 'Save');

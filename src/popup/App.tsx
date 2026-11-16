@@ -8,27 +8,35 @@ import {
   Stop,
 } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
+import { IDLE_CONFIG } from '../config/idle';
 import Brand, { setMascotMoment, useMascotState } from '../shared/Brand';
+import { SyncStatus } from '../shared/SyncStatus';
 import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
+import { activeElapsed, nextTimerTick, pauseTimestamp } from '../shared/activeTime';
 import { signOutUser, useAuth } from '../shared/auth';
-import { sendMessage, useLiveSession, useSettings } from '../shared/hooks';
-import { submitLatestUnsubmitted } from '../shared/submitManager';
-import type { CaptureState, StepSummary } from '../shared/types';
-import { actionLabel, fmtDuration, hostOf } from '../shared/utils/format';
+import { sendMessage, useLiveSessionState, useSettings } from '../shared/hooks';
+import type { LiveSession, Session, StepSummary } from '../shared/types';
+import { fmtDuration, hostOf } from '../shared/utils/format';
+import { LOCAL_WORKFLOW_ENABLED, LOCAL_WORKFLOW_UPLOADS } from '../shared/workflows';
+import EarningsDashboard from './EarningsDashboard';
 import Login from './Login';
 import Onboarding from './Onboarding';
+import { PrivacyPrompt } from './PrivacyPrompt';
+import WorkflowPicker from './WorkflowPicker';
 
 export default function App() {
-  const liveSession = useLiveSession();
+  const { session: liveSession, loaded: liveLoaded } = useLiveSessionState();
   const mascotState = useMascotState();
   const [settings] = useSettings();
   const { user, loading: authLoading } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
-  const [intent, setIntent] = useState('');
-  const [uploading, setUploading] = useState(false);
-  const [submitFailed, setSubmitFailed] = useState(false);
-  const resumedRef = useRef(false);
-  const prevStateRef = useRef<CaptureState | null>(null);
+  const [controlBusy, setControlBusy] = useState<string | null>(null);
+  const [controlError, setControlError] = useState('');
+  const [controlPreview, setControlPreview] = useState<LiveSession | null>(null);
+  const controlPendingRef = useRef<string | null>(null);
+  const controlSequenceRef = useRef(0);
+  const manuallyStoppedRef = useRef<string | null>(null);
+  const prevSessionRef = useRef<LiveSession | null>(null);
   // Known before any click: Chrome only opens the side panel when open() is
   // called right inside the click, with no await before it.
   const windowIdRef = useRef<number | null>(null);
@@ -39,50 +47,32 @@ export default function App() {
     });
   }, []);
 
-  // Uploads the newest session. The session is already stored on this device,
-  // so the saved screen shows either way; a failed upload is called out there.
-  function uploadLatest() {
-    setUploading(true);
-    setSubmitFailed(false);
-    setMascotMoment('capturing', 60000);
-    submitLatestUnsubmitted()
-      .then((res) => setSubmitFailed(!res.ok))
-      .catch(() => setSubmitFailed(true))
-      .finally(() => {
-        setUploading(false);
-        setMascotMoment('done', null);
-      });
-  }
-
-  // If the popup closed mid-upload, that upload stopped with it. Pick it up
-  // again the next time the popup opens instead of staying on "Saving".
   useEffect(() => {
-    if (resumedRef.current || authLoading || !user || uploading) return;
-    if (mascotState === 'capturing' && !liveSession) {
-      resumedRef.current = true;
-      uploadLatest();
+    const previous = prevSessionRef.current;
+    prevSessionRef.current = liveSession;
+    if (previous && !liveSession) {
+      // A manual Stop waits for its archive response before submitting.
+      if (
+        controlPendingRef.current === 'STOP_CAPTURE' ||
+        manuallyStoppedRef.current === previous.id
+      )
+        return;
+      // Automatic stops also clear live state before the archive is ready.
+      // The worker waits for cleanup, then returns this exact saved session.
+      controlPendingRef.current = 'STOP_CAPTURE';
+      setControlBusy('STOP_CAPTURE');
+      void sendMessage<Session | null>('GET_SESSION', { id: previous.id })
+        .then((archived) => {
+          if (!archived) throw new Error('Capture stopped, but the session could not be saved.');
+          setMascotMoment('done', null);
+        })
+        .catch((error) => setControlError(String(error)))
+        .finally(() => {
+          controlPendingRef.current = null;
+          setControlBusy(null);
+        });
     }
-  });
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: uploadLatest only calls state setters and module functions, so a stale copy behaves the same
-  useEffect(() => {
-    const prevState = prevStateRef.current;
-    const currentState = liveSession?.state ?? null;
-    prevStateRef.current = currentState;
-
-    if ((prevState === 'capturing' || prevState === 'paused') && currentState === null) {
-      // A capture just stopped and archived. Two paths:
-      //  - signed in  -> upload now, then show the saved screen.
-      //  - signed out -> keep the data locally, prompt login; upload on login.
-      // The saved screen offers "Review session" so the panel opens on a click.
-      if (user) {
-        uploadLatest();
-      } else {
-        setShowLogin(true);
-        setMascotMoment('done', null);
-      }
-    }
-  }, [liveSession?.state, user]);
+  }, [liveSession]);
 
   if (!settings.onboarding_complete) {
     return <Onboarding />;
@@ -94,36 +84,76 @@ export default function App() {
         onCancel={() => setShowLogin(false)}
         onSuccess={() => {
           setShowLogin(false);
-          // Upload any session captured before signing in, then show the saved screen.
-          uploadLatest();
         }}
       />
     );
   }
 
-  const state = liveSession?.state ?? 'idle';
+  const displayedSession = controlPreview ?? liveSession;
+  const localOnly = displayedSession
+    ? !!displayedSession.metadata.workflow?.local_only
+    : LOCAL_WORKFLOW_ENABLED && !LOCAL_WORKFLOW_UPLOADS;
+  const state = displayedSession?.state ?? 'idle';
   const isCapturing = state === 'capturing';
   const isPaused = state === 'paused';
-  const isIdle = state === 'idle';
+  const isIdle = liveLoaded && state === 'idle';
   // The saved screen stays until the user picks what to do next.
-  const isSaving = isIdle && (uploading || mascotState === 'capturing');
+  const isSaving = controlBusy === 'STOP_CAPTURE';
   const isSaved = isIdle && !isSaving && mascotState === 'done';
-  const handleToggleCapture = async () => {
-    await sendMessage('TOGGLE_CAPTURE', { intent: intent.trim() || undefined });
-    setIntent('');
-  };
-
-  const handlePause = async () => {
-    await sendMessage('PAUSE_CAPTURE');
-  };
-
-  const handleResume = async () => {
-    await sendMessage('RESUME_CAPTURE');
-  };
-
-  const handleStop = async () => {
-    await sendMessage('STOP_CAPTURE');
-  };
+  async function control(
+    type: 'START_CAPTURE' | 'PAUSE_CAPTURE' | 'RESUME_CAPTURE' | 'STOP_CAPTURE',
+    workflowId?: string,
+    annotationOptIn = false,
+  ) {
+    if (!liveLoaded) return;
+    if (
+      controlPendingRef.current &&
+      (type !== 'STOP_CAPTURE' || controlPendingRef.current === type)
+    )
+      return;
+    const sequence = ++controlSequenceRef.current;
+    const requestedAt = Date.now();
+    if (type === 'STOP_CAPTURE') manuallyStoppedRef.current = liveSession?.id ?? null;
+    controlPendingRef.current = type;
+    setControlBusy(type);
+    setControlError('');
+    if (displayedSession && type !== 'START_CAPTURE' && type !== 'RESUME_CAPTURE') {
+      setControlPreview({
+        ...displayedSession,
+        state: 'paused',
+        paused_at:
+          displayedSession.state === 'paused' ? pauseTimestamp(displayedSession) : requestedAt,
+      });
+    }
+    try {
+      const result = await sendMessage<{ sessionId?: string | null }>(type, {
+        requested_at: requestedAt,
+        session_id: liveSession?.id,
+        workflow_id: workflowId,
+        annotation_opt_in: annotationOptIn,
+      });
+      if (type === 'STOP_CAPTURE') {
+        if (!result?.sessionId)
+          throw new Error('Capture stopped, but the session could not be saved.');
+        setMascotMoment('done', null);
+      }
+    } catch (error) {
+      if (type === 'STOP_CAPTURE') manuallyStoppedRef.current = null;
+      if (sequence === controlSequenceRef.current)
+        setControlError(
+          error instanceof Error ? error.message : 'The control did not complete. Try again.',
+        );
+    } finally {
+      if (sequence === controlSequenceRef.current) {
+        controlPendingRef.current = null;
+        setControlBusy(null);
+        setControlPreview(null);
+      }
+    }
+  }
+  const handlePause = () => control('PAUSE_CAPTURE');
+  const handleResume = () => control('RESUME_CAPTURE');
+  const handleStop = () => control('STOP_CAPTURE');
 
   /** Opens the review side panel, then closes the popup so the panel has the screen. */
   function openPanel() {
@@ -148,20 +178,26 @@ export default function App() {
     }
   };
 
-  const statusTitle = isCapturing
-    ? 'Recording'
-    : isPaused
-      ? 'Paused'
-      : isSaving
-        ? 'Saving your session'
-        : isSaved
-          ? 'Session saved'
-          : 'Ready when you are';
+  const statusTitle = !liveLoaded
+    ? 'Loading session'
+    : controlBusy === 'STOP_CAPTURE'
+      ? 'Saving your session'
+      : isCapturing
+        ? 'Recording'
+        : isPaused
+          ? 'Paused'
+          : isSaving
+            ? 'Saving your session'
+            : isSaved
+              ? 'Session saved'
+              : user
+                ? 'Choose a workflow'
+                : 'Sign in to start';
 
   return (
     <div className="flex flex-col px-5 pb-4 pt-4">
       <header className="flex items-center justify-between">
-        <Brand size="text-2xl" />
+        <Brand size="text-[32px]" />
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -184,22 +220,57 @@ export default function App() {
         </div>
       </header>
 
+      {user && isIdle && !isSaving && (
+        <EarningsDashboard key={`${user.uid}-${localOnly}`} uid={user.uid} localOnly={localOnly} />
+      )}
+
       <section className="pt-5">
-        <h1 className="text-xl font-semibold text-text">{statusTitle}</h1>
-        {(isCapturing || isPaused) && liveSession ? (
-          <LiveTimer startedAt={liveSession.started_at} isPaused={isPaused} />
+        {(isCapturing || isPaused) && displayedSession ? (
+          <>
+            <p className="flex items-center gap-2 text-sm font-medium text-text-muted">
+              <span
+                aria-hidden="true"
+                className={`h-2 w-2 rounded-full ${isCapturing ? 'pulse-dot bg-green' : 'bg-orange'}`}
+              />
+              {statusTitle}
+              {displayedSession.metadata.workflow && (
+                <span className="truncate text-xs text-text-faint">
+                  {displayedSession.metadata.workflow.name}
+                </span>
+              )}
+            </p>
+            <LiveTimer live={displayedSession} />
+            {displayedSession.pause_reason === 'idle' && (
+              <output className="mt-3 block text-sm text-text-muted">{IDLE_CONFIG.notice}</output>
+            )}
+          </>
         ) : (
+          <h1 className="text-xl font-semibold text-text">{statusTitle}</h1>
+        )}
+        {!(isCapturing || isPaused) && (!isIdle || isSaving || isSaved) && (
           <p className="mt-1 text-[15px] leading-snug text-text/80">
-            {isSaving
-              ? 'Hang on, this takes a few seconds.'
-              : isSaved
-                ? submitFailed
-                  ? "Saved on this device, but it didn't upload. Submit it from the review panel."
-                  : 'Open the review panel to label it.'
-                : 'Sidekick learns from your clicks, typing and pages across tabs.'}
+            {!liveLoaded
+              ? 'Checking your current session.'
+              : isSaving
+                ? 'Hang on, this takes a few seconds.'
+                : isSaved
+                  ? localOnly
+                    ? 'Your session is saved on this device. You can review it anytime.'
+                    : 'Your session uploads automatically. You can review it anytime.'
+                  : 'Sign in to see your assigned workflows.'}
           </p>
         )}
+        {user && (
+          <div className="mt-2">
+            <SyncStatus uid={user.uid} localOnly={localOnly} />
+          </div>
+        )}
       </section>
+      {controlError && (
+        <p className="mt-3 text-sm text-coral" role="alert">
+          {controlError}
+        </p>
+      )}
 
       {isSaved && (
         <div className="mt-5 space-y-2.5">
@@ -208,78 +279,120 @@ export default function App() {
           </button>
           <button type="button" onClick={() => setMascotMoment(null)} className="btn-ghost w-full">
             <Plus size={16} weight="bold" />
-            Start a new session
+            New task
           </button>
         </div>
       )}
 
-      {isIdle && !isSaving && !isSaved && (
-        <div className="mt-5 space-y-2.5">
-          <label htmlFor="intent" className="sr-only">
-            What are you about to do?
-          </label>
-          <textarea
-            id="intent"
-            value={intent}
-            onChange={(e) => setIntent(e.target.value)}
-            placeholder="What are you about to do? (optional)"
-            rows={2}
-            className="field resize-none"
+      {isIdle &&
+        !isSaving &&
+        !isSaved &&
+        (user ? (
+          <WorkflowPicker
+            key={user.uid}
+            uid={user.uid}
+            busy={!!controlBusy}
+            onStart={(id, annotationOptIn) => control('START_CAPTURE', id, annotationOptIn)}
           />
-          <button type="button" onClick={handleToggleCapture} className="btn-primary w-full">
-            <Play size={16} weight="fill" />
-            Start capturing
+        ) : (
+          <button
+            type="button"
+            className="btn-primary mt-4 w-full"
+            disabled={authLoading}
+            onClick={() => setShowLogin(true)}
+          >
+            Sign in
           </button>
-          <p className="text-center text-xs text-text-faint">Shortcut: Ctrl or Cmd + Shift + Y</p>
-        </div>
-      )}
+        ))}
 
       {(isCapturing || isPaused) && liveSession && (
         <div className="mt-5 space-y-5">
-          <dl className="grid grid-cols-3 text-center">
-            <Stat label="Steps" value={liveSession.step_count} />
-            <Stat label="Clicks" value={liveSession.stats.clicks} />
-            <Stat label="Keys" value={liveSession.stats.keystrokes} />
-          </dl>
+          {liveSession.privacy_gate ? (
+            <PrivacyPrompt
+              key={liveSession.privacy_gate.id}
+              gate={liveSession.privacy_gate}
+              sessionId={liveSession.id}
+              onStop={handleStop}
+              stopping={isSaving}
+            />
+          ) : (
+            <>
+              <dl className="grid grid-cols-3 divide-x divide-white/[0.06] rounded-btn border border-white/[0.06] py-2.5 text-center">
+                <Stat label="Steps" value={liveSession.step_count} />
+                <Stat label="Clicks" value={liveSession.stats.clicks} />
+                <Stat label="Keys" value={liveSession.stats.keystrokes} />
+              </dl>
 
-          <div className="grid grid-cols-2 gap-2">
-            {isCapturing ? (
-              <>
-                <button type="button" onClick={handlePause} className="btn-ghost">
-                  <Pause size={16} weight="fill" />
-                  Pause
-                </button>
-                <button type="button" onClick={handleStop} className="btn-primary">
-                  <Stop size={16} weight="fill" />
-                  Stop and save
-                </button>
-              </>
-            ) : (
-              <>
-                <button type="button" onClick={handleResume} className="btn-primary">
-                  <Play size={16} weight="fill" />
-                  Resume
-                </button>
-                <button type="button" onClick={handleStop} className="btn-ghost">
-                  <Stop size={16} weight="fill" />
-                  Stop and save
-                </button>
-              </>
-            )}
-          </div>
+              <div className="grid grid-cols-2 gap-2">
+                {isCapturing ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handlePause}
+                      disabled={!!controlBusy}
+                      className="btn-ghost"
+                    >
+                      <Pause size={16} weight="fill" />
+                      Pause
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleStop}
+                      disabled={controlBusy === 'STOP_CAPTURE'}
+                      className="btn-primary"
+                    >
+                      <Stop size={16} weight="fill" />
+                      Stop and save
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleResume}
+                      disabled={!!controlBusy}
+                      className="btn-primary"
+                    >
+                      <Play size={16} weight="fill" />
+                      {liveSession.pause_reason === 'idle' ? 'Continue' : 'Resume'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleStop}
+                      disabled={controlBusy === 'STOP_CAPTURE'}
+                      className="btn-ghost"
+                    >
+                      <Stop size={16} weight="fill" />
+                      Stop and save
+                    </button>
+                  </>
+                )}
+              </div>
 
-          {liveSession.recent.length > 0 && (
-            <div>
-              <h2 className="mb-1 text-xs font-medium text-text-muted">Latest steps</h2>
-              <ul className="max-h-[132px] overflow-y-auto">
-                {liveSession.recent
-                  .slice()
-                  .reverse()
-                  .map((step) => (
-                    <StepRow key={`${step.index}-${step.timestamp}`} step={step} />
-                  ))}
-              </ul>
-            </div>
+              {liveSession.pause_reason === 'idle' && (
+                <button
+                  type="button"
+                  className="btn-ghost w-full"
+                  disabled={!!controlBusy}
+                  onClick={handlePause}
+                >
+                  Keep paused
+                </button>
+              )}
+              {liveSession.recent.length > 0 && (
+                <div>
+                  <h2 className="mb-1 text-xs font-medium text-text-muted">Recent steps</h2>
+                  <ul className="max-h-[132px] overflow-y-auto">
+                    {liveSession.recent
+                      .slice()
+                      .reverse()
+                      .map((step) => (
+                        <StepRow key={`${step.index}-${step.timestamp}`} step={step} />
+                      ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -300,7 +413,7 @@ export default function App() {
             </>
           ) : (
             <>
-              <span>Sign in to submit your sessions.</span>
+              <span>Sign in to sync your sessions.</span>
               <button
                 type="button"
                 onClick={() => setShowLogin(true)}
@@ -316,18 +429,48 @@ export default function App() {
   );
 }
 
-function LiveTimer({ startedAt, isPaused }: { startedAt: number; isPaused: boolean }) {
-  const [elapsed, setElapsed] = useState(Date.now() - startedAt);
+function LiveTimer({ live }: { live: LiveSession }) {
+  // Only forces a re-render. The time is read fresh on every render, so the
+  // first frame after Resume shows the right number instead of a stale one.
+  const [, setTick] = useState(0);
+  const isPaused = live.state === 'paused';
 
   useEffect(() => {
     if (isPaused) return;
-    const interval = setInterval(() => {
-      setElapsed(Date.now() - startedAt);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [startedAt, isPaused]);
+    let timeout: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      timeout = setTimeout(
+        () => {
+          setTick((t) => t + 1);
+          schedule();
+        },
+        nextTimerTick(activeElapsed(live, Date.now())),
+      );
+    };
+    const refresh = () => {
+      clearTimeout(timeout);
+      setTick((t) => t + 1);
+      schedule();
+    };
+    schedule();
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearTimeout(timeout);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [isPaused, live]);
 
-  return <p className="mt-1 text-[15px] tabular-nums text-text/80">{fmtDuration(elapsed)}</p>;
+  const elapsed = activeElapsed(live, Date.now());
+
+  return (
+    <p
+      className={`mt-1 text-[40px] font-semibold leading-none tracking-tight tabular-nums ${
+        isPaused ? 'text-text-muted' : 'text-text'
+      }`}
+    >
+      {fmtDuration(elapsed)}
+    </p>
+  );
 }
 
 function Stat({ label, value }: { label: string; value: number }) {

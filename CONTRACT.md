@@ -67,7 +67,6 @@ UI/content → worker. Worker returns a value (the listener uses async sendRespo
 - `LIST_SESSIONS` → `Session[]` (summaries ok to send; they include steps).
 - `GET_SESSION` payload `{id}` → `Session | undefined`.
 - `DELETE_SESSION` payload `{id}` → `{ok:true}`.
-- `EXPORT_SESSION` payload `{id, formats: ExportFormatFlags}` → triggers download.
 - `SAVE_SEGMENT` payload `{sessionId, segment: Segment}` → updated `Session`.
 - `DELETE_SEGMENT` payload `{sessionId, segmentId}` → updated `Session`.
 - `UPDATE_ANNOTATION` payload `{sessionId, stepIndex, annotation}` → `Session`.
@@ -79,13 +78,12 @@ UI/content → worker. Worker returns a value (the listener uses async sendRespo
   listening + shows/hides overlay. (Not in MessageType enum; content defines its
   own handler. Use this exact shape.)
 
-## Converters (exporters builder)
+## Automatic sync
 
-Implement `FormatConverter` (see types.ts) for keys `anthropic`, `openai`,
-`universal`, `trajectory`. Register them in `src/shared/converters/index.ts`
-(you create this). Each is a pure `(session, screenshots) => Promise<string>`.
-The exporter in the worker resolves screenshot blobs from IndexedDB and zips
-results with `fflate`.
+Archived sessions carry durable sync revisions and their owning account/project.
+The offscreen page sends pending sessions automatically. The worker wakes it on
+archive, edits, login, browser startup, and a recovery alarm. No download API or
+format converters are used.
 
 ## Design system (non-negotiable)
 
@@ -98,4 +96,4 @@ Import `'../styles.css'` once per entry tsx.
 
 Your files `tsc --noEmit` clean against the contract and follow Biome formatting
 (2-space, single quotes, semicolons, lineWidth 100). Don't import packages beyond
-those in package.json (react, react-dom, @phosphor-icons/react, idb-keyval, fflate).
+those in package.json (react, react-dom, @phosphor-icons/react, idb-keyval).

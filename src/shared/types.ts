@@ -12,6 +12,10 @@
 
 // ── Actions ───────────────────────────────────────────────────────────────
 
+import type { PrivacyGate } from './privacy';
+import type { SiteClassification } from './urlCategories';
+import type { WorkflowDefinition } from './workflows';
+
 export type ActionType =
   | 'click'
   | 'double_click'
@@ -92,6 +96,8 @@ export interface StepOrigin {
   frame_id: number;
   url: string;
   title: string;
+  /** Automatic site tag, optional for sessions recorded before URL tagging. */
+  site?: SiteClassification;
 }
 
 // ── Step ──────────────────────────────────────────────────────────────────
@@ -124,6 +130,8 @@ export interface Segment {
   category: TaskCategory | null;
   notes: string;
   created_at: string;
+  /** All sites covered by the task, separate from its manual task category. */
+  sites?: SiteClassification[];
 }
 
 export type TaskCategory =
@@ -160,12 +168,28 @@ export interface Annotation {
 
 export type CaptureState = 'idle' | 'capturing' | 'paused';
 
+export interface CaptureControlRequest {
+  /** Wall-clock time of the click, before messaging or storage delays. */
+  requested_at?: number;
+  /** Prevents a delayed click from changing a replacement session. */
+  session_id?: string;
+}
+
 /** The live, in-progress session held in chrome.storage.session. Steps are
  *  stored separately in IndexedDB and referenced by count for performance. */
 export interface LiveSession {
   id: string;
   state: CaptureState;
   started_at: number;
+  /** Finished pauses as [paused at, resumed at], so paused time never counts. */
+  pauses?: [number, number][];
+  /** When the current pause began. Set only while paused. */
+  paused_at?: number;
+  pause_reason?: 'idle';
+  last_activity_at?: number;
+  privacy_gate?: PrivacyGate;
+  privacy_approval?: string;
+  privacy_epoch?: number;
   /** Optional free-text the user typed before starting ("what are you about
    *  to do"). Becomes the instruction / first segment label on submit. */
   intent?: string;
@@ -184,6 +208,8 @@ export interface Session {
   source: 'human';
   started_at: number;
   ended_at: number;
+  /** Pauses as [paused at, resumed at]. Missing on sessions saved before pauses were tracked. */
+  pauses?: [number, number][];
   /** Optional intent the user declared before capturing. */
   intent?: string | null;
   environment: Environment;
@@ -196,6 +222,12 @@ export interface Session {
     domains_touched: string[];
   };
   metadata: SessionMetadata;
+  sync?: {
+    revision: number;
+    synced_revision: number;
+    attempts: number;
+    retry_at: number;
+  };
   /** Submission state to Drafted (credential_tasks). Set after a successful
    *  submit so the UI can show status and so a later enrich updates the
    *  right doc rather than creating a duplicate. */
@@ -224,7 +256,9 @@ export interface SessionMetadata {
   drafted_org_id: string | null;
   drafted_project_id: string | null;
   created_at: string;
-  exported_at: string | null;
+  owner_uid?: string;
+  /** Rates and workflow identity fixed when this session started. */
+  workflow?: WorkflowDefinition;
 }
 
 export interface CaptureStats {
@@ -247,16 +281,8 @@ export interface StepSummary {
 // ── Settings ────────────────────────────────────────────────────────────────
 
 export interface Settings {
-  drafted_api_key: string;
   /** Capture a screenshot on every discrete action. */
   screenshot_on_action: boolean;
-  /** Record a screen video for the whole session (prompts for a screen on
-   *  start). Off by default since it requires a one-time picker each session. */
-  record_video: boolean;
-  /** Periodic screenshot cadence in ms to catch passive state changes. */
-  screenshot_interval_ms: number;
-  /** Domains to never capture on (privacy). Wildcards supported. */
-  domain_blocklist: string[];
   /** Capture only on domains in `domain_allowlist` (an empty list captures nothing). */
   allowlist_only: boolean;
   domain_allowlist: string[];
@@ -269,50 +295,39 @@ export interface Settings {
   idle_timeout_ms: number;
   drafted_org_id: string;
   drafted_project_id: string;
-  export_formats: ExportFormatFlags;
   onboarding_complete: boolean;
   /** One-time legal consent captured on first run. */
   consent_accepted: boolean;
   consent_accepted_at: string | null;
 }
 
-export interface ExportFormatFlags {
-  anthropic: boolean;
-  openai: boolean;
-  universal: boolean;
-  trajectory: boolean;
-}
-
-// ── Export converters ────────────────────────────────────────────────────────
-
-export interface FormatConverter {
-  /** Registry key + base filename. */
-  key: keyof ExportFormatFlags;
-  /** Human label for the UI. */
-  name: string;
-  filename: string;
-  convert(session: Session, screenshots: Map<string, Blob>): Promise<string>;
-}
-
 // ── Message protocol (content/UI → service worker) ───────────────────────────
 
 export type MessageType =
   | 'TOGGLE_CAPTURE'
+  | 'GET_WORKFLOWS'
   | 'START_CAPTURE'
   | 'PAUSE_CAPTURE'
   | 'RESUME_CAPTURE'
   | 'STOP_CAPTURE'
+  | 'PRIVACY_CHECK'
+  | 'USER_ACTIVITY'
+  | 'CONFIRM_PRIVACY'
+  | 'KEEP_PRIVACY_PAUSED'
   | 'CAPTURE_EVENT'
+  | 'SCREENSHOT_TICK'
   | 'GET_LIVE_SESSION'
   | 'GET_CAPTURE_STATE'
   | 'LIST_SESSIONS'
+  | 'GET_EARNINGS'
   | 'GET_SESSION'
   | 'DELETE_SESSION'
-  | 'EXPORT_SESSION'
   | 'SAVE_SEGMENT'
   | 'DELETE_SEGMENT'
   | 'UPDATE_ANNOTATION'
-  | 'PING_CONTENT';
+  | 'PING_CONTENT'
+  | 'WAKE_SYNC'
+  | 'SESSION_SYNC_CHANGED';
 
 export interface ExtensionMessage<P = unknown> {
   type: MessageType;

@@ -19,6 +19,21 @@ const stubs = {
 const swapStubs = {
   name: 'swap-stubs',
   setup(b) {
+    b.onResolve({ filter: /^\.\/privacy$/ }, (args) => {
+      if (args.resolveDir === join(root, 'src/background')) return { path: join(root, 'tests/stubs/privacy.ts') };
+    });
+    b.onResolve({ filter: /^(firebase\/|\.\/lib\/|\.\.\/vendor\/seeker\/firebaseInit)/ }, (args) => {
+      if (['src/shared/submitToDrafted.ts', 'src/shared/workflowAccess.ts', 'src/shared/privacyPolicyAccess.ts', 'src/vendor/seeker/submitTaskCore.js'].some((file) => args.importer === join(root, file))) {
+        return { path: join(root, 'tests/stubs/backend.ts') };
+      }
+    });
+    b.onResolve({ filter: /^\.\/(auth|submitToDrafted)$/ }, (args) => {
+      if (!['src/shared/submitManager.ts', 'src/shared/syncQueue.ts', 'src/shared/workflowAccess.ts'].some((file) => args.importer === join(root, file))) return null;
+      return { path: join(root, 'tests/stubs/submission.ts') };
+    });
+    b.onResolve({ filter: /^\.\/sync$/ }, (args) => {
+      if (args.importer === join(root, 'src/offscreen/index.ts')) return { path: join(root, 'tests/stubs/offscreenSync.ts') };
+    });
     b.onResolve({ filter: /(storage\/db|utils\/captureQueue)$/ }, (args) => {
       if (args.importer.includes(`${join('tests', 'stubs')}`)) return null;
       const key = Object.keys(stubs).find((k) => args.path.endsWith(k));

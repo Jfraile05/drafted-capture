@@ -5,18 +5,25 @@
 //  state when the worker wakes from eviction.
 // ════════════════════════════════════════════════════════════════════════
 
-import { ALARM_SCREENSHOT, ALARM_SESSION_CAP } from '../shared/constants';
-import { deleteSession, getSession, listSessions, putSession } from '../shared/storage/db';
+import { IDLE_CONFIG } from '../config/idle';
+import { PRIVACY_CONFIG } from '../config/privacy';
+import { ALARM_SCREENSHOT, ALARM_SESSION_CAP, STORAGE_KEYS } from '../shared/constants';
+import { summarizeEarnings } from '../shared/earnings';
+import { deleteSession, getSession, listSessions, updateSession } from '../shared/storage/db';
 import { getLiveSession, getSettings, migrateLegacyLimits } from '../shared/storage/live';
+import { notifySessionUpdate } from '../shared/storage/sessionUpdates';
+import { SYNC_CONFIG } from '../shared/syncConfig';
+import { markSessionDirty } from '../shared/syncState';
 import type {
   Annotation,
+  CaptureControlRequest,
   CaptureEventPayload,
-  ExportFormatFlags,
   ExtensionMessage,
   LiveSession,
   MessageType,
   Segment,
 } from '../shared/types';
+import { tagSegment } from '../shared/urlCategories';
 import {
   handleCaptureEvent,
   handleIntervalScreenshot,
@@ -25,9 +32,16 @@ import {
   handleTabRemoved,
   handleTabUpdated,
 } from './coordinator';
-import { exportSession } from './exporter';
-import { applyIdleDetection, pauseIfIdle } from './idle';
-import { startRecording } from './recorder';
+import {
+  applyIdleDetection,
+  checkInputIdle,
+  pauseIfIdle,
+  recordActivity,
+  scheduleIdleCheck,
+} from './idle';
+import { idleNoticeSession } from './idleNotice';
+import { checkCurrentScreen, invalidatePrivacyApproval, keepPrivacyPaused } from './privacy';
+import { refreshPrivacyPolicy } from './privacyPolicy';
 import {
   enforceSessionCap,
   getCaptureState,
@@ -36,11 +50,18 @@ import {
   resumeCapture,
   startCapture,
   stopCapture,
+  waitForCaptureStop,
 } from './session';
+import { clearStartPrompt, handleStartPromptButton, noteBrowsing } from './startPrompt';
+import { initializeSync, wakeSync } from './sync';
+import { getWorkflowAccess } from './workflows';
 
 // ── Message router ────────────────────────────────────────────────────────
 
 chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
+  // Offscreen commands have their own receiver. Do not race its response.
+  if ('target' in message && message.target === 'offscreen') return;
+  if (['RECORDING_SAVED', 'RECORDING_FAILED'].includes(message.type)) return;
   handleMessage(message, sender)
     .then(sendResponse)
     .catch((err) => {
@@ -59,15 +80,29 @@ async function handleMessage(
   sender: chrome.runtime.MessageSender,
 ): Promise<unknown> {
   switch (msg.type) {
+    case 'GET_WORKFLOWS':
+      return getWorkflowAccess();
+    case 'WAKE_SYNC':
+      wakeSync();
+      return { ok: true };
+    case 'SESSION_SYNC_CHANGED':
+      await notifySessionUpdate((msg.payload as { id: string }).id);
+      return { ok: true };
     case 'TOGGLE_CAPTURE': {
       if (toggleInFlight) return getLiveSession();
       toggleInFlight = true;
       try {
-        const intent = (msg.payload as { intent?: string } | undefined)?.intent;
+        const payload = msg.payload as
+          | { intent?: string; workflow_id?: string; annotation_opt_in?: boolean }
+          | undefined;
         const live = await getLiveSession();
         if (!live || live.state === 'idle') {
-          const started = await startCapture(intent);
-          await maybeStartRecording(started.id);
+          const started = await startCapture(
+            payload?.intent,
+            payload?.workflow_id,
+            payload?.annotation_opt_in === true,
+          );
+          void clearStartPrompt();
           return started;
         }
         if (live.state === 'capturing') {
@@ -80,31 +115,70 @@ async function handleMessage(
     }
 
     case 'START_CAPTURE': {
-      const started = await startCapture((msg.payload as { intent?: string } | undefined)?.intent);
-      await maybeStartRecording(started.id);
+      const payload = msg.payload as
+        | { intent?: string; workflow_id?: string; annotation_opt_in?: boolean }
+        | undefined;
+      const started = await startCapture(
+        payload?.intent,
+        payload?.workflow_id,
+        payload?.annotation_opt_in === true,
+      );
+      void clearStartPrompt();
       return started;
     }
 
     case 'PAUSE_CAPTURE':
-      return pauseCapture();
+      return pauseCapture(msg.payload as CaptureControlRequest | undefined);
 
     case 'RESUME_CAPTURE':
-      return resumeCapture();
+      return resumeCapture(msg.payload as CaptureControlRequest | undefined);
+
+    case 'USER_ACTIVITY': {
+      const { sessionId, timestamp } = msg.payload as { sessionId: string; timestamp: number };
+      await recordActivity(sessionId, timestamp, sender);
+      return { ok: true };
+    }
+
+    case 'PRIVACY_CHECK':
+      await checkCurrentScreen();
+      return { ok: true };
+
+    case 'CONFIRM_PRIVACY':
+    case 'KEEP_PRIVACY_PAUSED': {
+      const { gateId, sessionId } = msg.payload as { gateId: string; sessionId?: string };
+      const live = await getLiveSession();
+      if (!live || live.privacy_gate?.id !== gateId || (sessionId && sessionId !== live.id)) {
+        throw new Error('This screen changed. Review the current privacy prompt.');
+      }
+      if (sender.tab && (sender.frameId !== 0 || sender.tab.id !== live.privacy_gate.tab_id)) {
+        throw new Error('Confirm from the current screen or the Sidekick popup.');
+      }
+      if (msg.type === 'KEEP_PRIVACY_PAUSED') {
+        await keepPrivacyPaused(gateId);
+        return { ok: true };
+      }
+      return resumeCapture({ session_id: live.id }, gateId);
+    }
 
     case 'STOP_CAPTURE': {
-      // Archive only. Submission to Drafted runs in a DOM context (popup/panel)
-      // where Firebase auth is reliable; the worker stays Firebase-free so STOP
-      // can never hang on auth/network. The popup auto-submits on the
-      // capturing/paused -> idle transition.
-      const sessionId = await stopCapture();
+      // Archive locally and let the durable background queue handle uploads.
+      const sessionId = await stopCapture(msg.payload as CaptureControlRequest | undefined);
       return { sessionId };
     }
 
     case 'CAPTURE_EVENT':
       return handleCaptureEvent(msg.payload as CaptureEventPayload, sender);
 
-    case 'GET_LIVE_SESSION':
-      return getLiveSession();
+    case 'SCREENSHOT_TICK':
+      return handleIntervalScreenshot(sender);
+
+    case 'GET_LIVE_SESSION': {
+      const live = await getLiveSession();
+      if (live && sender.tab && live.privacy_gate?.tab_id !== sender.tab.id) {
+        return { ...live, privacy_gate: undefined };
+      }
+      return live;
+    }
 
     case 'GET_CAPTURE_STATE':
       return getCaptureState();
@@ -112,18 +186,18 @@ async function handleMessage(
     case 'LIST_SESSIONS':
       return listSessions();
 
+    case 'GET_EARNINGS': {
+      const { uid, localOnly } = msg.payload as { uid: string; localOnly: boolean };
+      await waitForCaptureStop();
+      return summarizeEarnings(await listSessions(), uid, localOnly);
+    }
+
     case 'GET_SESSION':
+      await waitForCaptureStop();
       return getSession((msg.payload as { id: string }).id);
 
     case 'DELETE_SESSION':
       await deleteSession((msg.payload as { id: string }).id);
-      return { ok: true };
-
-    case 'EXPORT_SESSION':
-      await exportSession(
-        (msg.payload as { id: string; formats: ExportFormatFlags }).id,
-        (msg.payload as { id: string; formats: ExportFormatFlags }).formats,
-      );
       return { ok: true };
 
     case 'SAVE_SEGMENT': {
@@ -131,16 +205,18 @@ async function handleMessage(
         sessionId: string;
         segment: Segment;
       };
-      const session = await getSession(sessionId);
-      if (!session) throw new Error('Session not found');
-      const existing = session.segments.findIndex((s) => s.id === segment.id);
-      if (existing >= 0) {
-        session.segments[existing] = segment;
-      } else {
-        session.segments.push(segment);
-      }
-      await putSession(session);
-      return session;
+      const updated = await updateSession(sessionId, (session) => {
+        const taggedSegment = tagSegment(segment, session.steps);
+        const existing = session.segments.findIndex((s) => s.id === segment.id);
+        if (existing >= 0) {
+          session.segments[existing] = taggedSegment;
+        } else {
+          session.segments.push(taggedSegment);
+        }
+        return markSessionDirty(session);
+      });
+      wakeSync();
+      return updated;
     }
 
     case 'DELETE_SEGMENT': {
@@ -148,11 +224,12 @@ async function handleMessage(
         sessionId: string;
         segmentId: string;
       };
-      const session = await getSession(sessionId);
-      if (!session) throw new Error('Session not found');
-      session.segments = session.segments.filter((s) => s.id !== segmentId);
-      await putSession(session);
-      return session;
+      const updated = await updateSession(sessionId, (session) => {
+        session.segments = session.segments.filter((s) => s.id !== segmentId);
+        return markSessionDirty(session);
+      });
+      wakeSync();
+      return updated;
     }
 
     case 'UPDATE_ANNOTATION': {
@@ -161,14 +238,15 @@ async function handleMessage(
         stepIndex: number;
         annotation: Annotation | null;
       };
-      const session = await getSession(sessionId);
-      if (!session) throw new Error('Session not found');
-      if (stepIndex < 0 || stepIndex >= session.steps.length) {
-        throw new Error('Step index out of range');
-      }
-      session.steps[stepIndex].annotation = annotation;
-      await putSession(session);
-      return session;
+      const updated = await updateSession(sessionId, (session) => {
+        if (stepIndex < 0 || stepIndex >= session.steps.length) {
+          throw new Error('Step index out of range');
+        }
+        session.steps[stepIndex].annotation = annotation;
+        return markSessionDirty(session);
+      });
+      wakeSync();
+      return updated;
     }
 
     case 'PING_CONTENT':
@@ -182,18 +260,6 @@ async function handleMessage(
   }
 }
 
-// Start screen recording for a session if the setting is on. Best-effort:
-// prompts for a screen once; if cancelled, capture proceeds screenshot-only.
-async function maybeStartRecording(sessionId: string): Promise<void> {
-  try {
-    const settings = await getSettings();
-    if (!settings.record_video) return;
-    await startRecording(sessionId);
-  } catch (err) {
-    console.warn('[bg] recording start skipped:', err);
-  }
-}
-
 // ── Tab listeners ─────────────────────────────────────────────────────────
 
 chrome.tabs.onActivated.addListener((activeInfo) => {
@@ -201,6 +267,11 @@ chrome.tabs.onActivated.addListener((activeInfo) => {
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tab.url) {
+    noteBrowsing(tab.url, tab.incognito).catch((err) =>
+      console.warn('[bg] start prompt error:', err),
+    );
+  }
   handleTabUpdated(tabId, changeInfo, tab).catch((err) =>
     console.error('[bg] tab updated error:', err),
   );
@@ -217,11 +288,45 @@ chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
 // ── Alarm handler ─────────────────────────────────────────────────────────
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === ALARM_SCREENSHOT) {
+  if (alarm.name === IDLE_CONFIG.alarmName) {
+    void checkInputIdle().catch(() => {});
+  } else if (alarm.name === PRIVACY_CONFIG.alarmName) {
+    void refreshPrivacyPolicy();
+  } else if (alarm.name === SYNC_CONFIG.alarmName) {
+    wakeSync();
+  } else if (alarm.name === ALARM_SCREENSHOT) {
     handleIntervalScreenshot().catch((err) => console.error('[bg] alarm screenshot error:', err));
   } else if (alarm.name === ALARM_SESSION_CAP) {
     enforceSessionCap().catch((err) => console.error('[bg] session cap error:', err));
   }
+});
+
+// ── Idle notification ─────────────────────────────────────────────────────
+//
+// Continue resumes after the usual privacy check of the current page. Keep
+// paused turns it into a manual pause, which stays paused across navigation.
+
+chrome.notifications?.onButtonClicked.addListener((notificationId, buttonIndex) => {
+  if (handleStartPromptButton(notificationId, buttonIndex)) return;
+  const sessionId = idleNoticeSession(notificationId);
+  if (!sessionId) return;
+  void chrome.notifications.clear(notificationId);
+  const request = { session_id: sessionId, requested_at: Date.now() };
+  const action = buttonIndex === 0 ? resumeCapture(request) : pauseCapture(request);
+  action.catch(async (err) => {
+    // Usually the page needs a privacy confirmation. Bring Chrome forward so
+    // the student sees the prompt on the page or in the popup.
+    console.warn('[bg] idle notice action failed:', err);
+    const win = await chrome.windows.getLastFocused().catch(() => null);
+    if (win?.id !== undefined) await chrome.windows.update(win.id, { focused: true });
+  });
+});
+
+chrome.notifications?.onClicked.addListener((notificationId) => {
+  if (!idleNoticeSession(notificationId)) return;
+  void chrome.windows.getLastFocused().then((win) => {
+    if (win.id !== undefined) return chrome.windows.update(win.id, { focused: true });
+  });
 });
 
 // ── Idle handler ──────────────────────────────────────────────────────────
@@ -258,16 +363,33 @@ chrome.runtime.onInstalled.addListener(() => {
 
 (async () => {
   const live = await getLiveSession();
-  if (live && live.state === 'capturing') {
+  if (live) {
     console.log('[bg] recovered live capture session:', live.id);
-    await chrome.action.setBadgeText({ text: String(live.step_count) });
-    await chrome.action.setBadgeBackgroundColor({ color: '#4DFFA0' });
-    const settings = await getSettings();
-    await chrome.alarms.create(ALARM_SCREENSHOT, {
-      periodInMinutes: settings.screenshot_interval_ms / 60000,
-    });
-    // Re-assert capture state to all tabs in case listeners were lost while
-    // the worker was evicted.
+    // Read the current state inside the same effects queue as Pause/Resume.
+    await checkInputIdle();
+    await scheduleIdleCheck();
     await rebroadcastCaptureState().catch(() => {});
   }
 })().catch((err) => console.error('[bg] recovery error:', err));
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes[STORAGE_KEYS.SETTINGS]) wakeSync();
+  if (area === 'local' && changes[PRIVACY_CONFIG.cacheKey]) {
+    void invalidatePrivacyApproval()
+      .then(() => checkCurrentScreen())
+      .catch(() => {});
+  }
+});
+chrome.windows.onFocusChanged.addListener(() => {
+  void invalidatePrivacyApproval()
+    .then(() => checkCurrentScreen())
+    .catch(() => {});
+});
+void chrome.alarms.create(PRIVACY_CONFIG.alarmName, {
+  periodInMinutes: PRIVACY_CONFIG.refreshMinutes,
+});
+void refreshPrivacyPolicy();
+chrome.runtime.onStartup.addListener(() => {
+  void initializeSync().catch(() => {});
+});
+void initializeSync().catch((error) => console.warn('[sync] recovery setup failed', error));

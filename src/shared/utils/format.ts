@@ -1,4 +1,4 @@
-import type { Action, ActionType, Step } from '../types';
+import type { Action, ActionType, Session, Step } from '../types';
 
 /** Phosphor icon name for an action type (used as a string key by UIs). */
 export const ACTION_ICON: Record<ActionType, string> = {
@@ -17,27 +17,30 @@ export const ACTION_ICON: Record<ActionType, string> = {
   screenshot: 'Camera',
 };
 
-/** Human-readable one-line label for an action. */
-export function actionLabel(action: Action): string {
+/** Human-readable one-line label for an action. Pass the step's DOM context
+ *  to name what was clicked instead of where. */
+export function actionLabel(action: Action, dom?: Step['dom']): string {
+  const target = targetName(dom);
+  const on = target ? ` "${target}"` : '';
   switch (action.type) {
     case 'click':
-      return action.coordinate ? `Click at ${fmtCoord(action.coordinate)}` : 'Click';
+      return target ? `Click${on}` : 'Click on page';
     case 'double_click':
-      return action.coordinate ? `Double-click at ${fmtCoord(action.coordinate)}` : 'Double-click';
+      return target ? `Double-click${on}` : 'Double-click on page';
     case 'right_click':
-      return action.coordinate ? `Right-click at ${fmtCoord(action.coordinate)}` : 'Right-click';
+      return target ? `Right-click${on}` : 'Right-click on page';
     case 'type':
-      return `Type "${truncate(action.text ?? '', 32)}"`;
+      return action.text ? `Type "${truncate(action.text, 32)}"` : 'Type';
     case 'key':
-      return `Press ${action.key ?? ''}`;
+      return action.key ? `Press ${action.key}` : 'Press a key';
     case 'scroll':
       return `Scroll ${action.scroll_direction ?? ''}`.trim();
     case 'drag':
       return 'Drag';
     case 'navigate':
-      return `Navigate ${action.url ? hostOf(action.url) : ''}`.trim();
+      return action.url ? `Go to ${hostOf(action.url)}` : 'Go to page';
     case 'tab_open':
-      return `Open tab ${action.url ? hostOf(action.url) : ''}`.trim();
+      return action.url ? `Open ${hostOf(action.url)} in a new tab` : 'Open a new tab';
     case 'tab_close':
       return 'Close tab';
     case 'tab_switch':
@@ -45,18 +48,22 @@ export function actionLabel(action: Action): string {
     case 'wait':
       return 'Wait';
     case 'screenshot':
-      return 'Screen state';
+      return 'Screenshot';
     default:
       return action.type;
   }
 }
 
 export function stepLabel(step: Step): string {
-  return actionLabel(step.action);
+  return actionLabel(step.action, step.dom);
 }
 
-function fmtCoord([x, y]: [number, number]): string {
-  return `${Math.round(x)}, ${Math.round(y)}`;
+/** Visible name of the element acted on, or null when there is nothing
+ *  readable (or the field is sensitive). */
+export function targetName(dom: Step['dom'] | undefined): string | null {
+  if (!dom || dom.sensitive) return null;
+  const raw = (dom.aria_label || dom.text || '').replace(/\s+/g, ' ').trim();
+  return raw ? truncate(raw, 40) : null;
 }
 
 export function truncate(s: string, n: number): string {
@@ -76,4 +83,8 @@ export function fmtDuration(ms: number): string {
   const m = Math.floor(total / 60);
   const s = total % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+export function workflowTitle(session: Session): string {
+  return session.intent?.trim() || session.segments[0]?.label.trim() || 'Untitled workflow';
 }

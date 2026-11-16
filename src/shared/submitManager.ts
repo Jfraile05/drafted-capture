@@ -9,16 +9,24 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import { getCurrentUser } from './auth';
-import { getSession, listSessions, putSession } from './storage/db';
+import { buildEnrichment } from './enrichment';
+import { getSession, updateSession } from './storage/db';
 import {
   type EnrichmentMap,
   enrichSubmittedSession,
   submitSessionToDrafted,
 } from './submitToDrafted';
+import { uploadsWithoutProject } from './workflows';
 
 export interface SubmitOutcome {
   ok: boolean;
-  reason?: 'not_signed_in' | 'not_found' | 'already_submitted' | 'error';
+  reason?:
+    | 'not_signed_in'
+    | 'not_found'
+    | 'already_submitted'
+    | 'wrong_account'
+    | 'no_project'
+    | 'error';
   draftedTaskId?: string;
   qualityScore?: number | null;
   error?: string;
@@ -30,6 +38,12 @@ export async function submitArchivedSession(
   sessionId: string,
   enrich?: EnrichmentMap,
 ): Promise<SubmitOutcome> {
+  return navigator.locks.request(`drafted-submit:${sessionId}`, () =>
+    submitUnlocked(sessionId, enrich),
+  );
+}
+
+async function submitUnlocked(sessionId: string, enrich?: EnrichmentMap): Promise<SubmitOutcome> {
   const session = await getSession(sessionId);
   if (!session) return { ok: false, reason: 'not_found' };
 
@@ -44,16 +58,31 @@ export async function submitArchivedSession(
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, reason: 'not_signed_in' };
+  if (session.metadata.owner_uid !== user.uid) return { ok: false, reason: 'wrong_account' };
+  if (!session.metadata.drafted_project_id && !uploadsWithoutProject(session.metadata.workflow))
+    return { ok: false, reason: 'no_project' };
 
   try {
-    const result = await submitSessionToDrafted(session, enrich);
-    session.submission = {
+    const result = await submitSessionToDrafted(session, enrich ?? buildEnrichment(session));
+    if (!result.taskId?.trim()) throw new Error('Submission did not return a receipt.');
+    const submission = {
       drafted_task_id: result.taskId,
       submitted_at: new Date().toISOString(),
       quality_score: result.qualityScore ?? null,
       last_enriched_at: null,
     };
-    await putSession(session);
+    await updateSession(sessionId, (current) => ({
+      ...current,
+      submission,
+      sync: current.sync
+        ? {
+            ...current.sync,
+            synced_revision: session.sync?.revision ?? 0,
+            attempts: 0,
+            retry_at: 0,
+          }
+        : undefined,
+    }));
     return { ok: true, draftedTaskId: result.taskId, qualityScore: result.qualityScore ?? null };
   } catch (err) {
     console.error('[submit] failed:', err);
@@ -61,46 +90,52 @@ export async function submitArchivedSession(
   }
 }
 
-/** Auto-submit the most recent archived session if it has not been submitted
- *  yet. Used by the popup right after a capture stops. No-ops silently when
- *  signed out (the user can still submit later from the panel). */
-export async function submitLatestUnsubmitted(): Promise<SubmitOutcome> {
-  const sessions = await listSessions(); // newest first
-  const latest = sessions[0];
-  if (!latest) return { ok: false, reason: 'not_found' };
-  if (latest.submission?.drafted_task_id) {
-    return {
-      ok: true,
-      reason: 'already_submitted',
-      draftedTaskId: latest.submission.drafted_task_id,
-    };
-  }
-  return submitArchivedSession(latest.id);
-}
-
 /** Enrich (patch) an already-submitted session's record with the user's
  *  per-step thoughts and segment-derived instruction. If the session was
  *  never submitted, submits it fresh (with the enrichment) instead. */
 export async function enrichArchivedSession(
   sessionId: string,
-  enrich: EnrichmentMap,
+  enrich?: EnrichmentMap,
 ): Promise<SubmitOutcome> {
+  return navigator.locks.request(`drafted-submit:${sessionId}`, () =>
+    enrichUnlocked(sessionId, enrich),
+  );
+}
+
+async function enrichUnlocked(sessionId: string, enrich?: EnrichmentMap): Promise<SubmitOutcome> {
   const session = await getSession(sessionId);
   if (!session) return { ok: false, reason: 'not_found' };
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, reason: 'not_signed_in' };
+  if (session.metadata.owner_uid !== user.uid) return { ok: false, reason: 'wrong_account' };
 
   // Not yet submitted -> submit fresh with the enrichment baked in.
   if (!session.submission?.drafted_task_id) {
-    return submitArchivedSession(sessionId, enrich);
+    return submitUnlocked(sessionId, enrich);
   }
+  const submission = session.submission;
 
   try {
-    await enrichSubmittedSession(session, session.submission.drafted_task_id, enrich);
-    session.submission.last_enriched_at = new Date().toISOString();
-    await putSession(session);
-    return { ok: true, draftedTaskId: session.submission.drafted_task_id };
+    await enrichSubmittedSession(
+      session,
+      submission.drafted_task_id,
+      enrich ?? buildEnrichment(session),
+    );
+    const lastEnrichedAt = new Date().toISOString();
+    await updateSession(sessionId, (current) => ({
+      ...current,
+      sync: current.sync
+        ? {
+            ...current.sync,
+            synced_revision: session.sync?.revision ?? 0,
+            attempts: 0,
+            retry_at: 0,
+          }
+        : undefined,
+      submission: { ...submission, ...current.submission, last_enriched_at: lastEnrichedAt },
+    }));
+    return { ok: true, draftedTaskId: submission.drafted_task_id };
   } catch (err) {
     console.error('[enrich] failed:', err);
     return { ok: false, reason: 'error', error: String(err) };

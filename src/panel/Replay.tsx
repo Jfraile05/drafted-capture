@@ -1,8 +1,10 @@
 import { CaretLeft, CaretRight, MonitorPlay, Pause, Play, Target } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
+import { activeOffset } from '../shared/activeTime';
 import { getRecording } from '../shared/storage/db';
 import type { Session } from '../shared/types';
 import { fmtDuration } from '../shared/utils/format';
+import { nearestScreenshotIndex } from './nearestScreenshot';
 import { useScreenshot } from './useScreenshot';
 
 interface ReplayProps {
@@ -14,12 +16,16 @@ type ViewMode = 'screenshots' | 'video';
 export function Replay({ session }: ReplayProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1);
+  const [speed, setSpeed] = useState(2);
   const [viewMode, setViewMode] = useState<ViewMode>('screenshots');
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
   const currentStep = session.steps[currentIndex];
-  const screenshotUrl = useScreenshot(currentStep?.screenshot?.hash);
+  const shotIndex = nearestScreenshotIndex(session.steps, currentIndex);
+  const borrowed = shotIndex !== null && shotIndex !== currentIndex;
+  const screenshotUrl = useScreenshot(
+    shotIndex === null ? null : session.steps[shotIndex].screenshot?.hash,
+  );
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -70,11 +76,13 @@ export function Replay({ session }: ReplayProps) {
     setPlaying((prev) => !prev);
   };
 
-  const elapsed = currentStep ? currentStep.timestamp - session.started_at : 0;
+  const elapsed = currentStep
+    ? activeOffset(session.started_at, session.pauses, currentStep.timestamp)
+    : 0;
 
   const coord = currentStep?.action.coordinate;
   let crosshairStyle: React.CSSProperties = {};
-  if (coord && currentStep?.screenshot && screenshotUrl) {
+  if (coord && currentStep?.screenshot && screenshotUrl && !borrowed) {
     const dpr = currentStep.screenshot.dpr;
     const imgW = currentStep.screenshot.width;
     const imgH = currentStep.screenshot.height;
@@ -110,6 +118,7 @@ export function Replay({ session }: ReplayProps) {
           // biome-ignore lint/a11y/useMediaCaption: screen recordings have no audio to caption
           <video
             controls
+            controlsList="nodownload"
             className="w-full h-auto rounded-btn border border-white/[0.06]"
             src={videoUrl}
           >
@@ -122,7 +131,7 @@ export function Replay({ session }: ReplayProps) {
               alt="Replay frame"
               className="w-full h-auto rounded-btn border border-white/[0.06]"
             />
-            {coord && (
+            {coord && !borrowed && (
               <div
                 className="absolute"
                 style={{ ...crosshairStyle, transform: 'translate(-50%, -50%)' }}
@@ -130,10 +139,15 @@ export function Replay({ session }: ReplayProps) {
                 <Target size={24} weight="bold" className="text-white drop-shadow" />
               </div>
             )}
+            {borrowed && (
+              <p className="mt-1.5 text-xs text-text-faint">
+                No screenshot was taken at this step. Showing step {(shotIndex ?? 0) + 1}.
+              </p>
+            )}
           </div>
         ) : (
           <p className="flex h-48 w-full items-center justify-center rounded-btn border border-dashed border-white/10 text-xs text-text-faint">
-            No screenshot for this step
+            No screenshots in this session
           </p>
         )}
       </div>
@@ -185,7 +199,7 @@ export function Replay({ session }: ReplayProps) {
 
           <div className="flex items-center gap-1.5">
             <span className="mr-1 text-xs text-text-muted">Speed</span>
-            {[0.5, 1, 2, 4].map((s) => (
+            {[2, 3, 4, 5, 6].map((s) => (
               <button
                 type="button"
                 key={s}

@@ -8,7 +8,7 @@
 ────────────────────────────────────────────────────────────────────────
  SINGLE PURPOSE DESCRIPTION   (one box, max 1000 chars)
 ────────────────────────────────────────────────────────────────────────
-drafted. Capture records the user's own browser interactions (clicks, keystrokes, scrolls, navigation, and screenshots) and exports them as structured computer-use training data in standard AI lab formats. That is its single purpose.
+drafted. Capture records the user's own browser interactions (clicks, keystrokes, scrolls, navigation, and screenshots) and uploads them automatically to the selected Drafted project as computer-use training data. That is its single purpose.
 
 
 ────────────────────────────────────────────────────────────────────────
@@ -19,19 +19,16 @@ drafted. Capture records the user's own browser interactions (clicks, keystrokes
 Used to know which tab and URL each recorded action belongs to, to capture a screenshot of the active tab, and to keep recording continuous as the user moves between tabs during a session. Tab data is read only while the user has capture turned on.
 
 [ storage justification ]
-Used to save the user's settings and the recorded session locally on their device (extension storage and IndexedDB). Recorded data is not transmitted anywhere; it stays on the machine until the user chooses to export it.
+Used to save the user's settings and the recorded session locally on their device (extension storage and IndexedDB). Sessions queue locally while offline and upload automatically to Drafted after sign-in and project selection.
 
 [ alarms justification ]
-Used to take a periodic screenshot of the screen state on a fixed interval during an active recording, so passive page changes (a page finishing loading, a timer updating) are captured even when the user is not clicking. Active only while recording.
-
-[ downloads justification ]
-Used to save the exported session as a ZIP file (JSON plus screenshots) to the user's computer when they click Export. Triggered only by an explicit user action.
+Used to take a periodic screenshot of the screen state on a fixed interval during an active recording, so passive page changes (a page finishing loading, a timer updating) are captured even when the user is not clicking. Also wakes the automatic upload queue to retry pending sessions.
 
 [ sidePanel justification ]
-Used to open the review workspace in Chrome's side panel, where the user steps through their recorded timeline, inspects steps, labels task segments, and exports. UI only.
+Used to open the review workspace in Chrome's side panel, where the user steps through their recorded timeline, inspects steps, labels task segments. UI only.
 
 [ Host permission justification ]
-The extension records the user's own actions on whatever sites they choose to demonstrate a task on, which cannot be known in advance, so broad host access is required. It uses a passive content listener that activates only while the user has capture turned on, and a domain blocklist lets the user exclude any sites. It does not read or transmit page content to third parties.
+The extension records the user's own actions on whatever sites they choose to demonstrate a task on, which cannot be known in advance, so broad host access is required. It uses a passive content listener that activates only while the user has capture turned on, and managed sensitive-screen checks pause capture before recording detected private screens. A personal allowlist can restrict capture further. Recorded page context and screenshots upload to Drafted for the selected project.
 
 
 ────────────────────────────────────────────────────────────────────────

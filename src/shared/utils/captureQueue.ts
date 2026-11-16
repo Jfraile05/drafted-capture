@@ -7,16 +7,16 @@
 //  funnels through ONE serial queue that:
 //
 //    1. spaces calls at least SCREENSHOT_MIN_INTERVAL_MS apart,
-//    2. coalesces requests that pile up while one is in flight (the latest
-//       wins — older screen states are stale anyway),
+//    2. coalesces requests for the same tab and URL while one is in flight,
 //    3. hashes + dedups so identical frames are stored once,
 //    4. never throws: a failed capture resolves to null and the step is
 //       still recorded (screenshot: null) so the trajectory stays complete.
 // ════════════════════════════════════════════════════════════════════════
 
 import { SCREENSHOT_MIN_INTERVAL_MS } from '../constants';
+import type { PrivacyPermit } from '../privacy';
 import { putScreenshot } from '../storage/db';
-import { getSettings } from '../storage/live';
+import { getLiveSession, getSettings, withLiveLock } from '../storage/live';
 import type { ScreenshotRef } from '../types';
 import { sha256 } from './crypto';
 import { getImageDimensions } from './screenshot';
@@ -24,6 +24,7 @@ import { type Rect, maskScreenshotBlob } from './screenshotMask';
 
 let lastCaptureAt = 0;
 let inFlight: Promise<ScreenshotRef | null> | null = null;
+let inFlightKey = '';
 let lastHash = '';
 let lastRef: ScreenshotRef | null = null;
 
@@ -37,6 +38,24 @@ interface CaptureOpts {
   /** The tab being captured. When set, sensitive regions on its page are masked
    *  first, and the screenshot is dropped if they cannot be determined. */
   tabId?: number;
+  /** URL associated with the step. Drop the frame if navigation has occurred. */
+  url?: string;
+  privacyPermit?: PrivacyPermit;
+  validate?: () => Promise<boolean>;
+}
+
+async function matchesTarget(opts: CaptureOpts): Promise<boolean> {
+  if (opts.tabId === undefined) return false;
+  const [active] = await chrome.tabs.query({
+    active: true,
+    ...(opts.windowId === undefined ? { currentWindow: true } : { windowId: opts.windowId }),
+  });
+  return (
+    active?.id === opts.tabId &&
+    active.status !== 'loading' &&
+    (!active.pendingUrl || active.pendingUrl === active.url) &&
+    (opts.url === undefined || active.url === opts.url)
+  );
 }
 
 /** Ask the page which regions to mask. Null when the page does not answer, so
@@ -63,20 +82,23 @@ async function getSensitiveRegions(
 
 /** Capture the visible tab, rate-limited and deduplicated. Resolves to a
  *  ScreenshotRef, or null if capture was not possible (protected page, no
- *  active tab, quota). Concurrent callers share the single in-flight capture. */
+ *  active tab, quota). Concurrent callers only share frames for the same page. */
 export async function captureVisible(opts: CaptureOpts): Promise<ScreenshotRef | null> {
-  // Coalesce: if a capture is already running, ride along with it. The screen
-  // state is effectively the same within a sub-second window.
-  if (inFlight) return inFlight;
+  const key = JSON.stringify([opts.windowId, opts.tabId, opts.url, opts.privacyPermit]);
+  if (inFlight) return key === inFlightKey ? inFlight : null;
+  inFlightKey = key;
 
-  inFlight = (async () => {
+  const capture = (async () => {
     try {
       const wait = SCREENSHOT_MIN_INTERVAL_MS - (Date.now() - lastCaptureAt);
       if (wait > 0) await sleep(wait);
+      if (!(await matchesTarget(opts))) return null;
 
       // Ask first, capture right after, so the regions match what is on screen.
       const regions = opts.tabId !== undefined ? await getSensitiveRegions(opts.tabId) : null;
       if (opts.tabId !== undefined && !regions) return null;
+      if (!(await matchesTarget(opts))) return null;
+      if (opts.validate && !(await opts.validate())) return null;
 
       const dataUrl =
         opts.windowId !== undefined
@@ -84,17 +106,33 @@ export async function captureVisible(opts: CaptureOpts): Promise<ScreenshotRef |
           : await chrome.tabs.captureVisibleTab({ format: 'png' });
       lastCaptureAt = Date.now();
 
-      if (!dataUrl) return null;
+      if (!dataUrl || !(await matchesTarget(opts))) return null;
 
       let blob = await (await fetch(dataUrl)).blob();
       if (regions) blob = await maskScreenshotBlob(blob, regions.rects, regions.viewportWidth);
       const buffer = await blob.arrayBuffer();
       const hash = await sha256(buffer);
+      if (opts.validate && !(await opts.validate())) return null;
 
       if (hash === lastHash && lastRef) return lastRef;
 
-      await putScreenshot(hash, blob);
       const { width, height } = await getImageDimensions(blob);
+      const stored = await withLiveLock(async () => {
+        const permit = opts.privacyPermit;
+        if (permit) {
+          const live = await getLiveSession();
+          if (
+            live?.id !== permit.session_id ||
+            live.state !== 'capturing' ||
+            live.privacy_gate ||
+            (live.privacy_epoch ?? 0) !== permit.epoch
+          )
+            return false;
+        }
+        await putScreenshot(hash, blob);
+        return true;
+      });
+      if (!stored) return null;
 
       const ref: ScreenshotRef = {
         hash,
@@ -110,17 +148,23 @@ export async function captureVisible(opts: CaptureOpts): Promise<ScreenshotRef |
     } catch {
       // Protected pages (chrome://, Web Store), quota, or no active tab.
       return null;
-    } finally {
-      inFlight = null;
     }
   })();
-
-  return inFlight;
+  inFlight = capture;
+  try {
+    return await capture;
+  } finally {
+    if (inFlight === capture) {
+      inFlight = null;
+      inFlightKey = '';
+    }
+  }
 }
 
 export function resetCaptureQueue(): void {
   lastCaptureAt = 0;
   inFlight = null;
+  inFlightKey = '';
   lastHash = '';
   lastRef = null;
 }

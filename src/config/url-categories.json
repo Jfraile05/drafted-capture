@@ -1,0 +1,153 @@
+{
+  "flight_booking": {
+    "label": "Flight booking",
+    "rules": [
+      {
+        "domains": [
+          "delta.com",
+          "united.com",
+          "aa.com",
+          "southwest.com",
+          "jetblue.com",
+          "alaskaair.com",
+          "ryanair.com",
+          "easyjet.com",
+          "airfrance.com",
+          "lufthansa.com",
+          "emirates.com",
+          "skyscanner.com",
+          "skyscanner.net"
+        ]
+      },
+      { "domains": ["google.com"], "path_prefix": "/travel/flights" }
+    ]
+  },
+  "shopping": {
+    "label": "Shopping",
+    "rules": [
+      {
+        "domains": [
+          "amazon.com",
+          "amazon.ca",
+          "amazon.com.mx",
+          "amazon.com.br",
+          "amazon.co.uk",
+          "amazon.de",
+          "amazon.fr",
+          "amazon.es",
+          "amazon.it",
+          "amazon.nl",
+          "amazon.co.jp",
+          "amazon.in",
+          "amazon.com.au",
+          "ebay.com",
+          "ebay.co.uk",
+          "ebay.de",
+          "etsy.com",
+          "walmart.com",
+          "target.com",
+          "aliexpress.com",
+          "mercadolibre.com",
+          "mercadolibre.com.mx",
+          "mercadolivre.com.br"
+        ]
+      }
+    ]
+  },
+  "email": {
+    "label": "Email",
+    "rules": [
+      {
+        "domains": [
+          "mail.google.com",
+          "mail.yahoo.com",
+          "outlook.live.com",
+          "outlook.office.com",
+          "outlook.office365.com",
+          "mail.proton.me",
+          "mail.protonmail.com"
+        ]
+      }
+    ]
+  },
+  "banking": {
+    "label": "Banking",
+    "rules": [
+      {
+        "domains": [
+          "chase.com",
+          "bankofamerica.com",
+          "wellsfargo.com",
+          "citi.com",
+          "capitalone.com",
+          "usbank.com",
+          "hsbc.com",
+          "barclays.co.uk",
+          "santander.co.uk",
+          "ally.com",
+          "schwab.com",
+          "fidelity.com"
+        ]
+      }
+    ]
+  },
+  "travel": {
+    "label": "Travel",
+    "rules": [
+      {
+        "domains": [
+          "booking.com",
+          "expedia.com",
+          "kayak.com",
+          "airbnb.com",
+          "hotels.com",
+          "tripadvisor.com",
+          "marriott.com",
+          "hilton.com",
+          "amtrak.com"
+        ]
+      },
+      { "domains": ["google.com"], "path_prefix": "/travel" }
+    ]
+  },
+  "productivity": {
+    "label": "Productivity",
+    "rules": [
+      {
+        "domains": [
+          "docs.google.com",
+          "drive.google.com",
+          "calendar.google.com",
+          "figma.com",
+          "canva.com",
+          "notion.so",
+          "notion.com",
+          "trello.com",
+          "asana.com",
+          "airtable.com",
+          "miro.com",
+          "linear.app",
+          "office.com",
+          "sharepoint.com",
+          "onedrive.live.com"
+        ]
+      }
+    ]
+  },
+  "education": {
+    "label": "Education",
+    "rules": [
+      {
+        "domains": [
+          "instructure.com",
+          "blackboard.com",
+          "classroom.google.com",
+          "coursera.org",
+          "edx.org",
+          "khanacademy.org"
+        ]
+      }
+    ]
+  },
+  "uncategorized": { "label": "Uncategorized", "rules": [] }
+}

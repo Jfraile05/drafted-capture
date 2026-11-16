@@ -5,7 +5,7 @@
 //  service worker. Keep in sync when the seeker hook changes.
 // ════════════════════════════════════════════════════════════════════════
 
-import { addDoc, collection, doc, getDoc, increment, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer, increment, runTransaction } from 'firebase/firestore';
 import { ensureAccountDocument } from './lib/accountSelfHeal';
 import { issueEarnedCertificates } from './lib/certificates/issuance';
 import { auth, db, ref, storage, uploadBytes } from './lib/firebase';
@@ -111,12 +111,8 @@ async function processComputerUseScreenshots(taskData, userId, taskId) {
           `[processComputerUseScreenshots] Failed to upload step ${step.step_index}:`,
           err,
         );
-        // On failure, strip the image entirely rather than failing submission
-        return {
-          ...step,
-          screenshot: undefined,
-          screenshot_upload_error: err.message,
-        };
+        // A receipt must mean every captured screenshot reached storage.
+        throw err;
       }
     }),
   );
@@ -131,7 +127,7 @@ async function processComputerUseScreenshots(taskData, userId, taskId) {
 }
 
 
-export async function submitTaskCore(taskType, taskData, behavioralData) {
+export async function submitTaskCore(taskType, taskData, behavioralData, submissionId) {
   try {
     // --- Pre-submission size check ---
     const taskDataSize = new Blob([JSON.stringify(taskData)]).size;
@@ -144,13 +140,19 @@ export async function submitTaskCore(taskType, taskData, behavioralData) {
     }
 
     // --- 1. Generate task ID and get current user ---
-    const taskId = crypto.randomUUID();
+    const taskId = submissionId || crypto.randomUUID();
     const user = auth.currentUser;
     if (!user) {
       throw new Error('User must be signed in to submit a task.');
     }
     const userEmail = user.email.toLowerCase();
     const userId = user.uid;
+    if (taskData.capture_metadata?.owner_uid && taskData.capture_metadata.owner_uid !== userId) {
+      throw new Error('Account changed during upload.');
+    }
+    const taskDocRef = doc(db, 'credential_tasks', taskId);
+    const existingReceipt = await getDocFromServer(taskDocRef);
+    if (existingReceipt.exists()) return receiptResult(existingReceipt.data(), userId, taskData);
 
     // --- 2. Fetch annotator profile from drafted-accounts ---
     // If the doc is missing (rare, but possible if a signup partially failed
@@ -278,144 +280,154 @@ export async function submitTaskCore(taskType, taskData, behavioralData) {
       ...cleanedTaskData,
     };
 
-    const taskDocRef = doc(db, 'credential_tasks', taskId);
-    await setDoc(taskDocRef, deepStripUndefined(taskRecord));
+    const committed = await runTransaction(db, async (transaction) => {
+      if (auth.currentUser?.uid !== userId) throw new Error('Account changed during upload.');
+      const receipt = await transaction.get(taskDocRef);
+      if (receipt.exists()) return { existing: receiptResult(receipt.data(), userId, taskData) };
+      const currentAccount = await transaction.get(accountDocRef);
+      const accountData = currentAccount.data();
+      if (!accountData) throw new Error('Account no longer exists.');
 
-    // --- 6. Update drafted-accounts/{email} ---
-    const accountUpdates = {
-      [`tasksCompleted.${config.field_key}`]: increment(1),
-      lastTaskCompletedAt: now,
-    };
-
-    // Fetch current badge info to check for new badges BEFORE updating
-    const currentTaskBadges = accountData.taskBadges || [];
-    const currentTasksCompleted = accountData.tasksCompleted || {};
-    const previousCount = currentTasksCompleted[config.field_key] || 0;
-    const newCount = previousCount + 1;
-
-    // --- 7. Check badge progression ---
-    // Fetch all quality scores for this task type to compute average
-    const annotatorProfileRef = doc(db, 'annotator_profiles', userEmail); // userEmail already lowercased above
-    const annotatorSnap = await getDoc(annotatorProfileRef);
-    const existingProfile = annotatorSnap.exists() ? annotatorSnap.data() : null;
-
-    const existingAvgQuality = existingProfile?.quality?.by_type?.[taskType] || 0;
-    const existingTotalForType = existingProfile?.tasks_by_type?.[taskType] || 0;
-
-    // Compute new rolling average quality for this task type
-    const newAvgQuality =
-      existingTotalForType > 0
-        ? (existingAvgQuality * existingTotalForType + qualityScore) / (existingTotalForType + 1)
-        : qualityScore;
-
-    // Compute new overall average
-    const existingOverallAvg = existingProfile?.quality?.overall_avg || 0;
-    const existingTotalTasks = existingProfile?.total_tasks_completed || 0;
-    const newOverallAvg =
-      existingTotalTasks > 0
-        ? (existingOverallAvg * existingTotalTasks + qualityScore) / (existingTotalTasks + 1)
-        : qualityScore;
-
-    // Determine badge level (computer use uses lower thresholds)
-    const badgeLevel = computeBadgeLevel(newCount, newAvgQuality, 50, taskType);
-
-    // Check if this is a new or upgraded badge
-    const existingBadges = existingProfile?.badges || [];
-    const currentBadgeForType = existingBadges.find((b) => b.badge_type === config.badge_type);
-    const currentBadgeLevel = currentBadgeForType?.level || null;
-    const badgeEarned = checkBadgeEarned(currentBadgeLevel, badgeLevel);
-
-    // If badge earned, add to account badges
-    if (badgeEarned && badgeLevel) {
-      const badgeEntry = {
-        badge_type: config.badge_type,
-        level: badgeLevel,
-        earned_at: now,
-        task_type: taskType,
+      // --- 6. Update drafted-accounts/{email} ---
+      const accountUpdates = {
+        [`tasksCompleted.${config.field_key}`]: increment(1),
+        lastTaskCompletedAt: now,
       };
 
-      // Filter out any existing badge of same type (upgrade case)
-      const updatedBadges = currentTaskBadges.filter((b) => b.badge_type !== config.badge_type);
-      updatedBadges.push(badgeEntry);
-      accountUpdates.taskBadges = updatedBadges;
-    }
+      // Fetch current badge info to check for new badges BEFORE updating
+      const currentTaskBadges = accountData.taskBadges || [];
+      const currentTasksCompleted = accountData.tasksCompleted || {};
+      const previousCount = currentTasksCompleted[config.field_key] || 0;
+      const newCount = previousCount + 1;
 
-    await updateDoc(accountDocRef, accountUpdates);
+      // --- 7. Check badge progression ---
+      // Fetch all quality scores for this task type to compute average
+      const annotatorProfileRef = doc(db, 'annotator_profiles', userEmail); // userEmail already lowercased above
+      const annotatorSnap = await transaction.get(annotatorProfileRef);
+      const existingProfile = annotatorSnap.exists() ? annotatorSnap.data() : null;
 
-    // --- 8. Update annotator_profiles/{email} ---
-    const updatedBehavioralSignature = computeRollingBehavioralSignature(
-      existingProfile?.behavioral_signature,
-      behavioralData,
-      taskData,
-      existingTotalTasks,
-    );
+      const existingAvgQuality = existingProfile?.quality?.by_type?.[taskType] || 0;
+      const existingTotalForType = existingProfile?.tasks_by_type?.[taskType] || 0;
 
-    const updatedBadgesArray = updateBadgesArray(
-      existingBadges,
-      config.badge_type,
-      badgeLevel,
-      newCount,
-      newAvgQuality,
-      now,
-    );
+      // Compute new rolling average quality for this task type
+      const newAvgQuality =
+        existingTotalForType > 0
+          ? (existingAvgQuality * existingTotalForType + qualityScore) / (existingTotalForType + 1)
+          : qualityScore;
 
-    // --- Gold tracking update ---
-    const updatedGoldTracking = computeUpdatedGoldTracking(
-      existingProfile,
-      isGold,
-      goldId,
-      goldResult?.accuracy ?? null,
-    );
+      // Compute new overall average
+      const existingOverallAvg = existingProfile?.quality?.overall_avg || 0;
+      const existingTotalTasks = existingProfile?.total_tasks_completed || 0;
+      const newOverallAvg =
+        existingTotalTasks > 0
+          ? (existingOverallAvg * existingTotalTasks + qualityScore) / (existingTotalTasks + 1)
+          : qualityScore;
 
-    // Compute attention_check_pass_rate from gold tracking
-    const goldAccuracyAvg = updatedGoldTracking.gold_accuracy_avg || 0;
-    const goldItemsCompleted = updatedGoldTracking.gold_items_completed || 0;
-    const attentionCheckPassRate = goldItemsCompleted > 0 ? goldAccuracyAvg : 0;
+      // Determine badge level (computer use uses lower thresholds)
+      const badgeLevel = computeBadgeLevel(newCount, newAvgQuality, 50, taskType);
 
-    const annotatorProfileData = {
-      user_id: userId,
-      total_tasks_completed: (existingTotalTasks || 0) + 1,
-      tasks_by_type: {
-        ...(existingProfile?.tasks_by_type || {
-          rlhf_preference_ranking: 0,
-          computer_use_trajectory: 0,
-          multilingual_evaluation: 0,
-          process_supervision: 0,
-          red_teaming: 0,
-          tool_call_evaluation: 0,
-          code_review: 0,
-        }),
-        [taskType]: (existingTotalForType || 0) + 1,
-      },
-      badges: updatedBadgesArray,
-      quality: {
-        overall_avg: Math.round(newOverallAvg * 100) / 100,
-        by_type: {
-          ...(existingProfile?.quality?.by_type || {}),
-          [taskType]: Math.round(newAvgQuality * 100) / 100,
+      // Check if this is a new or upgraded badge
+      const existingBadges = existingProfile?.badges || [];
+      const currentBadgeForType = existingBadges.find((b) => b.badge_type === config.badge_type);
+      const currentBadgeLevel = currentBadgeForType?.level || null;
+      const badgeEarned = checkBadgeEarned(currentBadgeLevel, badgeLevel);
+
+      // If badge earned, add to account badges
+      if (badgeEarned && badgeLevel) {
+        const badgeEntry = {
+          badge_type: config.badge_type,
+          level: badgeLevel,
+          earned_at: now,
+          task_type: taskType,
+        };
+
+        // Filter out any existing badge of same type (upgrade case)
+        const updatedBadges = currentTaskBadges.filter((b) => b.badge_type !== config.badge_type);
+        updatedBadges.push(badgeEntry);
+        accountUpdates.taskBadges = updatedBadges;
+      }
+
+      transaction.set(taskDocRef, deepStripUndefined(taskRecord));
+      transaction.update(accountDocRef, accountUpdates);
+
+      // --- 8. Update annotator_profiles/{email} ---
+      const updatedBehavioralSignature = computeRollingBehavioralSignature(
+        existingProfile?.behavioral_signature,
+        behavioralData,
+        taskData,
+        existingTotalTasks,
+      );
+
+      const updatedBadgesArray = updateBadgesArray(
+        existingBadges,
+        config.badge_type,
+        badgeLevel,
+        newCount,
+        newAvgQuality,
+        now,
+      );
+
+      // --- Gold tracking update ---
+      const updatedGoldTracking = computeUpdatedGoldTracking(
+        existingProfile,
+        isGold,
+        goldId,
+        goldResult?.accuracy ?? null,
+      );
+
+      // Compute attention_check_pass_rate from gold tracking
+      const goldAccuracyAvg = updatedGoldTracking.gold_accuracy_avg || 0;
+      const goldItemsCompleted = updatedGoldTracking.gold_items_completed || 0;
+      const attentionCheckPassRate = goldItemsCompleted > 0 ? goldAccuracyAvg : 0;
+
+      const annotatorProfileData = {
+        user_id: userId,
+        total_tasks_completed: (existingTotalTasks || 0) + 1,
+        tasks_by_type: {
+          ...(existingProfile?.tasks_by_type || {
+            rlhf_preference_ranking: 0,
+            computer_use_trajectory: 0,
+            multilingual_evaluation: 0,
+            process_supervision: 0,
+            red_teaming: 0,
+            tool_call_evaluation: 0,
+            code_review: 0,
+          }),
+          [taskType]: (existingTotalForType || 0) + 1,
         },
-        trend: existingProfile?.quality?.trend || 'stable',
-        inter_annotator_agreement: existingProfile?.quality?.inter_annotator_agreement || 0,
-        attention_check_pass_rate: Math.round(attentionCheckPassRate * 100) / 100,
-        gold_accuracy: goldItemsCompleted > 0 ? Math.round(goldAccuracyAvg * 100) / 100 : 0,
-        gold_items_completed: goldItemsCompleted,
-      },
-      gold_tracking: updatedGoldTracking,
-      behavioral_signature: updatedBehavioralSignature,
-      matching: {
-        university: annotator.university,
-        major: annotator.major,
-        degree_level: annotator.degree_level,
-        native_language: annotator.native_language,
-        verified_languages: accountData.verifiedLanguages ||
-          accountData.verified_languages || [annotator.native_language],
-        domain_strengths: existingProfile?.matching?.domain_strengths || [],
-        available_hours_per_week: existingProfile?.matching?.available_hours_per_week || null,
-      },
-      updated_at: now,
-    };
+        badges: updatedBadgesArray,
+        quality: {
+          overall_avg: Math.round(newOverallAvg * 100) / 100,
+          by_type: {
+            ...(existingProfile?.quality?.by_type || {}),
+            [taskType]: Math.round(newAvgQuality * 100) / 100,
+          },
+          trend: existingProfile?.quality?.trend || 'stable',
+          inter_annotator_agreement: existingProfile?.quality?.inter_annotator_agreement || 0,
+          attention_check_pass_rate: Math.round(attentionCheckPassRate * 100) / 100,
+          gold_accuracy: goldItemsCompleted > 0 ? Math.round(goldAccuracyAvg * 100) / 100 : 0,
+          gold_items_completed: goldItemsCompleted,
+        },
+        gold_tracking: updatedGoldTracking,
+        behavioral_signature: updatedBehavioralSignature,
+        matching: {
+          university: annotator.university,
+          major: annotator.major,
+          degree_level: annotator.degree_level,
+          native_language: annotator.native_language,
+          verified_languages: accountData.verifiedLanguages ||
+            accountData.verified_languages || [annotator.native_language],
+          domain_strengths: existingProfile?.matching?.domain_strengths || [],
+          available_hours_per_week: existingProfile?.matching?.available_hours_per_week || null,
+        },
+        updated_at: now,
+      };
 
-    await setDoc(annotatorProfileRef, annotatorProfileData, { merge: true });
+      transaction.set(annotatorProfileRef, annotatorProfileData, { merge: true });
+      return { badgeEarned, badgeLevel, annotatorProfileData };
+    });
+    if (committed.existing) return committed.existing;
+    const { badgeEarned, badgeLevel, annotatorProfileData } = committed;
 
     // --- 9. Nova XP + leveling (unified across all task surfaces) ---
     // If the user has a Nova agent, award XP. No-op if they don't.
@@ -489,6 +501,7 @@ export async function submitTaskCore(taskType, taskData, behavioralData) {
     return {
       taskId,
       qualityScore,
+      captureRevision: taskData.capture_revision,
       badgeEarned: !!badgeEarned,
       badgeLevel: badgeLevel || null,
       xpResult, // null if user has no Nova agent, or on failure
@@ -586,4 +599,13 @@ function updateBadgesArray(existingBadges, badgeType, badgeLevel, tasksCompleted
   });
 
   return filtered;
+}
+
+function receiptResult(record, userId, taskData) {
+  if (record.annotator?.annotator_id !== userId || record.session_id !== taskData.session_id ||
+      record.drafted_project_id !== taskData.drafted_project_id ||
+      record.drafted_org_id !== taskData.drafted_org_id) {
+    throw new Error('Receipt does not match this account, session and project.');
+  }
+  return { taskId: record.task_id, qualityScore: record.quality_score, captureRevision: record.capture_revision, badgeEarned: false, badgeLevel: null };
 }

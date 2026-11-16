@@ -7,10 +7,10 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0a0518;
-  --bg-card: #150d2e;
-  --bg-card-hover: #1e1248;
-  --bg-input: #110b25;
+  --bg: #0b0d0c;
+  --bg-card: #141716;
+  --bg-card-hover: #1b1f1d;
+  --bg-input: #101312;
   --border: rgba(255, 255, 255, 0.12);
   --border-active: rgba(77, 255, 160, 0.25);
   --green: #4dffa0;
@@ -19,9 +19,9 @@
   --violet: #9b7fff;
   --orange: #f5a623;
   --coral: #ff6b8a;
-  --text: #eef0ff;
-  --text-muted: #b8aee0;
-  --text-faint: #8e83bf;
+  --text: #f2f4f3;
+  --text-muted: #a6aca9;
+  --text-faint: #7d8380;
 }
 
 * {
@@ -56,6 +56,12 @@ body {
   background: var(--bg);
 }
 
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--text-muted);
+  outline-offset: 3px;
+}
+
 .card {
   background: var(--bg-card);
   border: 1px solid rgba(255, 255, 255, 0.07);
@@ -87,6 +93,9 @@ body {
   }
   .chip {
     @apply rounded-pill border border-white/10 px-3 py-1 text-xs text-text-muted transition-colors hover:text-text;
+  }
+  .kbd {
+    @apply inline-block min-w-[1.5em] rounded border border-white/15 bg-white/[0.04] px-1 text-center font-inter text-[11px] leading-[1.6] text-text-muted;
   }
   .chip-on {
     @apply border-white/40 bg-white/10 text-text;
@@ -157,7 +166,7 @@ body {
   margin-top: 4px;
 }
 
-/* Sidekick mascot, ported from the character playground. */
+/* Sidekick flat-shape mascots. */
 .mascot {
   --look-x: 0px;
   --look-y: 0px;

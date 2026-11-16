@@ -1,11 +1,10 @@
-import { Eye, EyeSlash } from '@phosphor-icons/react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import Brand from '../shared/Brand';
+import { EXTENSION_VERSION } from '../shared/constants';
 import { useSettings } from '../shared/hooks';
 
 export function Options() {
   const [settings, updateSettings] = useSettings();
-  const [showApiKey, setShowApiKey] = useState(false);
   // Chrome only opens the side panel when open() runs right inside the click,
   // so the window id is looked up ahead of time.
   const windowIdRef = useRef<number | null>(null);
@@ -15,14 +14,6 @@ export function Options() {
       windowIdRef.current = win.id ?? null;
     });
   }, []);
-
-  const handleDomainBlocklistChange = (value: string) => {
-    const domains = value
-      .split('\n')
-      .map((d) => d.trim())
-      .filter(Boolean);
-    updateSettings({ domain_blocklist: domains });
-  };
 
   const handleDomainAllowlistChange = (value: string) => {
     const domains = value
@@ -50,66 +41,10 @@ export function Options() {
       <div className="mx-auto max-w-2xl space-y-10">
         <header className="flex items-end justify-between gap-4">
           <h1>
-            <Brand size="text-2xl" />
+            <Brand size="text-[32px]" />
           </h1>
           <p className="text-xs text-text-muted">Changes save automatically.</p>
         </header>
-
-        <Section title="Account">
-          <div className="space-y-4 py-4">
-            <div>
-              <label htmlFor="api-key" className="field-label">
-                Drafted API key
-              </label>
-              <div className="relative">
-                <input
-                  id="api-key"
-                  type={showApiKey ? 'text' : 'password'}
-                  value={settings.drafted_api_key}
-                  onChange={(e) => updateSettings({ drafted_api_key: e.target.value })}
-                  placeholder="sk_..."
-                  className="field pr-11 font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="icon-btn absolute right-1 top-1/2 -translate-y-1/2"
-                  aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
-                >
-                  {showApiKey ? <EyeSlash size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor="org-id" className="field-label">
-                  Organization ID
-                </label>
-                <input
-                  id="org-id"
-                  type="text"
-                  value={settings.drafted_org_id}
-                  onChange={(e) => updateSettings({ drafted_org_id: e.target.value })}
-                  placeholder="org_..."
-                  className="field font-mono"
-                />
-              </div>
-              <div>
-                <label htmlFor="project-id" className="field-label">
-                  Project ID
-                </label>
-                <input
-                  id="project-id"
-                  type="text"
-                  value={settings.drafted_project_id}
-                  onChange={(e) => updateSettings({ drafted_project_id: e.target.value })}
-                  placeholder="proj_..."
-                  className="field font-mono"
-                />
-              </div>
-            </div>
-          </div>
-        </Section>
 
         <Section title="Capture">
           <Toggle
@@ -119,42 +54,11 @@ export function Options() {
             onChange={(v) => updateSettings({ screenshot_on_action: v })}
           />
           <Toggle
-            title="Record screen video"
-            description="Also record the screen. Chrome asks which screen to share each time you start, and the video uploads with the session."
-            checked={settings.record_video}
-            onChange={(v) => updateSettings({ record_video: v })}
-          />
-          <Toggle
             title="Mask all input values"
             description="Hide everything typed into fields, not just passwords."
             checked={settings.mask_all_inputs}
             onChange={(v) => updateSettings({ mask_all_inputs: v })}
           />
-          <div className="py-4">
-            <div className="flex items-baseline justify-between">
-              <label htmlFor="interval" className="text-sm font-medium text-text">
-                Screenshot interval
-              </label>
-              <span className="text-sm tabular-nums text-text-muted">
-                {(settings.screenshot_interval_ms / 1000).toFixed(1)} s
-              </span>
-            </div>
-            <p className="mt-0.5 text-xs text-text-muted">
-              How often to take a screenshot between actions, to catch changes on the page.
-            </p>
-            <input
-              id="interval"
-              type="range"
-              min="1000"
-              max="5000"
-              step="100"
-              value={settings.screenshot_interval_ms}
-              onChange={(e) =>
-                updateSettings({ screenshot_interval_ms: Number.parseInt(e.target.value, 10) })
-              }
-              className="mt-3 w-full accent-white"
-            />
-          </div>
           <div className="grid gap-4 py-4 sm:grid-cols-2">
             <div>
               <label htmlFor="max-steps" className="field-label">
@@ -212,59 +116,12 @@ export function Options() {
                 className="field font-mono"
               />
             </div>
-            <div>
-              <label htmlFor="blocklist" className="field-label">
-                Never capture on
-              </label>
-              <textarea
-                id="blocklist"
-                value={settings.domain_blocklist.join('\n')}
-                onChange={(e) => handleDomainBlocklistChange(e.target.value)}
-                placeholder={'banking.example.com\nmail.google.com\n*.stripe.com'}
-                rows={4}
-                className="field font-mono"
-              />
-            </div>
           </div>
           <p className="pb-4 text-xs text-text-muted">
             One domain per line. <span className="font-mono">*.example.com</span> matches subdomains
-            only, so list the bare domain too if you need it. The never-capture list always wins.
+            only, so list the bare domain too if you need it. Drafted manages sensitive-screen
+            protection.
           </p>
-        </Section>
-
-        <Section title="Export formats">
-          <Toggle
-            title="Anthropic Messages"
-            description="A /v1/messages request body with computer tool use."
-            checked={settings.export_formats.anthropic}
-            onChange={(v) =>
-              updateSettings({ export_formats: { ...settings.export_formats, anthropic: v } })
-            }
-          />
-          <Toggle
-            title="OpenAI Responses"
-            description="A /v1/responses request body with the computer tool."
-            checked={settings.export_formats.openai}
-            onChange={(v) =>
-              updateSettings({ export_formats: { ...settings.export_formats, openai: v } })
-            }
-          />
-          <Toggle
-            title="Drafted Universal"
-            description="The full session JSON with metadata, page elements and tasks."
-            checked={settings.export_formats.universal}
-            onChange={(v) =>
-              updateSettings({ export_formats: { ...settings.export_formats, universal: v } })
-            }
-          />
-          <Toggle
-            title="Trajectory v1"
-            description="The Drafted trajectory episode schema used for datasets."
-            checked={settings.export_formats.trajectory}
-            onChange={(v) =>
-              updateSettings({ export_formats: { ...settings.export_formats, trajectory: v } })
-            }
-          />
         </Section>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-6">
@@ -280,7 +137,7 @@ export function Options() {
               Show welcome again
             </button>
           </div>
-          <p className="text-xs text-text-faint">Sidekick 1.0.0 by Drafted Labs</p>
+          <p className="text-xs text-text-faint">Sidekick {EXTENSION_VERSION} by Drafted Labs</p>
         </footer>
       </div>
     </div>

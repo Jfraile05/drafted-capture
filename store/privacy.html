@@ -31,19 +31,18 @@
 
     <h2>Where your data goes</h2>
     <p>
-      <strong>Your recordings stay on your device.</strong> Sessions and settings are
-      stored locally using the browser's extension storage and IndexedDB. The extension
-      does not send your recordings to Drafted's servers or any third party. Data leaves
-      your machine only when you explicitly choose to export it as a file you save
-      yourself, or, if you configure an optional API key, when you choose to upload to a
-      destination you control. Optional AI lab API keys you enter are sent only to that
-      lab's own endpoint and never to Drafted.
+      Sessions and settings are stored on your device using extension storage and
+      IndexedDB. After sign-in and project selection, completed sessions upload
+      automatically to Drafted, including steps, screenshots, page context
+      and labels. New continuous screen video is disabled. If offline, the extension retains the session
+      locally and retries. Sessions without a project stay on your device until a
+      destination is selected. Deleting a local copy does not delete the server copy.
     </p>
 
     <h2>Privacy controls</h2>
     <ul>
       <li>Password fields are masked in the recorded data.</li>
-      <li>A domain blocklist lets you exclude any sites from capture entirely.</li>
+      <li>Drafted-managed sensitive-screen checks pause recording and ask before resuming. You can also restrict capture to a personal allowlist.</li>
       <li>Capture never runs unless you turn it on, and you can stop at any time.</li>
       <li>You can delete any recorded session from the review panel.</li>
     </ul>

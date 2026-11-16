@@ -1,16 +1,24 @@
-import { ArrowLeft, ArrowsClockwise, Trash } from '@phosphor-icons/react';
+import {
+  ArrowLeft,
+  ArrowsClockwise,
+  CaretLeft,
+  CaretRight,
+  TagSimple,
+  Trash,
+} from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Brand from '../shared/Brand';
+import { SessionSyncStatus } from '../shared/SyncStatus';
 import { sendMessage, useLiveSession } from '../shared/hooks';
+import { ARCHIVED_SESSION_CHANGE } from '../shared/storage/sessionUpdates';
 import type { Session } from '../shared/types';
-import { Export } from './Export';
+import { workflowTitle } from '../shared/utils/format';
 import { Inspector } from './Inspector';
 import { Replay } from './Replay';
 import { Segments } from './Segments';
-import { SubmitBar } from './SubmitBar';
 import { Timeline } from './Timeline';
 
-type Tab = 'timeline' | 'replay' | 'segments' | 'export';
+type Tab = 'timeline' | 'replay' | 'segments';
 
 export function App() {
   const liveSession = useLiveSession();
@@ -18,20 +26,31 @@ export function App() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [selectedStepIndex, setSelectedStepIndex] = useState<number | null>(null);
+  // The step just viewed, so the list returns to it after closing the details.
+  const [lastViewedStep, setLastViewedStep] = useState<number | null>(null);
   const [rangeStart, setRangeStart] = useState<number | null>(null);
   const [rangeEnd, setRangeEnd] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('timeline');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const loadSequence = useRef(0);
 
-  const loadSessions = useCallback(async (autoSelectNewest = false) => {
-    setLoading(true);
-    setLoadError(null);
+  const loadSessions = useCallback(async (autoSelectNewest = false, quiet = false) => {
+    const sequence = ++loadSequence.current;
+    if (!quiet) {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
       const list = await sendMessage<Session[]>('LIST_SESSIONS');
       // The worker answers { error } instead of throwing when it fails.
       if (!Array.isArray(list)) throw new Error((list as { error?: string })?.error ?? 'No answer');
+      if (sequence !== loadSequence.current) return;
       setSessions(list);
+      setSelectedSession((current) =>
+        current ? (list.find((session) => session.id === current.id) ?? null) : current,
+      );
+      setLoadError(null);
       // When opened fresh (e.g. right after a capture stops), jump straight
       // into the newest session so the user can label it immediately.
       if (autoSelectNewest && list.length > 0) {
@@ -39,13 +58,29 @@ export function App() {
       }
     } catch (err) {
       console.error('Failed to load sessions:', err);
-      setLoadError(String(err).replace(/^Error:\s*/, ''));
+      if (sequence === loadSequence.current && !quiet) {
+        setLoadError(String(err).replace(/^Error:\s*/, ''));
+      }
     }
-    setLoading(false);
+    if (sequence === loadSequence.current) setLoading(false);
   }, []);
 
   useEffect(() => {
+    const onArchiveChange = (
+      changes: Record<string, chrome.storage.StorageChange>,
+      area: string,
+    ) => {
+      if (area === 'session' && changes[ARCHIVED_SESSION_CHANGE]) void loadSessions(false, true);
+    };
+    const onFocus = () => void loadSessions(false, true);
+    chrome.storage.onChanged.addListener(onArchiveChange);
+    window.addEventListener('focus', onFocus);
     loadSessions(true);
+    return () => {
+      chrome.storage.onChanged.removeListener(onArchiveChange);
+      window.removeEventListener('focus', onFocus);
+      loadSequence.current++;
+    };
   }, [loadSessions]);
 
   // The panel can stay open while a capture runs. Reload the list when the
@@ -58,18 +93,27 @@ export function App() {
   }, [isActive, loadSessions]);
 
   useEffect(() => {
+    let cancelled = false;
     if (selectedSessionId) {
       sendMessage<Session | undefined>('GET_SESSION', { id: selectedSessionId })
-        .then((s) => setSelectedSession(s ?? null))
-        .catch(() => setSelectedSession(null));
+        .then((s) => {
+          if (!cancelled) setSelectedSession(s ?? null);
+        })
+        .catch(() => {
+          if (!cancelled) setSelectedSession(null);
+        });
     } else {
       setSelectedSession(null);
     }
+    return () => {
+      cancelled = true;
+    };
   }, [selectedSessionId]);
 
   const handleSessionSelect = (id: string) => {
     setSelectedSessionId(id);
     setSelectedStepIndex(null);
+    setLastViewedStep(null);
     setRangeStart(null);
     setRangeEnd(null);
     setActiveTab('timeline');
@@ -101,7 +145,7 @@ export function App() {
   };
 
   const handleSessionUpdate = (updatedSession: Session) => {
-    setSelectedSession(updatedSession);
+    setSelectedSession((current) => (current?.id === updatedSession.id ? updatedSession : current));
     setSessions((prev) => prev.map((s) => (s.id === updatedSession.id ? updatedSession : s)));
   };
 
@@ -143,7 +187,6 @@ export function App() {
     timeline: 'Steps',
     replay: 'Replay',
     segments: 'Tasks',
-    export: 'Export',
   };
 
   const closeSession = () => {
@@ -155,7 +198,7 @@ export function App() {
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-bg">
       <header className="flex h-[72px] shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] px-3">
-        <Brand size="text-2xl" className="pl-1" />
+        <Brand size="text-[28px]" className="pl-1" />
         {!selectedSession && (
           <button
             type="button"
@@ -180,8 +223,11 @@ export function App() {
           >
             <ArrowLeft size={18} />
           </button>
-          <h1 className="min-w-0 truncate text-sm font-semibold text-text">
-            {fmtSessionDate(selectedSession.started_at)}
+          <h1
+            className="min-w-0 flex-1 truncate text-sm font-semibold text-text"
+            title={`${workflowTitle(selectedSession)} (${fmtSessionDate(selectedSession.started_at)})`}
+          >
+            {workflowTitle(selectedSession)}
           </h1>
           <span className="shrink-0 text-xs text-text-muted">
             {selectedSession.outcome.total_steps} steps
@@ -191,7 +237,7 @@ export function App() {
 
       {liveSession && liveSession.state === 'capturing' && (
         <p className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-4 py-2 text-xs text-text-muted">
-          <span className="h-2 w-2 rounded-full bg-[#FF239B] pulse-dot" />
+          <span className="h-2 w-2 rounded-full bg-green pulse-dot" />
           Recording. Stop from the popup to review it here.
         </p>
       )}
@@ -212,12 +258,15 @@ export function App() {
             <div className="px-6 py-12 text-center">
               <p className="text-sm font-semibold text-text">No sessions yet</p>
               <p className="mt-1 text-sm text-text-muted">
-                Start capturing from the popup. Finished sessions show up here.
+                Start a recording from the popup. Sessions appear here when you stop.
               </p>
             </div>
           )}
           {!loading && sessions.length > 0 && (
             <>
+              <h1 className="px-4 pb-1 pt-4 text-xs font-medium text-text-muted">
+                {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}
+              </h1>
               <ul>
                 {sessions.map((s) => (
                   <li
@@ -231,18 +280,20 @@ export function App() {
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-medium text-text">
-                          {fmtSessionDate(s.started_at)}
+                          {workflowTitle(s)}
                         </span>
                         <span className="block text-xs text-text-muted">
-                          {s.outcome.total_steps} steps
+                          {fmtSessionDate(s.started_at)}, {s.outcome.total_steps} steps
                           {s.segments.length > 0
                             ? `, ${s.segments.length} ${s.segments.length === 1 ? 'task' : 'tasks'}`
                             : ''}
                         </span>
                       </span>
-                      {s.submission?.drafted_task_id && (
-                        <span className="shrink-0 text-xs text-text-muted">Submitted</span>
-                      )}
+                      <span
+                        className={`shrink-0 text-xs ${s.submission?.drafted_task_id ? 'text-green' : 'text-text-muted'}`}
+                      >
+                        <SessionSyncStatus session={s} />
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -272,25 +323,20 @@ export function App() {
 
       {selectedSessionId && selectedSession && (
         <div className="flex flex-1 flex-col overflow-hidden">
-          <SubmitBar
-            session={selectedSession}
-            onSessionUpdate={handleSessionUpdate}
-            onStartLabeling={() => {
-              setActiveTab('timeline');
-              setSelectedStepIndex(0);
-            }}
-          />
+          <div className="shrink-0 px-4 py-2">
+            <SessionSyncStatus session={selectedSession} />
+          </div>
           <nav
             className="flex shrink-0 gap-1 border-b border-white/[0.06] px-2"
             aria-label="Session views"
           >
-            {(['timeline', 'replay', 'segments', 'export'] as Tab[]).map((tab) => (
+            {(['timeline', 'replay', 'segments'] as Tab[]).map((tab) => (
               <button
                 type="button"
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 aria-current={activeTab === tab ? 'page' : undefined}
-                className={`-mb-px border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                className={`-mb-px min-w-0 flex-1 border-b-2 px-1 py-2.5 text-sm font-medium transition-colors ${
                   activeTab === tab
                     ? 'border-text text-text'
                     : 'border-transparent text-text-muted hover:text-text'
@@ -304,44 +350,93 @@ export function App() {
           <div className="flex-1 overflow-hidden">
             {activeTab === 'timeline' && (
               <div className="flex h-full flex-col">
-                <Timeline
-                  session={selectedSession}
-                  selectedIndex={selectedStepIndex}
-                  rangeStart={rangeStart}
-                  rangeEnd={rangeEnd}
-                  onStepSelect={handleStepSelect}
-                  onShiftStepSelect={handleShiftStepSelect}
-                  onLabelRange={handleLabelRange}
-                />
-                {selectedStepIndex !== null && (
-                  <Inspector
+                {selectedStepIndex === null ? (
+                  <Timeline
                     session={selectedSession}
-                    stepIndex={selectedStepIndex}
+                    selectedIndex={lastViewedStep}
                     rangeStart={rangeStart}
                     rangeEnd={rangeEnd}
-                    onSetRangeEnd={handleSetRangeEnd}
-                    onClearRange={handleClearRange}
-                    onSessionUpdate={handleSessionUpdate}
+                    onStepSelect={handleStepSelect}
+                    onShiftStepSelect={handleShiftStepSelect}
+                    onLabelRange={handleLabelRange}
                   />
+                ) : (
+                  // One step at a time, full height, so the list and the
+                  // screenshot never squeeze each other.
+                  <>
+                    <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.06] px-2 py-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLastViewedStep(selectedStepIndex);
+                          setSelectedStepIndex(null);
+                        }}
+                        className="icon-btn"
+                        aria-label="Back to all steps"
+                        title="All steps"
+                      >
+                        <ArrowLeft size={18} />
+                      </button>
+                      <span className="flex-1 text-sm font-medium tabular-nums text-text">
+                        Step {selectedStepIndex + 1} of {selectedSession.steps.length}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedStepIndex(selectedStepIndex - 1)}
+                        disabled={selectedStepIndex === 0}
+                        className="icon-btn disabled:cursor-not-allowed disabled:opacity-30"
+                        aria-label="Previous step"
+                      >
+                        <CaretLeft size={18} weight="bold" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedStepIndex(selectedStepIndex + 1)}
+                        disabled={selectedStepIndex >= selectedSession.steps.length - 1}
+                        className="icon-btn disabled:cursor-not-allowed disabled:opacity-30"
+                        aria-label="Next step"
+                      >
+                        <CaretRight size={18} weight="bold" />
+                      </button>
+                    </div>
+                    {rangeStart !== null && rangeEnd !== null && (
+                      <div className="shrink-0 px-3 pt-3">
+                        <button
+                          type="button"
+                          onClick={handleLabelRange}
+                          className="btn-ghost w-full"
+                        >
+                          <TagSimple size={16} />
+                          Name these {Math.abs(rangeEnd - rangeStart) + 1} steps as a task
+                        </button>
+                      </div>
+                    )}
+                    <Inspector
+                      key={selectedStepIndex}
+                      session={selectedSession}
+                      stepIndex={selectedStepIndex}
+                      rangeStart={rangeStart}
+                      rangeEnd={rangeEnd}
+                      onSetRangeEnd={handleSetRangeEnd}
+                      onClearRange={handleClearRange}
+                      onSessionUpdate={handleSessionUpdate}
+                    />
+                  </>
                 )}
               </div>
             )}
             {activeTab === 'replay' && <Replay session={selectedSession} />}
             {activeTab === 'segments' && (
               <Segments
+                key={selectedSession.id}
                 session={selectedSession}
                 rangeStart={rangeStart}
                 rangeEnd={rangeEnd}
                 onSessionUpdate={handleSessionUpdate}
                 onClearRange={handleClearRange}
-              />
-            )}
-            {activeTab === 'export' && (
-              <Export
-                session={selectedSession}
-                onDelete={() => {
-                  setSelectedSessionId(null);
-                  loadSessions();
+                onRangeChange={(start, end) => {
+                  setRangeStart(start);
+                  setRangeEnd(end);
                 }}
               />
             )}

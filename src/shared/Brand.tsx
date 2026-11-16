@@ -1,6 +1,6 @@
 // Sidekick brand: the animated mascot, the "sidekick." wordmark and the
-// "By Drafted Labs" byline. The mascot SVG is ported from the Sidekick
-// character playground; its CSS lives in styles.css under `.mascot`.
+// "By Drafted Labs" byline. Each character is a flat shape with two eyes;
+// their animation CSS lives in styles.css under `.mascot`.
 
 import { type Ref, type RefObject, useEffect, useRef, useState } from 'react';
 import { useLiveSession } from './hooks';
@@ -9,25 +9,26 @@ export type MascotState = 'waiting' | 'watching' | 'capturing' | 'paused' | 'don
 
 const SHAPES: Record<MascotState, string> = {
   waiting:
-    '<path d="M160 52 C218 50 260 93 261 150 C262 204 218 241 159 241 C101 241 59 204 59 150 C59 96 101 54 160 52Z" fill="#FFFFFF"/>',
+    '<path d="M117 62 H203 Q254 62 254 113 V181 Q254 232 203 232 H117 Q66 232 66 181 V113 Q66 62 117 62Z" fill="#FFFFFF"/>',
   watching:
-    '<path d="M176 50 C189 40 201 48 210 70 C222 100 247 153 255 184 C263 215 242 231 209 235 C168 241 112 228 83 210 C55 193 59 174 78 152 C105 121 151 69 176 50Z" fill="#FF239B"/>',
+    '<path d="M141 60 Q163 43 183 62 L245 121 Q267 142 248 166 L193 226 Q174 246 151 229 L77 177 Q52 159 70 134Z" fill="#FF239B"/>',
   capturing:
-    '<path d="M102 80 C111 48 149 40 175 62 C205 48 235 63 244 91 C273 102 282 137 262 163 C277 193 257 224 225 227 C204 249 170 245 148 230 C117 244 88 225 85 198 C55 192 43 163 54 137 C44 106 69 78 102 80Z" fill="#1286FF"/>',
+    '<path d="M160 76 C205 38 263 88 229 138 C272 181 221 243 171 216 C125 254 65 211 87 161 C43 121 99 56 143 80 Q152 84 160 76Z" fill="#1286FF"/>',
   paused:
-    '<path d="M127 48 C133 42 140 47 150 55 C175 76 214 103 230 130 C251 165 245 199 222 220 C197 243 159 246 129 231 C97 215 78 184 83 151 C88 116 108 74 120 55 C122 52 124 50 127 48Z" fill="#FFAE00"/>',
-  done: '<path d="M62 185 C58 125 92 72 151 63 C209 54 250 92 258 151 L263 194 C268 220 250 235 223 236 L101 236 C77 236 63 219 62 197Z" fill="#00CA78"/>',
+    '<path d="M80 72 Q116 58 160 80 Q204 58 240 72 Q254 78 248 96 Q232 144 248 194 Q254 214 234 222 Q194 236 160 216 Q126 236 86 222 Q66 214 72 194 Q88 144 72 96 Q66 78 80 72Z" fill="#FFAE00"/>',
+  done: '<circle cx="160" cy="145" r="88" fill="#00CA78"/>',
 };
 
 const EYES: Record<MascotState, string> = {
   waiting:
-    '<g transform="rotate(-9 160 146)"><rect x="119" y="116" width="25" height="58" rx="12.5"/><rect x="176" y="116" width="25" height="58" rx="12.5"/></g>',
+    '<rect x="119" y="120" width="24" height="48" rx="12"/><rect x="177" y="116" width="24" height="48" rx="12"/>',
   watching:
-    '<rect x="151" y="110" width="20" height="36" rx="10"/><rect x="190" y="119" width="20" height="36" rx="10"/>',
+    '<rect x="125" y="119" width="23" height="43" rx="11.5"/><rect x="181" y="115" width="23" height="43" rx="11.5"/>',
   capturing:
-    '<rect x="118" y="118" width="27" height="60" rx="13.5"/><rect x="176" y="123" width="27" height="60" rx="13.5"/>',
-  paused: '<ellipse cx="139" cy="164" rx="20" ry="25"/><circle cx="186" cy="155" r="12"/>',
-  done: '<rect x="120" y="123" width="24" height="53" rx="12"/><rect x="177" y="123" width="24" height="53" rx="12"/>',
+    '<rect x="121" y="121" width="24" height="46" rx="12"/><rect x="177" y="125" width="24" height="46" rx="12"/>',
+  paused:
+    '<rect x="117" y="140" width="29" height="15" rx="7.5"/><rect x="176" y="136" width="29" height="15" rx="7.5"/>',
+  done: '<rect x="121" y="119" width="24" height="39" rx="12"/><rect x="178" y="115" width="24" height="39" rx="12"/>',
 };
 
 /**
@@ -366,9 +367,11 @@ function useFollowCursor(elRef: RefObject<HTMLSpanElement | null>, enabled: bool
 /** Mascot and wordmark, top left on every page. The mascot shows the live capture state. */
 export default function Brand({
   size = 'text-xl',
+  mascotSize = 'h-12 w-[52px]',
   className = '',
 }: {
   size?: string;
+  mascotSize?: string;
   className?: string;
 }) {
   const state = useMascotState();
@@ -391,7 +394,7 @@ export default function Brand({
       <button
         type="button"
         onClick={() => playReaction(ref.current, 'petting')}
-        className="h-12 w-[52px] shrink-0 cursor-pointer"
+        className={`${mascotSize} shrink-0 cursor-pointer`}
         aria-label="Sidekick"
       >
         <Mascot ref={ref} state={state} className="h-full w-full" />

@@ -1,11 +1,25 @@
+import { type EarningsClock, earningsClock } from '../shared/liveEarnings';
+import type { PrivacyGate } from '../shared/privacy';
+import type { LiveSession } from '../shared/types';
+import { watchActivity } from './activity';
 import { startCapture } from './capture';
-import { createOverlay, destroyOverlay } from './overlay';
+import { createOverlay } from './overlay';
+import { showPrivacyGate, watchPrivacy } from './privacyOverlay';
+import { startScreenshotHeartbeat } from './screenshotHeartbeat';
 import { findSensitiveRegions } from './sensitiveRegions';
 
 type CleanupFn = () => void;
 
 let captureCleanup: CleanupFn | null = null;
+let heartbeatCleanup: CleanupFn | null = null;
+let privacyCleanup: CleanupFn | null = null;
 let isCapturing = false;
+let activitySessionId: string | undefined;
+let activityCleanup: CleanupFn | undefined;
+let latestClock: EarningsClock | null = null;
+let captureUpdateReceived = false;
+// Bumped by every broadcast, so a slower resync read never undoes a newer one.
+let captureUpdateVersion = 0;
 
 // Overlay needs document.body, which may not exist yet at document_start.
 // Defer just the overlay paint until the body is available; capture listeners
@@ -18,20 +32,36 @@ function withBody(fn: () => void): void {
   }
 }
 
-function handleSetCapture(capturing: boolean): void {
+function handleSetCapture(
+  capturing: boolean,
+  gate: PrivacyGate | null = null,
+  clock: EarningsClock | null = null,
+): void {
+  showPrivacyGate(gate);
+  latestClock = clock;
+  if (activitySessionId !== clock?.id) {
+    activityCleanup?.();
+    activitySessionId = clock?.id;
+    activityCleanup = clock ? watchActivity(clock.id) : undefined;
+  }
+  withBody(() => createOverlay(latestClock));
   if (capturing === isCapturing) return;
 
   isCapturing = capturing;
 
   if (capturing) {
     captureCleanup = startCapture();
-    withBody(createOverlay);
+    heartbeatCleanup = startScreenshotHeartbeat();
+    privacyCleanup = watchPrivacy();
   } else {
+    heartbeatCleanup?.();
+    heartbeatCleanup = null;
+    privacyCleanup?.();
+    privacyCleanup = null;
     if (captureCleanup) {
       captureCleanup();
       captureCleanup = null;
     }
-    destroyOverlay();
   }
 }
 
@@ -42,7 +72,13 @@ function initContentScript(): void {
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       try {
         if (message?.type === 'SET_CAPTURE') {
-          handleSetCapture(Boolean(message.payload?.capturing));
+          captureUpdateReceived = true;
+          captureUpdateVersion++;
+          handleSetCapture(
+            Boolean(message.payload?.capturing),
+            message.payload?.privacyGate ?? null,
+            message.payload?.clock ?? null,
+          );
           sendResponse({ ok: true });
           return true;
         }
@@ -62,12 +98,34 @@ function initContentScript(): void {
       return false;
     });
 
-    // The worker replies with a CaptureState string ('idle' | 'capturing' |
-    // 'paused'). If this page loaded while capture is already running, self
-    // start so capture stays continuous across every tab.
-    chrome.runtime.sendMessage({ type: 'GET_CAPTURE_STATE' }, (response?: string) => {
-      if (chrome.runtime.lastError) return;
-      if (response === 'capturing') handleSetCapture(true);
+    // Restore the clock on navigation without letting an older read undo a broadcast.
+    chrome.runtime.sendMessage({ type: 'GET_LIVE_SESSION' }, (response?: LiveSession) => {
+      if (chrome.runtime.lastError || captureUpdateReceived) return;
+      handleSetCapture(
+        response?.state === 'capturing',
+        response?.privacy_gate ?? null,
+        earningsClock(response ?? null),
+      );
+    });
+
+    // Frozen background tabs and pages restored from the back/forward cache
+    // miss broadcasts (like Stop or a new task). Re-read the session when the
+    // page is shown so the pill never keeps an old task's time.
+    const resync = () => {
+      if (document.hidden || !chrome.runtime?.id) return;
+      const version = captureUpdateVersion;
+      chrome.runtime.sendMessage({ type: 'GET_LIVE_SESSION' }, (response?: LiveSession) => {
+        if (chrome.runtime.lastError || version !== captureUpdateVersion) return;
+        handleSetCapture(
+          response?.state === 'capturing',
+          response?.privacy_gate ?? null,
+          earningsClock(response ?? null),
+        );
+      });
+    };
+    document.addEventListener('visibilitychange', resync);
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) resync();
     });
   } catch (err) {
     console.warn('[drafted.capture] content script init failed', err);

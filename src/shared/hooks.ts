@@ -8,25 +8,28 @@
 
 import { useEffect, useState } from 'react';
 import { DEFAULT_SETTINGS, STORAGE_KEYS } from './constants';
+import { observeLiveSession } from './observeLiveSession';
+import { currentSettings } from './storage/live';
 import type { LiveSession, Settings } from './types';
 
 export function useLiveSession(): LiveSession | null {
+  return useLiveSessionState().session;
+}
+
+export function useLiveSessionState(): { session: LiveSession | null; loaded: boolean } {
   const [session, setSession] = useState<LiveSession | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    chrome.storage.session.get(STORAGE_KEYS.LIVE_SESSION, (r) => {
-      setSession(r[STORAGE_KEYS.LIVE_SESSION] ?? null);
-    });
-    const listener = (changes: { [k: string]: chrome.storage.StorageChange }, area: string) => {
-      if (area === 'session' && changes[STORAGE_KEYS.LIVE_SESSION]) {
-        setSession(changes[STORAGE_KEYS.LIVE_SESSION].newValue ?? null);
-      }
-    };
-    chrome.storage.onChanged.addListener(listener);
-    return () => chrome.storage.onChanged.removeListener(listener);
-  }, []);
+  useEffect(
+    () =>
+      observeLiveSession((value) => {
+        setSession(value);
+        setLoaded(true);
+      }),
+    [],
+  );
 
-  return session;
+  return { session, loaded };
 }
 
 export function useSettings(): [Settings, (patch: Partial<Settings>) => void] {
@@ -34,11 +37,11 @@ export function useSettings(): [Settings, (patch: Partial<Settings>) => void] {
 
   useEffect(() => {
     chrome.storage.local.get(STORAGE_KEYS.SETTINGS, (r) => {
-      setSettings({ ...DEFAULT_SETTINGS, ...(r[STORAGE_KEYS.SETTINGS] ?? {}) });
+      setSettings(currentSettings(r[STORAGE_KEYS.SETTINGS]));
     });
     const listener = (changes: { [k: string]: chrome.storage.StorageChange }, area: string) => {
       if (area === 'local' && changes[STORAGE_KEYS.SETTINGS]) {
-        setSettings({ ...DEFAULT_SETTINGS, ...(changes[STORAGE_KEYS.SETTINGS].newValue ?? {}) });
+        setSettings(currentSettings(changes[STORAGE_KEYS.SETTINGS].newValue));
       }
     };
     chrome.storage.onChanged.addListener(listener);
@@ -47,7 +50,7 @@ export function useSettings(): [Settings, (patch: Partial<Settings>) => void] {
 
   const update = (patch: Partial<Settings>) => {
     setSettings((prev) => {
-      const next = { ...prev, ...patch };
+      const next = currentSettings({ ...prev, ...patch });
       chrome.storage.local.set({ [STORAGE_KEYS.SETTINGS]: next });
       return next;
     });
