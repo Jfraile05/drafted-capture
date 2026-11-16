@@ -381,9 +381,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 chrome.windows.onFocusChanged.addListener(() => {
-  void invalidatePrivacyApproval()
-    .then(() => checkCurrentScreen())
-    .catch(() => {});
+  void checkCurrentScreen().catch(() => {});
 });
 void chrome.alarms.create(PRIVACY_CONFIG.alarmName, {
   periodInMinutes: PRIVACY_CONFIG.refreshMinutes,

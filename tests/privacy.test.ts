@@ -9,7 +9,7 @@ import { captureVisible, resetCaptureQueue } from '../src/shared/utils/captureQu
 import { getPrivacyPolicy, refreshPrivacyPolicy } from '../src/background/privacyPolicy';
 import { startCapture, resumeCapture, stopCapture, pauseCapture } from '../src/background/session';
 import { getLiveSession, setLiveSession, currentSettings } from '../src/shared/storage/live';
-import { handleCaptureEvent, handleIntervalScreenshot, handleTabUpdated } from '../src/background/coordinator';
+import { handleCaptureEvent, handleIntervalScreenshot, handleTabActivated, handleTabUpdated } from '../src/background/coordinator';
 import { __reset, __steps, __screenshots, __sessions } from './stubs/db';
 import { checkInputIdle } from '../src/background/idle';
 import { activeElapsed } from '../src/shared/activeTime';
@@ -197,11 +197,13 @@ describe('privacy before persistence', () => {
     assert.equal(__screenshots.size, 1);
     assert.equal(__steps.get(live.id)?.length, 1);
   });
-  it('fails closed if a page cannot be inspected', async (t) => {
+  it('captures nothing from a page it cannot inspect, without asking the student', async (t) => {
     const live = await startCapture(undefined, 'productivity');
     t.mock.method(chrome.scripting, 'executeScript', async () => { throw Error('Cannot inspect'); });
     assert.equal(await privacy.capturePermit(tab.id, tab.url), null);
-    assert.ok((await getLiveSession())?.privacy_gate?.reasons.includes('unavailable'));
+    assert.equal((await handleCaptureEvent(raw(), sender())).ok, false);
+    assert.equal((await getLiveSession())?.state, 'capturing');
+    assert.equal((await getLiveSession())?.privacy_gate, undefined);
     assert.equal(__steps.get(live.id)?.length ?? 0, 0);
     assert.equal(captures, 0);
   });
@@ -241,13 +243,10 @@ describe('privacy confirmation', () => {
     assert.equal((await resumeCapture({ session_id: live.id }, gate.id))?.state, 'capturing');
     assert.ok(await privacy.capturePermit(tab.id, tab.url));
   });
-  it('rejects stale confirmation after navigation or a different document loads at the same URL', async () => {
+  it('rejects stale confirmation after moving to another sensitive site', async () => {
     tab.url = 'https://chase.com/';
     const live = await startCapture(undefined, 'productivity');
-    documentId = 'document-2';
-    assert.equal((await resumeCapture({ session_id: live.id }, live.privacy_gate!.id))?.state, 'paused');
-    const gate = (await getLiveSession())!.privacy_gate!;
-    assert.notEqual(gate.id, live.privacy_gate!.id);
+    const gate = live.privacy_gate!;
     tab.url = 'https://paypal.com/';
     assert.equal((await resumeCapture({ session_id: live.id }, gate.id))?.state, 'paused');
     assert.ok((await getLiveSession())?.privacy_gate?.reasons.includes('payment'));
@@ -271,5 +270,52 @@ describe('privacy confirmation', () => {
     assert.equal(await privacy.validatePermit(permit), false);
     await stopCapture(); await startCapture(undefined, 'productivity');
     assert.equal(await privacy.validatePermit(permit), false);
+  });
+});
+
+describe('busy pages keep recording', () => {
+  it('does not pause when a single page app changes its URL faster than the tab reports it', async (t) => {
+    const live = await startCapture(undefined, 'productivity');
+    tab.url = 'https://www.google.com/travel/flights';
+    t.mock.method(chrome.scripting, 'executeScript', async () => [{
+      frameId: 0, documentId, result: { url: tab.url + '?tfs=abc', reasons: [], ready: true, frames: [] },
+    }]);
+    await privacy.checkCurrentScreen();
+    assert.equal((await handleCaptureEvent(raw(), sender())).ok, true);
+    assert.equal((await getLiveSession())?.state, 'capturing');
+    assert.equal(__steps.get(live.id)?.length, 1);
+  });
+  it('ignores loading or unreachable ad and video frames', async () => {
+    const live = await startCapture(undefined, 'productivity');
+    childFrames = [
+      { frameId: 4, documentId: 'ad', result: { url: 'https://ads.example.net/slot', reasons: [], ready: false, frames: [] } },
+      { frameId: 5, documentId: 'yt', result: { url: 'https://www.youtube.com/embed/x?redirected=1', reasons: [], ready: true, frames: [] } },
+    ];
+    await privacy.checkCurrentScreen();
+    assert.equal((await handleCaptureEvent(raw(), sender())).ok, true);
+    assert.equal((await getLiveSession())?.privacy_gate, undefined);
+    assert.equal(__steps.get(live.id)?.length, 1);
+  });
+  it('asks once per site: navigation, tab switches and window focus keep the approval', async () => {
+    tab.url = 'https://secure.chase.com/accounts';
+    const live = await startCapture(undefined, 'productivity');
+    assert.equal((await resumeCapture({ session_id: live.id }, live.privacy_gate!.id))?.state, 'capturing');
+    documentId = 'document-2';
+    tab.url = 'https://secure.chase.com/accounts/activity';
+    await handleTabUpdated(7, { url: tab.url, status: 'complete' }, tab);
+    await handleTabActivated({ tabId: 7, windowId: 1 });
+    await privacy.checkCurrentScreen();
+    assert.equal((await getLiveSession())?.state, 'capturing');
+    assert.equal((await getLiveSession())?.privacy_gate, undefined);
+    assert.equal((await handleCaptureEvent(raw(), sender())).ok, true);
+  });
+  it('still asks again when a new kind of sensitive content appears on an approved site', async () => {
+    tab.url = 'https://secure.chase.com/accounts';
+    const live = await startCapture(undefined, 'productivity');
+    await resumeCapture({ session_id: live.id }, live.privacy_gate!.id);
+    reasons = ['login'];
+    await privacy.checkCurrentScreen();
+    assert.equal((await getLiveSession())?.state, 'paused');
+    assert.deepEqual((await getLiveSession())?.privacy_gate?.reasons, ['banking', 'login']);
   });
 });

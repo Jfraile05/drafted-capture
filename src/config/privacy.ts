@@ -6,7 +6,7 @@ export const PRIVACY_CONFIG = {
   refreshMinutes: 60,
   inspectionTimeoutMs: 2000,
   observerDebounceMs: 150,
-  maxScanElements: 12000,
+  maxScanElements: 50000,
   scanBudgetMs: 100,
   continuousVideoEnabled: false,
   prompt: 'This screen may contain sensitive information. Are you sure you want to record this?',

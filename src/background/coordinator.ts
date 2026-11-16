@@ -27,12 +27,7 @@ import { captureVisible } from '../shared/utils/captureQueue';
 import { actionLabel } from '../shared/utils/format';
 import { redactStep } from '../shared/utils/redact';
 import { siteAllowed } from '../shared/utils/siteAccess';
-import {
-  capturePermit,
-  checkCurrentScreen,
-  invalidatePrivacyApproval,
-  validatePermit,
-} from './privacy';
+import { capturePermit, checkCurrentScreen, validatePermit } from './privacy';
 import { sessionCapMs, stopCapture } from './session';
 
 // ── Commit a step ─────────────────────────────────────────────────────────
@@ -252,7 +247,6 @@ export async function handleIntervalScreenshot(
 // ── Tab events ────────────────────────────────────────────────────────────
 
 export async function handleTabActivated(activeInfo: chrome.tabs.TabActiveInfo): Promise<void> {
-  await invalidatePrivacyApproval();
   await checkCurrentScreen(activeInfo.tabId);
   const live = await getLiveSession();
   if (!live || live.state !== 'capturing') return;
@@ -304,7 +298,6 @@ export async function handleTabUpdated(
   changeInfo: chrome.tabs.TabChangeInfo,
   tab: chrome.tabs.Tab,
 ): Promise<void> {
-  if (changeInfo.url || changeInfo.status === 'loading') await invalidatePrivacyApproval(tabId);
   await checkCurrentScreen(changeInfo.url || changeInfo.status === 'complete' ? tabId : undefined);
   const live = await getLiveSession();
   if (!live || live.state !== 'capturing') return;

@@ -25,6 +25,7 @@ export function scanPrivacy(
   const roots: (Document | ShadowRoot)[] = [document];
   const deadline = performance.now() + config.scanBudgetMs;
   const inboxHeading = new RegExp(config.inboxHeadingPattern, 'i');
+  const candidates = `h1, h2, h3, [role="heading"], ${config.selectors.messaging}`;
   let count = 0;
   const visible = (el: Element) => {
     const rect = el.getBoundingClientRect();
@@ -48,15 +49,18 @@ export function scanPrivacy(
         break;
       }
       if (el.shadowRoot) roots.push(el.shadowRoot);
+      const field =
+        el instanceof HTMLInputElement ||
+        el instanceof HTMLTextAreaElement ||
+        el instanceof HTMLSelectElement;
+      const frame = el instanceof HTMLIFrameElement || el instanceof HTMLFrameElement;
+      // Layout reads are the slow part, so only measure elements that could matter.
+      if (!field && !frame && !el.matches(candidates)) continue;
       if (!visible(el)) continue;
       for (const [reason, selector] of Object.entries(config.selectors)) {
         if (el.matches(selector)) reasons.add(reason as PrivacyReason);
       }
-      if (
-        el instanceof HTMLInputElement ||
-        el instanceof HTMLTextAreaElement ||
-        el instanceof HTMLSelectElement
-      ) {
+      if (field) {
         const description = [
           el.name,
           el.id,
@@ -78,8 +82,7 @@ export function scanPrivacy(
         inboxHeading.test(el.textContent?.trim() ?? '')
       )
         reasons.add('messaging');
-      if (el instanceof HTMLIFrameElement || el instanceof HTMLFrameElement)
-        result.frames.push(el.src || 'about:blank');
+      if (frame) result.frames.push(el.src || 'about:blank');
     }
   }
   result.reasons = [...reasons].sort();

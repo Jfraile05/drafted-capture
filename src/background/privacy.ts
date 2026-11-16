@@ -15,7 +15,10 @@ interface Inspection {
   domain: string;
   signature: string;
   location: string;
+  /** Sensitive reasons only. A failed check never asks the student to approve anything. */
   reasons: PrivacyReason[];
+  /** The page could not be fully checked, so nothing from it is captured right now. */
+  unavailable: boolean;
 }
 
 function leftGatedPage(gate: PrivacyGate, screen: Inspection): boolean {
@@ -28,8 +31,8 @@ async function inspect(tab: chrome.tabs.Tab, url = tab.url ?? ''): Promise<Inspe
   if (tab.id === undefined || tab.incognito || !/^https?:\/\//.test(url)) return null;
   const policy = await getPrivacyPolicy();
   const reasons = new Set(privacyReasonsForUrl(url, policy));
+  const host = new URL(url).hostname;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  let documents: string[] = [];
   try {
     const frames = await Promise.race([
       chrome.scripting.executeScript({
@@ -44,51 +47,49 @@ async function inspect(tab: chrome.tabs.Tab, url = tab.url ?? ''): Promise<Inspe
         );
       }),
     ]);
-    if (
-      !frames?.some(
-        (frame) => frame.frameId === 0 && frame.result?.url === url && frame.result.ready,
-      )
-    ) {
-      reasons.add('unavailable');
-    }
+    // Single page apps (Google Flights, search) rewrite the URL constantly, so the
+    // tab URL can lag the page. The top frame only has to be ready on the same site.
+    const top = frames?.find((frame) => frame.frameId === 0)?.result;
+    if (!top?.ready || hostOf(top.url) !== host) reasons.add('unavailable');
     for (const frame of frames ?? []) {
       const scan = frame.result;
-      if (!scan || !scan.ready) {
-        reasons.add('unavailable');
-        continue;
-      }
-      documents.push(`${frame.frameId}:${frame.documentId}:${scan.url}`);
+      // A child frame that is still loading has nothing on screen yet.
+      if (!scan || !scan.ready) continue;
       for (const reason of [...scan.reasons, ...privacyReasonsForUrl(scan.url, policy)])
         reasons.add(reason);
-      for (const frameUrl of scan.frames) {
+      for (const frameUrl of scan.frames)
         for (const reason of privacyReasonsForUrl(frameUrl, policy)) reasons.add(reason);
-        if (
-          !frames.some((child) => child.frameId !== frame.frameId && child.result?.url === frameUrl)
-        )
-          reasons.add('unavailable');
-      }
     }
   } catch {
     reasons.add('unavailable');
   } finally {
     clearTimeout(timer);
   }
-  documents = documents.sort();
+  const unavailable = reasons.delete('unavailable');
   const sortedReasons = [...reasons].sort();
+  // One approval covers the site for the rest of the session, as long as the
+  // same kinds of sensitive content are on screen. New kinds ask again.
   const signature = await sha256(
-    new TextEncoder().encode(
-      JSON.stringify([policy.version, tab.id, url, documents, sortedReasons]),
-    ).buffer,
+    new TextEncoder().encode(JSON.stringify([policy.version, host, sortedReasons])).buffer,
   );
   const location = await sha256(new TextEncoder().encode(JSON.stringify([tab.id, url])).buffer);
   return {
     tab_id: tab.id,
     url,
-    domain: new URL(url).hostname,
+    domain: host,
     signature,
     location,
     reasons: sortedReasons,
+    unavailable,
   };
+}
+
+function hostOf(value: string): string {
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return '';
+  }
 }
 
 async function activeTab(): Promise<chrome.tabs.Tab | undefined> {
@@ -140,15 +141,12 @@ export async function capturePermit(
   if (tab?.id !== tabId || tab.url !== url) return null;
   const screen = await inspect(tab);
   if (!screen) return null;
-  if (screen.reasons.includes('unavailable')) {
-    if (screen.reasons.length > 1 || tab.status !== 'loading')
-      await gateScreen(live.id, screen, live.privacy_epoch ?? 0);
-    return null;
-  }
   if (screen.reasons.length && live.privacy_approval !== screen.signature) {
     await gateScreen(live.id, screen, live.privacy_epoch ?? 0);
     return null;
   }
+  // Skip this frame quietly. The next check after the page settles captures it.
+  if (screen.unavailable) return null;
   return withLiveLock(async () => {
     const current = await getLiveSession();
     if (
@@ -193,17 +191,12 @@ export async function checkCurrentScreen(navigationTabId?: number): Promise<void
   if (!tab) return;
   if (navigationTabId !== undefined && tab.id !== navigationTabId) return;
   const screen = await inspect(tab);
-  if (
-    screen?.reasons.length &&
-    (screen.reasons.length > 1 ||
-      !screen.reasons.includes('unavailable') ||
-      tab.status !== 'loading') &&
-    live.privacy_approval !== screen.signature
-  ) {
+  if (screen?.reasons.length && live.privacy_approval !== screen.signature) {
     await gateScreen(live.id, screen, live.privacy_epoch ?? 0);
   } else if (
     screen &&
     !screen.reasons.length &&
+    !screen.unavailable &&
     live.state === 'paused' &&
     siteAllowed(screen.url, await getSettings(), tab)
   ) {
@@ -230,16 +223,13 @@ export async function prepareResume(
       throw new Error('Switch to a webpage and review the privacy prompt again.');
     return true;
   }
-  if (screen.reasons.includes('unavailable')) {
-    await gateScreen(sessionId, screen, live.privacy_epoch ?? 0);
-    throw new Error(
-      'This screen could not be checked. Wait for it to load or switch to another page.',
-    );
-  }
   const gate = live.privacy_gate;
   if (
     automaticGateId &&
-    (!gate || !leftGatedPage(gate, screen) || !siteAllowed(screen.url, await getSettings(), tab))
+    (!gate ||
+      !leftGatedPage(gate, screen) ||
+      screen.unavailable ||
+      !siteAllowed(screen.url, await getSettings(), tab))
   )
     return false;
   if (

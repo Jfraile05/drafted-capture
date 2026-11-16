@@ -2,7 +2,7 @@ import type { AnnotationTag, Settings, TaskCategory } from './types';
 
 import { IDLE_CONFIG } from '../config/idle';
 
-export const EXTENSION_VERSION = '1.0.14';
+export const EXTENSION_VERSION = '1.0.15';
 
 // ── Storage keys ──────────────────────────────────────────────────────────
 
