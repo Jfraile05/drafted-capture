@@ -29,12 +29,29 @@ export default function WorkflowPicker({
   useEffect(() => {
     let cancelled = false;
     setStatus('loading');
-    void Promise.all([sendMessage<WorkflowAccess>('GET_WORKFLOWS'), selectedWorkflow(uid)])
+    // Just after sign in the background can lag a moment, so retry quietly first.
+    const load = async (): Promise<WorkflowAccess> => {
+      for (let attempt = 1; ; attempt++) {
+        try {
+          const access = await sendMessage<WorkflowAccess>('GET_WORKFLOWS');
+          if (access?.uid === uid && Array.isArray(access.workflows)) return access;
+          throw new Error('Workflow access unavailable');
+        } catch (error) {
+          if (cancelled || attempt >= 3) throw error;
+          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+        }
+      }
+    };
+    void Promise.all([load(), selectedWorkflow(uid)])
       .then(([access, previous]) => {
         if (cancelled) return;
-        if (access.uid !== uid) throw new Error('Account changed');
         setWorkflows(access.workflows);
-        setSelected(access.workflows.some((item) => item.id === previous) ? previous : null);
+        // Keep the last choice, otherwise pick the first so Start is one click.
+        setSelected(
+          access.workflows.some((item) => item.id === previous)
+            ? previous
+            : (access.workflows[0]?.id ?? null),
+        );
         setStatus('ready');
       })
       .catch(() => {

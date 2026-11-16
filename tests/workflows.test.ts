@@ -79,7 +79,7 @@ describe('assignment-only workflow catalog', () => {
 
   it('rejects unauthenticated and offline reads instead of using cached eligibility', async () => {
     submission.user = null;
-    await assert.rejects(loadWorkflowAccess(false), /Sign in/);
+    await assert.rejects(loadWorkflowAccess(false, 0), /Sign in/);
     submission.user = { uid: 'student' };
     backend.failRead = true;
     await assert.rejects(loadWorkflowAccess(false), /Server unavailable/);
@@ -90,6 +90,17 @@ describe('assignment-only workflow catalog', () => {
     const pending = loadWorkflowAccess(false);
     queueMicrotask(() => { submission.user = { uid: 'other-student' }; });
     await assert.rejects(pending, /account changed/);
+  });
+
+  it('waits for a sign in that reaches the background a moment late', async () => {
+    submission.user = null;
+    setTimeout(() => { submission.user = { uid: 'student' }; }, 300);
+    assert.equal((await loadWorkflowAccess(true, 2000)).uid, 'student');
+  });
+
+  it('lists assigned projects first, then Generalist', async () => {
+    backend.records.set('capture_workflow_assignments/student', { assignments: [grant('flight-booking'), grant('productivity')] });
+    assert.deepEqual((await loadWorkflowAccess(true)).workflows.map((item) => item.id), ['flight-booking', 'productivity', 'generalist']);
   });
 
   it('keeps remembered selection isolated between accounts', async () => {
@@ -132,7 +143,7 @@ describe('workflow start enforcement', () => {
 
   it('still requires sign-in for Generalist', async () => {
     submission.user = null;
-    await assert.rejects(loadWorkflowAccess(), /Sign in/);
+    await assert.rejects(loadWorkflowAccess(undefined, 0), /Sign in/);
   });
   it('requires a selection even when invoked without the popup', async () => {
     await assert.rejects(startCapture(), /Choose a workflow/);
