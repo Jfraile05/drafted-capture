@@ -327,6 +327,8 @@ export type MessageType =
   | 'GET_CAPTURE_STATE'
   | 'LIST_SESSIONS'
   | 'GET_EARNINGS'
+  | 'GET_QUALITY'
+  | 'GET_SESSION_QUALITY'
   | 'GET_SESSION'
   | 'DELETE_SESSION'
   | 'SAVE_SEGMENT'

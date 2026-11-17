@@ -1,5 +1,6 @@
 import { onAuthChanged } from '../shared/auth';
 import { loadPrivacyPolicy } from '../shared/privacyPolicyAccess';
+import { loadQualityReviews } from '../shared/qualityAccess';
 import { type SyncDestination, syncQueuedSessions } from '../shared/syncQueue';
 import { loadWorkflowAccess } from '../shared/workflowAccess';
 
@@ -35,6 +36,10 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     void loadWorkflowAccess().then(respond, () =>
       respond({ error: 'Workflow access is unavailable.' }),
     );
+    return true;
+  }
+  if (message.type === 'QUALITY_REVIEWS') {
+    void loadQualityReviews(message.taskIds).then(respond, () => respond({}));
     return true;
   }
   if (message.type === 'SYNC_QUEUE') {

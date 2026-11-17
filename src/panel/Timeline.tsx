@@ -1,7 +1,8 @@
-import { Info, TagSimple } from '@phosphor-icons/react';
+import { ArrowDown, ArrowUp, Info, TagSimple } from '@phosphor-icons/react';
 import { useEffect, useRef } from 'react';
 import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
 import { activeOffset } from '../shared/activeTime';
+import type { StepNote } from '../shared/quality';
 import type { Session } from '../shared/types';
 import { actionLabel, fmtDuration, hostOf } from '../shared/utils/format';
 import { getSegmentColor } from './palette';
@@ -14,6 +15,8 @@ interface TimelineProps {
   onStepSelect: (index: number) => void;
   onShiftStepSelect: (index: number) => void;
   onLabelRange?: () => void;
+  /** Steps the quality review said raised or lowered the score. */
+  stepNotes?: StepNote[];
 }
 
 export function Timeline({
@@ -24,8 +27,10 @@ export function Timeline({
   onStepSelect,
   onShiftStepSelect,
   onLabelRange,
+  stepNotes = [],
 }: TimelineProps) {
   const listRef = useRef<HTMLOListElement>(null);
+  const notes = new Map(stepNotes.map((note) => [note.step, note]));
 
   // Coming back from a step's details: show that step instead of the top.
   useEffect(() => {
@@ -93,6 +98,7 @@ export function Timeline({
           const segColor = getSegmentColorForStep(idx);
           const inRange = isInRange(idx);
           const selected = selectedIndex === idx;
+          const note = notes.get(idx);
 
           return (
             <li key={step.index}>
@@ -121,6 +127,28 @@ export function Timeline({
                   <span className="block truncate text-sm text-text">
                     {actionLabel(step.action, step.dom)}
                   </span>
+                  {note && (
+                    <span
+                      className={`mt-0.5 flex items-start gap-1 text-xs ${note.effect === 'up' ? 'text-green' : 'text-coral'}`}
+                    >
+                      {note.effect === 'up' ? (
+                        <ArrowUp
+                          size={12}
+                          weight="bold"
+                          className="mt-0.5 shrink-0"
+                          aria-label="Raised quality"
+                        />
+                      ) : (
+                        <ArrowDown
+                          size={12}
+                          weight="bold"
+                          className="mt-0.5 shrink-0"
+                          aria-label="Lowered quality"
+                        />
+                      )}
+                      {note.note}
+                    </span>
+                  )}
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-text-faint">
                   {fmtDuration(activeOffset(session.started_at, session.pauses, step.timestamp))}
