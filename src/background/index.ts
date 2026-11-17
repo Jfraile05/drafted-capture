@@ -9,6 +9,7 @@ import { IDLE_CONFIG } from '../config/idle';
 import { PRIVACY_CONFIG } from '../config/privacy';
 import { ALARM_SCREENSHOT, ALARM_SESSION_CAP, STORAGE_KEYS } from '../shared/constants';
 import { summarizeEarnings } from '../shared/earnings';
+import { summarizeQuality } from '../shared/quality';
 import { deleteSession, getSession, listSessions, updateSession } from '../shared/storage/db';
 import { getLiveSession, getSettings, migrateLegacyLimits } from '../shared/storage/live';
 import { notifySessionUpdate } from '../shared/storage/sessionUpdates';
@@ -42,6 +43,7 @@ import {
 import { idleNoticeSession } from './idleNotice';
 import { checkCurrentScreen, invalidatePrivacyApproval, keepPrivacyPaused } from './privacy';
 import { refreshPrivacyPolicy } from './privacyPolicy';
+import { qualityReviews } from './quality';
 import {
   enforceSessionCap,
   getCaptureState,
@@ -190,6 +192,23 @@ async function handleMessage(
       const { uid, localOnly } = msg.payload as { uid: string; localOnly: boolean };
       await waitForCaptureStop();
       return summarizeEarnings(await listSessions(), uid, localOnly);
+    }
+
+    case 'GET_QUALITY': {
+      const { uid, localOnly } = msg.payload as { uid: string; localOnly: boolean };
+      await waitForCaptureStop();
+      const sessions = await listSessions();
+      const taskIds = sessions.flatMap((s) =>
+        s.metadata.owner_uid === uid && s.submission?.drafted_task_id
+          ? [s.submission.drafted_task_id]
+          : [],
+      );
+      return summarizeQuality(sessions, await qualityReviews(taskIds), uid, localOnly);
+    }
+
+    case 'GET_SESSION_QUALITY': {
+      const taskId = (msg.payload as { taskId: string }).taskId;
+      return (await qualityReviews([taskId]))[taskId] ?? null;
     }
 
     case 'GET_SESSION':

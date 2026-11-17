@@ -10,10 +10,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Brand from '../shared/Brand';
 import { SessionSyncStatus } from '../shared/SyncStatus';
 import { sendMessage, useLiveSession } from '../shared/hooks';
+import type { QualityReview } from '../shared/quality';
 import { ARCHIVED_SESSION_CHANGE } from '../shared/storage/sessionUpdates';
 import type { Session } from '../shared/types';
 import { workflowTitle } from '../shared/utils/format';
 import { Inspector } from './Inspector';
+import { QualityCard } from './QualityCard';
 import { Replay } from './Replay';
 import { Segments } from './Segments';
 import { Timeline } from './Timeline';
@@ -31,6 +33,7 @@ export function App() {
   const [rangeStart, setRangeStart] = useState<number | null>(null);
   const [rangeEnd, setRangeEnd] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('timeline');
+  const [review, setReview] = useState<QualityReview | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadSequence = useRef(0);
@@ -109,6 +112,22 @@ export function App() {
       cancelled = true;
     };
   }, [selectedSessionId]);
+
+  const taskId = selectedSession?.submission?.drafted_task_id;
+  useEffect(() => {
+    let cancelled = false;
+    setReview(null);
+    if (taskId) {
+      sendMessage<QualityReview | null>('GET_SESSION_QUALITY', { taskId })
+        .then((result) => {
+          if (!cancelled) setReview(result);
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId]);
 
   const handleSessionSelect = (id: string) => {
     setSelectedSessionId(id);
@@ -326,6 +345,15 @@ export function App() {
           <div className="shrink-0 px-4 py-2">
             <SessionSyncStatus session={selectedSession} />
           </div>
+          {review ? (
+            <QualityCard review={review} />
+          ) : (
+            taskId && (
+              <p className="shrink-0 border-b border-white/[0.06] px-4 py-2.5 text-xs text-text-muted">
+                Quality review in progress. It shows up here a few minutes after upload.
+              </p>
+            )
+          )}
           <nav
             className="flex shrink-0 gap-1 border-b border-white/[0.06] px-2"
             aria-label="Session views"
@@ -359,6 +387,7 @@ export function App() {
                     onStepSelect={handleStepSelect}
                     onShiftStepSelect={handleShiftStepSelect}
                     onLabelRange={handleLabelRange}
+                    stepNotes={review?.step_notes}
                   />
                 ) : (
                   // One step at a time, full height, so the list and the
