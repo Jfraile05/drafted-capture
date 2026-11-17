@@ -319,3 +319,47 @@ describe('busy pages keep recording', () => {
     assert.deepEqual((await getLiveSession())?.privacy_gate?.reasons, ['banking', 'login']);
   });
 });
+
+describe('pause and resume around privacy prompts', () => {
+  it('resumes after a manual pause on a site that was already approved', async () => {
+    tab.url = 'https://secure.chase.com/accounts';
+    const live = await startCapture(undefined, 'productivity');
+    await resumeCapture({ session_id: live.id }, live.privacy_gate!.id);
+    await pauseCapture();
+    assert.equal((await resumeCapture())?.state, 'capturing');
+    assert.equal((await getLiveSession())?.privacy_gate, undefined);
+  });
+  it('resumes an idle pause on an approved site from the notification', async (t) => {
+    let now = 1000000;
+    t.mock.method(Date, 'now', () => now);
+    tab.url = 'https://secure.chase.com/accounts';
+    const live = await startCapture(undefined, 'productivity');
+    await resumeCapture({ session_id: live.id }, live.privacy_gate!.id);
+    now += 180000;
+    await checkInputIdle();
+    assert.equal((await getLiveSession())?.state, 'paused');
+    assert.equal((await resumeCapture({ session_id: live.id }))?.state, 'capturing');
+  });
+  it('continues on its own after switching from a gated tab to a safe tab', async () => {
+    tab.url = 'https://secure.chase.com/accounts';
+    await startCapture(undefined, 'productivity');
+    assert.equal((await getLiveSession())?.state, 'paused');
+    tab = { ...tab, id: 8, url: 'https://example.com/' };
+    await handleTabActivated({ tabId: 8, windowId: 1 });
+    assert.equal((await getLiveSession())?.state, 'capturing');
+  });
+  it('continues on its own after switching back to a tab that was already approved', async () => {
+    tab.url = 'https://secure.chase.com/accounts';
+    const live = await startCapture(undefined, 'productivity');
+    await resumeCapture({ session_id: live.id }, live.privacy_gate!.id);
+    const chase = { ...tab };
+    tab = { ...tab, id: 8, url: 'https://paypal.com/' };
+    await handleTabActivated({ tabId: 8, windowId: 1 });
+    assert.ok((await getLiveSession())?.privacy_gate);
+    tab = chase;
+    await handleTabActivated({ tabId: 7, windowId: 1 });
+    assert.equal((await getLiveSession())?.state, 'capturing');
+    assert.equal((await getLiveSession())?.privacy_gate, undefined);
+    assert.equal((await handleCaptureEvent(raw(), sender())).ok, true);
+  });
+});
