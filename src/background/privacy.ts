@@ -4,6 +4,7 @@ import { scanPrivacy } from '../content/privacyScan';
 import type { PrivacyGate, PrivacyPermit, PrivacyReason } from '../shared/privacy';
 import { privacyReasonsForUrl } from '../shared/privacy';
 import { getLiveSession, getSettings, setLiveSession, withLiveLock } from '../shared/storage/live';
+import type { LiveSession } from '../shared/types';
 import { sha256 } from '../shared/utils/crypto';
 import { siteAllowed } from '../shared/utils/siteAccess';
 import { getPrivacyPolicy } from './privacyPolicy';
@@ -19,6 +20,11 @@ interface Inspection {
   reasons: PrivacyReason[];
   /** The page could not be fully checked, so nothing from it is captured right now. */
   unavailable: boolean;
+}
+
+/** Sensitive content the student has not approved yet this session. */
+function needsApproval(live: LiveSession, screen: Inspection): boolean {
+  return screen.reasons.length > 0 && !live.privacy_approvals?.includes(screen.signature);
 }
 
 function leftGatedPage(gate: PrivacyGate, screen: Inspection): boolean {
@@ -102,7 +108,7 @@ async function gateScreen(sessionId: string, screen: Inspection, epoch: number):
   await withLiveLock(async () => {
     const live = await getLiveSession();
     if (!live || live.id !== sessionId || (live.privacy_epoch ?? 0) !== epoch) return;
-    if (live.privacy_approval === screen.signature) return;
+    if (!needsApproval(live, screen)) return;
     if (live.privacy_gate?.signature === screen.signature) return;
     live.privacy_gate = {
       id: crypto.randomUUID(),
@@ -112,7 +118,6 @@ async function gateScreen(sessionId: string, screen: Inspection, epoch: number):
       location: screen.location,
       reasons: screen.reasons,
     };
-    live.privacy_approval = undefined;
     live.pause_reason = undefined;
     live.privacy_epoch = (live.privacy_epoch ?? 0) + 1;
     if (live.state === 'capturing') {
@@ -141,7 +146,7 @@ export async function capturePermit(
   if (tab?.id !== tabId || tab.url !== url) return null;
   const screen = await inspect(tab);
   if (!screen) return null;
-  if (screen.reasons.length && live.privacy_approval !== screen.signature) {
+  if (needsApproval(live, screen)) {
     await gateScreen(live.id, screen, live.privacy_epoch ?? 0);
     return null;
   }
@@ -191,11 +196,10 @@ export async function checkCurrentScreen(navigationTabId?: number): Promise<void
   if (!tab) return;
   if (navigationTabId !== undefined && tab.id !== navigationTabId) return;
   const screen = await inspect(tab);
-  if (screen?.reasons.length && live.privacy_approval !== screen.signature) {
+  if (screen && needsApproval(live, screen)) {
     await gateScreen(live.id, screen, live.privacy_epoch ?? 0);
   } else if (
     screen &&
-    !screen.reasons.length &&
     !screen.unavailable &&
     live.state === 'paused' &&
     siteAllowed(screen.url, await getSettings(), tab)
@@ -233,7 +237,7 @@ export async function prepareResume(
   )
     return false;
   if (
-    screen.reasons.length &&
+    needsApproval(live, screen) &&
     (!gateId || gate?.id !== gateId || gate.signature !== screen.signature)
   ) {
     await gateScreen(sessionId, screen, live.privacy_epoch ?? 0);
@@ -246,11 +250,13 @@ export async function prepareResume(
       automaticGateId &&
       (current.privacy_gate?.id !== automaticGateId ||
         (current.privacy_epoch ?? 0) !== (live.privacy_epoch ?? 0) ||
-        screen.reasons.length)
+        needsApproval(current, screen))
     )
       return false;
-    if (screen.reasons.length && current.privacy_gate?.signature !== screen.signature) return false;
-    current.privacy_approval = screen.reasons.length ? screen.signature : undefined;
+    if (needsApproval(current, screen)) {
+      if (current.privacy_gate?.signature !== screen.signature) return false;
+      current.privacy_approvals = [...(current.privacy_approvals ?? []), screen.signature];
+    }
     current.privacy_gate = undefined;
     current.privacy_epoch = (current.privacy_epoch ?? 0) + 1;
     await setLiveSession(current);
@@ -273,7 +279,7 @@ export async function invalidatePrivacyApproval(tabId?: number): Promise<void> {
   await withLiveLock(async () => {
     const live = await getLiveSession();
     if (!live) return;
-    live.privacy_approval = undefined;
+    live.privacy_approvals = undefined;
     live.privacy_epoch = (live.privacy_epoch ?? 0) + 1;
     await setLiveSession(live);
   });

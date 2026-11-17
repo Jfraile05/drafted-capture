@@ -188,7 +188,8 @@ export interface LiveSession {
   pause_reason?: 'idle';
   last_activity_at?: number;
   privacy_gate?: PrivacyGate;
-  privacy_approval?: string;
+  /** Screens the student approved this session. */
+  privacy_approvals?: string[];
   privacy_epoch?: number;
   /** Optional free-text the user typed before starting ("what are you about
    *  to do"). Becomes the instruction / first segment label on submit. */

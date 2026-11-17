@@ -176,7 +176,7 @@ export async function pauseCapture(
     if (!idle && cur.state === 'paused') {
       cur.pause_reason = undefined;
       cur.privacy_gate = undefined;
-      cur.privacy_approval = undefined;
+      cur.privacy_approvals = undefined;
       cur.privacy_epoch = (cur.privacy_epoch ?? 0) + 1;
       await setLiveSession(cur);
       return { live: cur, changed: true };
