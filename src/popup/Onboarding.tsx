@@ -44,8 +44,9 @@ export default function Onboarding() {
         <span className="text-xs leading-relaxed text-text-muted">
           I understand this records my browser activity (clicks, keystrokes, scrolls, navigation and
           screenshots) while capture is on, and I consent to automatically uploading it as training
-          data to my Drafted account. I will only capture work I am authorized to share, and I agree
-          to the{' '}
+          data to my Drafted account. Each session I submit gets a quality review, which may be used
+          for feedback and pay. I will only capture work I am authorized to share, and I agree to
+          the{' '}
           <a
             href={chrome.runtime.getURL('src/terms/index.html')}
             target="_blank"
