@@ -2,9 +2,13 @@ import type { DOMContext } from '../shared/types';
 import { buildCSSSelector, buildXPath } from '../shared/utils/selector';
 
 const SENSITIVE_AUTOCOMPLETE =
-  /(^|\s)(cc-[a-z-]+|one-time-code|current-password|new-password|tel(-[a-z-]+)?|email|street-address|address-line\d|postal-code|bday(-[a-z]+)?)(\s|$)/i;
+  /(^|\s)(cc-[a-z-]+|one-time-code|current-password|new-password|tel(-[a-z-]+)?|email|street-address|address-line\d|postal-code|bday(-[a-z]+)?|name|given-name|family-name|additional-name|address-level\d)(\s|$)/i;
 const SENSITIVE_NAME =
-  /passw|pwd|card.?(num|no)|cvv|cvc|security.?code|ssn|social.?sec|passport|routing|account.?(num|no)|\bdob\b|birth|tax.?id/i;
+  /passw|pwd|card.?(num|no)|cvv|cvc|security.?code|ssn|social.?sec|passport|routing|account.?(num|no)|\bdob\b|birth|tax.?id|(first|last|full|legal|middle|given|family|sur).?name|(^|\s)name(\s|$)|address|street|zip.?code|postal/i;
+// A field whose whole visible label is a personal detail, for pages that give
+// fields random names and ids.
+const SENSITIVE_LABEL =
+  /^(your\s+)?(((first|last|full|legal|middle|given|family)\s+)?name|(home\s+|mailing\s+|street\s+|billing\s+|shipping\s+)?address(\s+line\s*\d)?|street|zip(\s+code)?|postal\s+code|date\s+of\s+birth|birthday|social\s+security(\s+number)?|(phone|mobile|cell)(\s+number)?)$/i;
 
 /** Password, card, contact, address, birthday, ID and similar fields: typed text
  *  is never stored, and the field is masked in screenshots. */
@@ -14,7 +18,55 @@ export function isSensitiveField(
 ): boolean {
   if (inputType === 'password' || inputType === 'email' || inputType === 'tel') return true;
   if (SENSITIVE_AUTOCOMPLETE.test(el.getAttribute('autocomplete') ?? '')) return true;
-  return SENSITIVE_NAME.test(`${el.name} ${el.id}`);
+  if (SENSITIVE_NAME.test(`${el.name} ${el.id}`)) return true;
+  const labels = [
+    el.labels?.[0]?.textContent,
+    el.getAttribute('aria-label'),
+    el.getAttribute('placeholder'),
+  ];
+  return labels.some(
+    (text) =>
+      !!text &&
+      SENSITIVE_LABEL.test(
+        text
+          .replace(/\s+/g, ' ')
+          .trim()
+          .replace(/[\s:*]+$/, ''),
+      ),
+  );
+}
+
+/** The page's own label for a form field: its <label>, aria-labelledby, or
+ *  placeholder. Never the field's value. */
+export function fieldLabel(el: Element): string | null {
+  if (
+    !(el instanceof HTMLInputElement) &&
+    !(el instanceof HTMLTextAreaElement) &&
+    !(el instanceof HTMLSelectElement)
+  ) {
+    return null;
+  }
+  let raw = '';
+  const label = el.labels?.[0];
+  if (label) {
+    // A label can wrap the field itself; drop the controls so no value or
+    // option text is read.
+    const copy = label.cloneNode(true) as HTMLElement;
+    for (const control of copy.querySelectorAll('input, select, textarea')) control.remove();
+    raw = copy.textContent ?? '';
+  }
+  if (!raw.trim()) {
+    raw = (el.getAttribute('aria-labelledby') ?? '')
+      .split(/\s+/)
+      .map((id) => (id ? (document.getElementById(id)?.textContent ?? '') : ''))
+      .join(' ');
+  }
+  if (!raw.trim()) raw = el.getAttribute('placeholder') ?? '';
+  const clean = raw
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[\s:*]+$/, '');
+  return clean ? clean.slice(0, 80) : null;
 }
 
 export function extractDOMContext(element: Element): DOMContext | null {
@@ -61,6 +113,8 @@ export function extractDOMContext(element: Element): DOMContext | null {
       }
     }
 
+    const label = fieldLabel(element);
+
     const textNode = Array.from(element.childNodes).find(
       (n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim(),
     );
@@ -84,6 +138,7 @@ export function extractDOMContext(element: Element): DOMContext | null {
       input_type: inputType,
       input_value: inputValue,
       ...(sensitive ? { sensitive } : {}),
+      ...(label ? { field_label: label } : {}),
     };
   } catch (err) {
     console.warn('[drafted.capture] extractDOMContext failed', err);

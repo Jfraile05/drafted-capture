@@ -14,7 +14,12 @@ const SECRET_PATTERNS: RegExp[] = [
   /\bBearer\s+[A-Za-z0-9._~+/-]+=*/g,
 ];
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
-const SSN = /\b\d{3}-\d{2}-\d{4}\b/g;
+const SSN = /\b\d{3}([- ])\d{2}\1\d{4}\b/g;
+// Plain digit runs only count right after a label, so order numbers and IDs
+// stay readable. Group 1 is the number itself.
+const LABELED_SSN = /\b(?:ssn|social security(?: number| no\.?)?)\s*#?\s*:?\s*(\d{9})\b/gi;
+const LABELED_PHONE =
+  /\b(?:phone|tel|telephone|mobile|cell|call|text|whatsapp)(?:\s*(?:number|no\.?|#))?\s*:?\s*(\+?\d{10,11})\b/gi;
 const CARD_CANDIDATE = /\b(?:\d[ -]?){12,18}\d\b/g;
 // Phone numbers need separators or a leading +, so plain digit runs like order
 // numbers stay readable. North American (850) 555-0123 style, or international
@@ -55,6 +60,8 @@ export function redactText(text: string): string {
     return digits.length >= 13 && digits.length <= 19 && luhn(digits) ? '[card]' : m;
   });
   out = out.replace(PHONE, (m) => (isPhone(m) ? '[phone]' : m));
+  out = out.replace(LABELED_SSN, (m, num: string) => `${m.slice(0, -num.length)}[ssn]`);
+  out = out.replace(LABELED_PHONE, (m, num: string) => `${m.slice(0, -num.length)}[phone]`);
   return out;
 }
 
@@ -72,6 +79,12 @@ export function findSensitiveSpans(text: string): Array<[number, number]> {
     const digits = m[0].replace(/[ -]/g, '');
     if (digits.length >= 13 && digits.length <= 19 && luhn(digits)) {
       spans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+    }
+  }
+  for (const p of [LABELED_SSN, LABELED_PHONE]) {
+    for (const m of text.matchAll(p)) {
+      const end = (m.index ?? 0) + m[0].length;
+      spans.push([end - m[1].length, end]);
     }
   }
   return spans;
@@ -102,6 +115,7 @@ export function redactStep(step: Step, opts: { maskAllInputs: boolean }): void {
     }
     if (dom.text) dom.text = redactText(dom.text);
     if (dom.aria_label) dom.aria_label = redactText(dom.aria_label);
+    if (dom.field_label) dom.field_label = redactText(dom.field_label);
   }
 
   origin.url = redactUrl(origin.url);

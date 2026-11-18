@@ -53,7 +53,11 @@ export const notices = new Map<string, { title: string; buttons?: { title: strin
       cb(Object.fromEntries([...notices.keys()].map((id) => [id, true]))),
   },
   storage: { session, local },
-  action: { setBadgeText: async () => {}, setBadgeBackgroundColor: async () => {} },
+  action: {
+    setBadgeText: async () => {},
+    setBadgeBackgroundColor: async () => {},
+    setIcon: async () => {},
+  },
   alarms: {
     create: async (name: string, info: { when?: number; periodInMinutes?: number }) => {
       alarmCreates.push({ name, info });

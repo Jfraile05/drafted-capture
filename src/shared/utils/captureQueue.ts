@@ -58,8 +58,9 @@ async function matchesTarget(opts: CaptureOpts): Promise<boolean> {
   );
 }
 
-/** Ask the page which regions to mask. Null when the page does not answer, so
- *  the caller can drop the screenshot instead of storing it unmasked. */
+/** Ask the page which regions to mask. Null when the page does not answer or
+ *  could not check everything in time, so the caller can drop the screenshot
+ *  instead of storing it unmasked. */
 async function getSensitiveRegions(
   tabId: number,
 ): Promise<{ rects: Rect[]; viewportWidth: number } | null> {
@@ -72,8 +73,9 @@ async function getSensitiveRegions(
         { frameId: 0 },
       ),
       sleep(1000).then(() => null),
-    ])) as { rects?: Rect[]; viewportWidth?: number } | null;
+    ])) as { rects?: Rect[]; viewportWidth?: number; complete?: boolean } | null;
     if (!answer || !Array.isArray(answer.rects) || !answer.viewportWidth) return null;
+    if (answer.complete !== true) return null;
     return { rects: answer.rects, viewportWidth: answer.viewportWidth };
   } catch {
     return null;

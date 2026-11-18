@@ -15,7 +15,7 @@ beforeEach(() => {
   active = { id: 7, windowId: 1, url: opts.url, status: 'complete' };
   calls = 0;
   (chrome.tabs.query as any) = async () => [{ ...active }];
-  (chrome.tabs.sendMessage as any) = async () => ({ rects: [], viewportWidth: 800 });
+  (chrome.tabs.sendMessage as any) = async () => ({ rects: [], viewportWidth: 800, complete: true });
   (chrome.tabs.captureVisibleTab as any) = async () => { calls++; return 'data:image/png;base64,dGVzdA=='; };
   (globalThis as any).createImageBitmap = async () => ({ width: 800, height: 600, close() {} });
 });
@@ -39,10 +39,17 @@ describe('screenshot target consistency', () => {
   it('drops a frame if the tab changes while sensitive regions are being read', async (t) => {
     t.mock.method(chrome.tabs, 'sendMessage', async () => {
       active.id = 8;
-      return { rects: [], viewportWidth: 800 };
+      return { rects: [], viewportWidth: 800, complete: true };
     });
     assert.equal(await captureVisible(opts), null);
     assert.equal(calls, 0);
+  });
+
+  it('drops the frame when the page could not check everything for sensitive info', async (t) => {
+    t.mock.method(chrome.tabs, 'sendMessage', async () => ({ rects: [], viewportWidth: 800, complete: false }));
+    assert.equal(await captureVisible(opts), null);
+    assert.equal(calls, 0);
+    assert.equal(__screenshots.size, 0);
   });
 
   it('drops a captured frame before storage if navigation occurred during capture', async (t) => {
@@ -59,7 +66,7 @@ describe('screenshot target consistency', () => {
     const wait = new Promise<void>((resolve) => { release = resolve; });
     t.mock.method(chrome.tabs, 'sendMessage', async () => {
       await wait;
-      return { rects: [], viewportWidth: 800 };
+      return { rects: [], viewportWidth: 800, complete: true };
     });
     const first = captureVisible(opts);
     const same = captureVisible(opts);
