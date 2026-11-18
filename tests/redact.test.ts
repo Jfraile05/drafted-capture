@@ -109,6 +109,7 @@ describe('redactStep', () => {
         text: 'ssn 123-45-6789',
         input_value: 'me@corp.com',
         aria_label: 'card 4111111111111111',
+        field_label: 'Send to me@corp.com',
       },
       origin: { tab_id: 1, frame_id: 0, url: 'https://x.com/?token=abc', title: 'Hi me@corp.com' },
     });
@@ -117,6 +118,7 @@ describe('redactStep', () => {
     assert.equal(s.dom?.text, 'ssn [ssn]');
     assert.equal(s.dom?.input_value, '[email]');
     assert.equal(s.dom?.aria_label, 'card [card]');
+    assert.equal(s.dom?.field_label, 'Send to [email]');
     assert.equal(s.origin.url, 'https://x.com/?token=[redacted]');
     assert.equal(s.origin.title, 'Hi [email]');
   });

@@ -28,6 +28,23 @@ describe('actionLabel', () => {
     );
   });
 
+  it('names a form field by its label', () => {
+    assert.equal(
+      actionLabel({ type: 'click' }, dom({ text: null, field_label: 'Promo code' })),
+      'Click "Promo code"',
+    );
+  });
+
+  it('names a sensitive field by its label but never its text', () => {
+    assert.equal(
+      actionLabel(
+        { type: 'click' },
+        dom({ text: '4242', field_label: 'Card number', sensitive: true }),
+      ),
+      'Click "Card number"',
+    );
+  });
+
   it('falls back to plain wording without coordinates', () => {
     assert.equal(actionLabel({ type: 'click', coordinate: [1, 2] }), 'Click on page');
     assert.equal(

@@ -71,6 +71,9 @@ export interface DOMContext {
   input_value: string | null;
   /** Password, card, or one-time-code field. Typed text is never stored. */
   sensitive?: boolean;
+  /** The page's label for a form field (its <label>, aria-labelledby or
+   *  placeholder), so steps can say which field was used. Never the value. */
+  field_label?: string;
 }
 
 // ── Screenshot ──────────────────────────────────────────────────────────────

@@ -59,10 +59,11 @@ export function stepLabel(step: Step): string {
 }
 
 /** Visible name of the element acted on, or null when there is nothing
- *  readable (or the field is sensitive). */
+ *  readable. A sensitive field is named only by its page label, never its text. */
 export function targetName(dom: Step['dom'] | undefined): string | null {
-  if (!dom || dom.sensitive) return null;
-  const raw = (dom.aria_label || dom.text || '').replace(/\s+/g, ' ').trim();
+  if (!dom) return null;
+  const name = dom.sensitive ? dom.field_label : dom.aria_label || dom.text || dom.field_label;
+  const raw = (name || '').replace(/\s+/g, ' ').trim();
   return raw ? truncate(raw, 40) : null;
 }
 
