@@ -1,36 +1,60 @@
 // Sidekick brand: the animated mascot, the "sidekick." wordmark and the
-// "By Drafted Labs" byline. Each character is a flat shape with two eyes;
-// their animation CSS lives in styles.css under `.mascot`.
+// "By Drafted Labs" byline. The mascot is the 3D Sidekick (Sidekick3D.tsx)
+// where WebGL works, and the flat 2D one below otherwise; the 2D animation CSS
+// lives in styles.css under `.mascot`.
 
-import { type Ref, type RefObject, useEffect, useRef, useState } from 'react';
+import {
+  type ComponentType,
+  type Ref,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
+import type Sidekick3DType from './Sidekick3D';
+import type { Sidekick3DHandle } from './Sidekick3D';
 import { IS_BETA, STORAGE_KEYS } from './constants';
 import { useLiveSession } from './hooks';
 import type { Settings } from './types';
 
 export type MascotState = 'waiting' | 'watching' | 'capturing' | 'paused' | 'done';
 
-const SHAPES: Record<MascotState, string> = {
-  waiting:
-    '<path d="M117 62 H203 Q254 62 254 113 V181 Q254 232 203 232 H117 Q66 232 66 181 V113 Q66 62 117 62Z" fill="#FFFFFF"/>',
-  watching:
-    '<path d="M141 60 Q163 43 183 62 L245 121 Q267 142 248 166 L193 226 Q174 246 151 229 L77 177 Q52 159 70 134Z" fill="#FF239B"/>',
-  capturing:
-    '<path d="M160 76 C205 38 263 88 229 138 C272 181 221 243 171 216 C125 254 65 211 87 161 C43 121 99 56 143 80 Q152 84 160 76Z" fill="#1286FF"/>',
-  paused:
-    '<path d="M80 72 Q116 58 160 80 Q204 58 240 72 Q254 78 248 96 Q232 144 248 194 Q254 214 234 222 Q194 236 160 216 Q126 236 86 222 Q66 214 72 194 Q88 144 72 96 Q66 78 80 72Z" fill="#FFAE00"/>',
-  done: '<circle cx="160" cy="145" r="88" fill="#00CA78"/>',
-};
+// The flat 2D Sidekick: the same character as the 3D one (white egg head, dark
+// visor, mint eyes, ear pods and an antenna bulb), drawn for small sizes and as
+// the fallback when WebGL or motion is off. The body is the same in every
+// state; the eyes and the antenna bulb show the mood.
+const BODY = `
+  <defs>
+    <radialGradient id="sk-shell" cx="38%" cy="28%" r="80%">
+      <stop offset="0" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#E6ECE9"/><stop offset="1" stop-color="#B9C4BF"/>
+    </radialGradient>
+  </defs>
+  <path d="M160 72 C160 42 148 24 124 22 C106 21 96 32 98 46" fill="none" stroke="#1B2422" stroke-width="7" stroke-linecap="round"/>
+  <circle class="ms-bulb-glow" cx="98" cy="54" r="22" fill="#5CFFC4" opacity=".22"/>
+  <circle class="ms-bulb" cx="98" cy="54" r="11" fill="#5CFFC4"/>
+  <rect x="36" y="120" width="30" height="56" rx="13" fill="#1B2422"/>
+  <rect x="254" y="120" width="30" height="56" rx="13" fill="#1B2422"/>
+  <ellipse cx="42" cy="148" rx="4" ry="13" fill="none" stroke="#5CFFC4" stroke-width="3"/>
+  <ellipse cx="278" cy="148" rx="4" ry="13" fill="none" stroke="#5CFFC4" stroke-width="3"/>
+  <ellipse cx="160" cy="150" rx="106" ry="80" fill="url(#sk-shell)"/>
+  <rect x="132" y="64" width="56" height="12" rx="5" fill="#1B2422"/>
+  <rect x="136" y="61" width="48" height="3" rx="1.5" fill="#5CFFC4"/>
+  <rect x="76" y="104" width="168" height="76" rx="38" fill="#3A4743"/>
+  <rect x="81" y="109" width="158" height="66" rx="33" fill="#030807"/>
+  <path d="M102 122 Q122 114 160 114" fill="none" stroke="#FFFFFF" stroke-opacity=".2" stroke-width="5" stroke-linecap="round"/>
+`;
 
 const EYES: Record<MascotState, string> = {
   waiting:
-    '<rect x="119" y="120" width="24" height="48" rx="12"/><rect x="177" y="116" width="24" height="48" rx="12"/>',
+    '<rect x="128" y="122" width="20" height="40" rx="10"/><rect x="172" y="122" width="20" height="40" rx="10"/>',
   watching:
-    '<rect x="125" y="119" width="23" height="43" rx="11.5"/><rect x="181" y="115" width="23" height="43" rx="11.5"/>',
+    '<rect x="127" y="120" width="22" height="44" rx="11"/><rect x="171" y="120" width="22" height="44" rx="11"/>',
   capturing:
-    '<rect x="121" y="121" width="24" height="46" rx="12"/><rect x="177" y="125" width="24" height="46" rx="12"/>',
+    '<rect x="128" y="130" width="20" height="24" rx="10"/><rect x="172" y="130" width="20" height="24" rx="10"/>',
   paused:
-    '<rect x="117" y="140" width="29" height="15" rx="7.5"/><rect x="176" y="136" width="29" height="15" rx="7.5"/>',
-  done: '<rect x="121" y="119" width="24" height="39" rx="12"/><rect x="178" y="115" width="24" height="39" rx="12"/>',
+    '<rect x="124" y="140" width="28" height="8" rx="4"/><rect x="168" y="140" width="28" height="8" rx="4"/>',
+  done: '<path d="M126 150 Q138 128 150 150" fill="none" stroke="#5CFFC4" stroke-width="9" stroke-linecap="round"/><path d="M170 150 Q182 128 194 150" fill="none" stroke="#5CFFC4" stroke-width="9" stroke-linecap="round"/>',
 };
 
 /**
@@ -65,6 +89,7 @@ export function Mascot({
     <span ref={setRef} className={`mascot ${className}`} data-state={state} aria-hidden="true">
       <svg className="mascot-svg" viewBox="0 0 320 280" aria-hidden="true" focusable="false">
         <g className="ms-entrance">
+          <ellipse cx="160" cy="262" rx="72" ry="8" fill="#000000" opacity="0.35" />
           <g className="ms-react">
             <g className="ms-motion">
               <g className="ms-tilt">
@@ -72,10 +97,10 @@ export function Mascot({
                   <g
                     className="ms-shape"
                     // biome-ignore lint/security/noDangerouslySetInnerHtml: static SVG from the constants above
-                    dangerouslySetInnerHTML={{ __html: SHAPES[state] }}
+                    dangerouslySetInnerHTML={{ __html: BODY }}
                   />
                   <g className="ms-gaze">
-                    <g className="ms-eyes" fill="#000000">
+                    <g className="ms-eyes" fill="#5CFFC4">
                       <g className="ms-ack">
                         <g
                           className="ms-blink"
@@ -366,18 +391,68 @@ function useFollowCursor(elRef: RefObject<HTMLSpanElement | null>, enabled: bool
   }, [elRef, enabled]);
 }
 
+/** WebGL works and the user has not asked for less motion. */
+function canShow3D(): boolean {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  try {
+    return Boolean(document.createElement('canvas').getContext('webgl2'));
+  } catch {
+    return false;
+  }
+}
+
 /** Mascot and wordmark, top left on every page. The mascot shows the live capture state. */
 export default function Brand({
   size = 'text-xl',
   mascotSize = 'h-12 w-[52px]',
   className = '',
+  flat = false,
 }: {
   size?: string;
   mascotSize?: string;
   className?: string;
+  /** Always use the 2D mascot (pages that do not need a live 3D one). */
+  flat?: boolean;
 }) {
   const state = useMascotState();
   const ref = useRef<HTMLSpanElement>(null);
+  const lookRef = useRef<HTMLSpanElement>(null);
+  const handle = useRef<Sidekick3DHandle>(null);
+  const [Three, setThree] = useState<ComponentType<Parameters<typeof Sidekick3DType>[0]> | null>(
+    null,
+  );
+  const threeRef = useRef(false);
+  threeRef.current = Three !== null;
+
+  // The 3D Sidekick loads after the page, so the 2D one shows first.
+  useEffect(() => {
+    if (flat || !canShow3D()) return;
+    let live = true;
+    import('./Sidekick3D').then((m) => {
+      if (live) setThree(() => m.default);
+    });
+    return () => {
+      live = false;
+    };
+  }, [flat]);
+  const fallBackTo2D = useCallback(() => setThree(null), []);
+
+  // The 3D Sidekick follows the same cursor as the 2D one, read from the CSS
+  // variables useFollowCursor sets on its wrapper.
+  useFollowCursor(lookRef, Three !== null && state !== 'paused');
+  const getLook = useCallback(() => {
+    const el = lookRef.current;
+    if (!el) return null;
+    const x = Number.parseFloat(el.style.getPropertyValue('--look-x')) || 0;
+    const y = Number.parseFloat(el.style.getPropertyValue('--look-y')) || 0;
+    return x === 0 && y === 0 ? null : { x: x / 7, y: y / 4 };
+  }, []);
+
+  const react = useCallback((kind: 'petting' | 'celebrating') => {
+    if (!threeRef.current) return playReaction(ref.current, kind);
+    if (kind === 'petting') handle.current?.boop();
+    else handle.current?.celebrate();
+  }, []);
 
   useEffect(() => {
     if (state !== 'done') return;
@@ -386,26 +461,32 @@ export default function Brand({
         (saved[STORAGE_KEYS.SETTINGS] as Partial<Settings> | undefined)?.celebrate_saves === false
       )
         return;
-      playReaction(ref.current, 'celebrating');
+      react('celebrating');
       // Confetti only in the popup, and only right after a save, not when it
       // opens already green. The side panel and settings just hop.
       if (!location.pathname.includes('/popup/')) return;
       chrome.storage.session.get(MOMENT_KEY, (r) => {
         const at = (r[MOMENT_KEY] as Moment | null)?.at ?? 0;
-        if (Date.now() - at < 2500) burstConfetti(ref.current);
+        if (Date.now() - at < 2500) burstConfetti(threeRef.current ? lookRef.current : ref.current);
       });
     });
-  }, [state]);
+  }, [state, react]);
 
   return (
     <div className={`flex items-center gap-2.5 ${className}`}>
       <button
         type="button"
-        onClick={() => playReaction(ref.current, 'petting')}
+        onClick={() => react('petting')}
         className={`${mascotSize} shrink-0 cursor-pointer`}
         aria-label="Sidekick"
       >
-        <Mascot ref={ref} state={state} className="h-full w-full" />
+        {Three ? (
+          <span ref={lookRef} className="block h-full w-full" aria-hidden="true">
+            <Three ref={handle} state={state} getLook={getLook} onError={fallBackTo2D} />
+          </span>
+        ) : (
+          <Mascot ref={ref} state={state} className="h-full w-full" />
+        )}
       </button>
       <div className="flex flex-col leading-none text-left">
         <span className="flex items-center gap-2">
