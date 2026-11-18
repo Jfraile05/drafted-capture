@@ -91,7 +91,7 @@ describe('privacy before persistence', () => {
   it('resumes automatically after leaving a gated page for a safe page, excluding the pause', async (t) => {
     let now=1000000;t.mock.method(Date,'now',()=>now);
     await startCapture(undefined,'productivity');now+=10000;
-    tab.url='https://example.com/checkout';await privacy.checkCurrentScreen();
+    tab.url='https://example.com/inbox';await privacy.checkCurrentScreen();
     const paused=(await getLiveSession())!;assert.equal(paused.state,'paused');
     await privacy.keepPrivacyPaused(paused.privacy_gate!.id);
     now+=30000;tab.url='https://example.com/products';await privacy.checkCurrentScreen();
@@ -99,9 +99,9 @@ describe('privacy before persistence', () => {
     assert.equal(live.state,'capturing');assert.equal(live.privacy_gate,undefined);assert.equal(activeElapsed(live,now),10000);
   });
   it('does not auto-resume on the same page or another sensitive page',async()=>{
-    await startCapture(undefined,'productivity');reasons=['payment'];await privacy.checkCurrentScreen();
+    await startCapture(undefined,'productivity');reasons=['messaging'];await privacy.checkCurrentScreen();
     reasons=[];await privacy.checkCurrentScreen();assert.equal((await getLiveSession())?.state,'paused');
-    tab.url='https://example.com/inbox';await handleTabUpdated(7,{url:tab.url,status:'complete'},tab);
+    tab.url='https://secure.chase.com/';await handleTabUpdated(7,{url:tab.url,status:'complete'},tab);
     assert.equal((await getLiveSession())?.state,'paused');assert.ok((await getLiveSession())?.privacy_gate);
   });
   it('resumes an idle pause on foreground safe navigation, but preserves manual pauses',async(t)=>{
@@ -117,11 +117,11 @@ describe('privacy before persistence', () => {
   it('requires confirmation when an idle student opens a sensitive page',async(t)=>{
     let now=1000000;t.mock.method(Date,'now',()=>now);
     await startCapture(undefined,'productivity');now+=180000;await checkInputIdle();
-    tab.url='https://example.com/checkout';await handleTabUpdated(7,{url:tab.url,status:'complete'},tab);
-    assert.equal((await getLiveSession())?.state,'paused');assert.ok((await getLiveSession())?.privacy_gate?.reasons.includes('payment'));
+    tab.url='https://example.com/inbox';await handleTabUpdated(7,{url:tab.url,status:'complete'},tab);
+    assert.equal((await getLiveSession())?.state,'paused');assert.ok((await getLiveSession())?.privacy_gate?.reasons.includes('messaging'));
   });
   it('a manual pause wins a race against automatic safe-page resume',async(t)=>{
-    await startCapture(undefined,'productivity');tab.url='https://example.com/checkout';await privacy.checkCurrentScreen();
+    await startCapture(undefined,'productivity');tab.url='https://example.com/inbox';await privacy.checkCurrentScreen();
     tab.url='https://example.com/products';let inspections=0;
     t.mock.method(chrome.scripting,'executeScript',async()=>{
       if(++inspections===2)await pauseCapture();
@@ -135,7 +135,7 @@ describe('privacy before persistence', () => {
     t.mock.method(Date, 'now', () => now);
     await startCapture(undefined, 'productivity');
     now += 240000;
-    tab.url = 'https://example.com/checkout';
+    tab.url = 'https://example.com/inbox';
     await privacy.checkCurrentScreen();
     const live = (await getLiveSession())!;
     assert.equal(live.paused_at, 1000000);
@@ -155,34 +155,34 @@ describe('privacy before persistence', () => {
     await stopCapture();
     assert.equal(__sessions.get(started.id)?.steps.length, 0);
   });
-  it('gates checkout and inbox navigation, including before the new document finishes loading', async () => {
+  it('gates inbox and bank navigation, including before the new document finishes loading', async () => {
     await startCapture(undefined, 'productivity');
-    tab.url = 'https://example.com/checkout'; tab.status = 'loading';
+    tab.url = 'https://example.com/inbox'; tab.status = 'loading';
     await handleTabUpdated(7, { url: tab.url, status: 'loading' }, tab);
     assert.equal((await getLiveSession())?.state, 'paused');
-    assert.ok((await getLiveSession())?.privacy_gate?.reasons.includes('payment'));
-    assert.equal(captures, 0);
-    tab.url = 'https://example.com/inbox'; tab.status = 'complete';
-    await privacy.checkCurrentScreen();
     assert.ok((await getLiveSession())?.privacy_gate?.reasons.includes('messaging'));
+    assert.equal(captures, 0);
+    tab.url = 'https://secure.chase.com/'; tab.status = 'complete';
+    await privacy.checkCurrentScreen();
+    assert.ok((await getLiveSession())?.privacy_gate?.reasons.includes('banking'));
   });
-  it('gates sensitive fields and a payment iframe on otherwise unknown domains', async () => {
+  it('gates an inbox or a banking frame on otherwise unknown domains', async () => {
     const live = await startCapture(undefined, 'productivity');
-    reasons = ['address', 'government', 'login'];
+    reasons = ['messaging'];
     assert.equal((await handleCaptureEvent(raw(), sender())).ok, false);
-    assert.deepEqual((await getLiveSession())?.privacy_gate?.reasons, ['address', 'government', 'login']);
+    assert.deepEqual((await getLiveSession())?.privacy_gate?.reasons, ['messaging']);
     await stopCapture();
     reasons = [];
-    childFrames = [{ frameId: 3, documentId: 'payment', result: { url: 'https://js.stripe.com/fields', reasons: [], ready: true, frames: [] } }];
+    childFrames = [{ frameId: 3, documentId: 'bank', result: { url: 'https://secure.chase.com/widget', reasons: [], ready: true, frames: [] } }];
     const second = await startCapture(undefined, 'productivity');
-    assert.ok(second.privacy_gate?.reasons.includes('payment'));
+    assert.ok(second.privacy_gate?.reasons.includes('banking'));
     assert.equal(__steps.get(live.id)?.length ?? 0, 0);
     assert.equal(__screenshots.size, 0);
   });
-  it('discards a screenshot if a sensitive form appears while capture is in flight', async (t) => {
+  it('discards a screenshot if an inbox appears while capture is in flight', async (t) => {
     const live = await startCapture(undefined, 'productivity');
     t.mock.method(chrome.tabs, 'captureVisibleTab', async () => {
-      captures++; reasons = ['payment'];
+      captures++; reasons = ['messaging'];
       return 'data:image/png;base64,dGVzdA==';
     });
     assert.equal((await handleCaptureEvent(raw(), sender())).ok, false);
@@ -247,9 +247,9 @@ describe('privacy confirmation', () => {
     tab.url = 'https://chase.com/';
     const live = await startCapture(undefined, 'productivity');
     const gate = live.privacy_gate!;
-    tab.url = 'https://paypal.com/';
+    tab.url = 'https://mail.google.com/';
     assert.equal((await resumeCapture({ session_id: live.id }, gate.id))?.state, 'paused');
-    assert.ok((await getLiveSession())?.privacy_gate?.reasons.includes('payment'));
+    assert.ok((await getLiveSession())?.privacy_gate?.reasons.includes('messaging'));
   });
   it('revokes approval on navigation and remote policy updates', async () => {
     tab.url = 'https://chase.com/';
@@ -313,10 +313,10 @@ describe('busy pages keep recording', () => {
     tab.url = 'https://secure.chase.com/accounts';
     const live = await startCapture(undefined, 'productivity');
     await resumeCapture({ session_id: live.id }, live.privacy_gate!.id);
-    reasons = ['login'];
+    reasons = ['messaging'];
     await privacy.checkCurrentScreen();
     assert.equal((await getLiveSession())?.state, 'paused');
-    assert.deepEqual((await getLiveSession())?.privacy_gate?.reasons, ['banking', 'login']);
+    assert.deepEqual((await getLiveSession())?.privacy_gate?.reasons, ['banking', 'messaging']);
   });
 });
 
@@ -353,7 +353,7 @@ describe('pause and resume around privacy prompts', () => {
     const live = await startCapture(undefined, 'productivity');
     await resumeCapture({ session_id: live.id }, live.privacy_gate!.id);
     const chase = { ...tab };
-    tab = { ...tab, id: 8, url: 'https://paypal.com/' };
+    tab = { ...tab, id: 8, url: 'https://mail.google.com/' };
     await handleTabActivated({ tabId: 8, windowId: 1 });
     assert.ok((await getLiveSession())?.privacy_gate);
     tab = chase;
@@ -361,5 +361,55 @@ describe('pause and resume around privacy prompts', () => {
     assert.equal((await getLiveSession())?.state, 'capturing');
     assert.equal((await getLiveSession())?.privacy_gate, undefined);
     assert.equal((await handleCaptureEvent(raw(), sender())).ok, true);
+  });
+});
+
+describe('mask instead of pause', () => {
+  it('keeps recording on checkout, payment, login and form-field pages', async () => {
+    const live = await startCapture(undefined, 'productivity');
+    for (const [url, found] of [
+      ['https://shop.example/checkout', []],
+      ['https://www.paypal.com/myaccount', []],
+      ['https://accounts.google.com/signin', []],
+      ['https://example.com/apply', ['payment', 'address', 'government', 'login']],
+    ] as const) {
+      tab.url = url;
+      reasons = [...found];
+      await privacy.checkCurrentScreen();
+      assert.equal((await getLiveSession())?.state, 'capturing', url);
+      assert.equal((await getLiveSession())?.privacy_gate, undefined, url);
+      assert.ok(await privacy.capturePermit(tab.id, tab.url), url);
+    }
+    assert.equal((await handleCaptureEvent(raw(), sender())).ok, true);
+    assert.equal(__steps.get(live.id)?.length, 1);
+  });
+  it('keeps recording when a payment iframe is on the page', async () => {
+    await startCapture(undefined, 'productivity');
+    childFrames = [
+      { frameId: 3, documentId: 'card', result: { url: 'https://js.stripe.com/v3/elements-inner-card.html', reasons: [], ready: true, frames: [] } },
+    ];
+    await privacy.checkCurrentScreen();
+    assert.equal((await getLiveSession())?.state, 'capturing');
+  });
+  it('still pauses on banks, email, health portals, password managers and government sites', async () => {
+    for (const url of [
+      'https://secure.chase.com/',
+      'https://mail.google.com/mail/u/0/',
+      'https://mychart.com/',
+      'https://vault.bitwarden.com/',
+      'https://www.irs.gov/',
+    ]) {
+      await stopCapture();
+      tab.url = url;
+      await startCapture(undefined, 'productivity');
+      assert.equal((await getLiveSession())?.state, 'paused', url);
+      assert.ok((await getLiveSession())?.privacy_gate, url);
+    }
+  });
+  it('still pauses when a page shows an inbox', async () => {
+    await startCapture(undefined, 'productivity');
+    reasons = ['messaging'];
+    await privacy.checkCurrentScreen();
+    assert.equal((await getLiveSession())?.state, 'paused');
   });
 });

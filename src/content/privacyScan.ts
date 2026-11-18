@@ -12,7 +12,7 @@ export interface PrivacyScan {
 export function scanPrivacy(
   config: Pick<
     typeof PRIVACY_CONFIG,
-    'selectors' | 'fieldTerms' | 'inboxHeadingPattern' | 'maxScanElements' | 'scanBudgetMs'
+    'selectors' | 'inboxHeadingPattern' | 'maxScanElements' | 'scanBudgetMs'
   >,
 ): PrivacyScan {
   const result: PrivacyScan = {
@@ -49,33 +49,12 @@ export function scanPrivacy(
         break;
       }
       if (el.shadowRoot) roots.push(el.shadowRoot);
-      const field =
-        el instanceof HTMLInputElement ||
-        el instanceof HTMLTextAreaElement ||
-        el instanceof HTMLSelectElement;
       const frame = el instanceof HTMLIFrameElement || el instanceof HTMLFrameElement;
       // Layout reads are the slow part, so only measure elements that could matter.
-      if (!field && !frame && !el.matches(candidates)) continue;
+      if (!frame && !el.matches(candidates)) continue;
       if (!visible(el)) continue;
       for (const [reason, selector] of Object.entries(config.selectors)) {
         if (el.matches(selector)) reasons.add(reason as PrivacyReason);
-      }
-      if (field) {
-        const description = [
-          el.name,
-          el.id,
-          el.getAttribute('aria-label'),
-          el.getAttribute('placeholder'),
-          ...Array.from(el.labels ?? [], (label) => label.textContent),
-        ]
-          .filter(Boolean)
-          .join(' ')
-          .toLowerCase()
-          .replace(/[_-]/g, ' ');
-        for (const [reason, terms] of Object.entries(config.fieldTerms)) {
-          if (terms.some((term) => description.includes(term)))
-            reasons.add(reason as PrivacyReason);
-        }
       }
       if (
         el.matches('h1, h2, h3, [role="heading"]') &&

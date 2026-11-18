@@ -2,15 +2,17 @@ import type { DOMContext } from '../shared/types';
 import { buildCSSSelector, buildXPath } from '../shared/utils/selector';
 
 const SENSITIVE_AUTOCOMPLETE =
-  /(^|\s)(cc-[a-z-]+|one-time-code|current-password|new-password)(\s|$)/i;
-const SENSITIVE_NAME = /passw|pwd|card.?(num|no)|cvv|cvc|security.?code|ssn|social.?sec/i;
+  /(^|\s)(cc-[a-z-]+|one-time-code|current-password|new-password|tel(-[a-z-]+)?|email|street-address|address-line\d|postal-code|bday(-[a-z]+)?)(\s|$)/i;
+const SENSITIVE_NAME =
+  /passw|pwd|card.?(num|no)|cvv|cvc|security.?code|ssn|social.?sec|passport|routing|account.?(num|no)|\bdob\b|birth|tax.?id/i;
 
-/** Password, card, one-time-code, and similar fields: typed text is never stored. */
+/** Password, card, contact, address, birthday, ID and similar fields: typed text
+ *  is never stored, and the field is masked in screenshots. */
 export function isSensitiveField(
   el: HTMLInputElement | HTMLTextAreaElement,
   inputType: string,
 ): boolean {
-  if (inputType === 'password') return true;
+  if (inputType === 'password' || inputType === 'email' || inputType === 'tel') return true;
   if (SENSITIVE_AUTOCOMPLETE.test(el.getAttribute('autocomplete') ?? '')) return true;
   return SENSITIVE_NAME.test(`${el.name} ${el.id}`);
 }

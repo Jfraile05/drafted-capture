@@ -16,6 +16,17 @@ const SECRET_PATTERNS: RegExp[] = [
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
 const SSN = /\b\d{3}-\d{2}-\d{4}\b/g;
 const CARD_CANDIDATE = /\b(?:\d[ -]?){12,18}\d\b/g;
+// Phone numbers need separators or a leading +, so plain digit runs like order
+// numbers stay readable. North American (850) 555-0123 style, or international
+// numbers that start with + and a country code.
+const PHONE =
+  /(?<![\w+])(?:(?:\+1[ .-]?)?(?:\(\d{3}\)[ .-]?|\d{3}[ .-])\d{3}[ .-]\d{4}|\+(?!1[ .-]?\(?\d{3})\d{1,3}(?:[ .-]?\d{1,4}){2,5})(?![\w-])/g;
+const PHONE_DIGITS = { min: 10, max: 15 };
+
+function isPhone(match: string): boolean {
+  const digits = match.replace(/\D/g, '').length;
+  return digits >= PHONE_DIGITS.min && digits <= PHONE_DIGITS.max;
+}
 const SENSITIVE_PARAM =
   /([?&#;]|^)((?:access_|id_|refresh_)?token|code|(?:api_?)?key|secret|passw(?:or)?d|pwd|auth|session(?:_?id)?|sid|signature|sig)=([^&#]*)/gi;
 
@@ -43,6 +54,7 @@ export function redactText(text: string): string {
     const digits = m.replace(/[ -]/g, '');
     return digits.length >= 13 && digits.length <= 19 && luhn(digits) ? '[card]' : m;
   });
+  out = out.replace(PHONE, (m) => (isPhone(m) ? '[phone]' : m));
   return out;
 }
 
@@ -52,6 +64,9 @@ export function findSensitiveSpans(text: string): Array<[number, number]> {
   const spans: Array<[number, number]> = [];
   for (const p of [...SECRET_PATTERNS, EMAIL, SSN]) {
     for (const m of text.matchAll(p)) spans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+  }
+  for (const m of text.matchAll(PHONE)) {
+    if (isPhone(m[0])) spans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
   }
   for (const m of text.matchAll(CARD_CANDIDATE)) {
     const digits = m[0].replace(/[ -]/g, '');

@@ -75,7 +75,7 @@ export function Options() {
         <Section title="Privacy">
           <Toggle
             title="Hide everything I type"
-            description="Passwords are always hidden. Turn this on to hide all other typing too."
+            description="Passwords, card numbers, SSNs, emails, phone numbers and addresses are always hidden. Turn this on to hide all other typing too."
             checked={settings.mask_all_inputs}
             onChange={(v) => updateSettings({ mask_all_inputs: v })}
           />
