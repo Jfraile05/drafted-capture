@@ -1,10 +1,10 @@
 import Brand from '../shared/Brand';
 
 // Terms from Drafted (Rodrigo Pecchio), November 17, 2026, reworded on
-// November 18, 2026 so students can read them easily. The meaning is unchanged.
-// Change the meaning only with Drafted's sign-off, and update LAST_UPDATED when
-// it changes.
-const LAST_UPDATED = 'November 17, 2026';
+// November 18, 2026 so students can read them easily. Section 4(c) was changed
+// on November 18, 2026 to allow quality reviews of submitted sessions. Change the
+// meaning only with Drafted's sign-off, and update LAST_UPDATED when it changes.
+const LAST_UPDATED = 'November 18, 2026';
 
 type Section = { title: string; lead?: string; points: string[]; note?: string };
 
@@ -39,7 +39,7 @@ const SECTIONS: Section[] = [
     points: [
       '(a) give clear written notice of what is captured and why,',
       '(b) get any consent or works council approval the law requires where the User is located, and',
-      '(c) not use Sidekick for covert monitoring or to score individual performance.',
+      '(c) not use Sidekick for covert monitoring or to score individual performance. This does not cover quality reviews of sessions a User chooses to record and submit, when the User has been told about them (for example, to give feedback on those sessions or to decide pay for them).',
     ],
     note: 'Sidekick shows a visible indicator while it is recording.',
   },
