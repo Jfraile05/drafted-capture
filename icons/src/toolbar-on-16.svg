@@ -2,8 +2,8 @@
 <defs><radialGradient id="bg" cx="50%" cy="40%" r="75%"><stop offset="0" stop-color="#16302A"/><stop offset="1" stop-color="#0B1210"/></radialGradient>
 <radialGradient id="shell" cx="38%" cy="28%" r="80%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#E6ECE9"/><stop offset="1" stop-color="#B9C4BF"/></radialGradient></defs>
 <rect width="128" height="128" rx="28" fill="url(#bg)"/>
-<path d="M64 50 C64 36 52 26 40.8 26" fill="none" stroke="#C9D3CF" stroke-width="9" stroke-linecap="round"/>
-<circle cx="34" cy="26" r="26" fill="#5CFFC4" opacity=".28"/><circle cx="34" cy="26" r="17" fill="#5CFFC4"/><circle cx="30" cy="22" r="5.949999999999999" fill="#E6FFF6" opacity=".9"/>
+<path d="M64 50 C64 38 54 30 45.6 30" fill="none" stroke="#C9D3CF" stroke-width="9" stroke-linecap="round"/>
+<circle cx="36" cy="30" r="31" fill="#5CFFC4" opacity=".28"/><circle cx="36" cy="30" r="24" fill="#5CFFC4"/><circle cx="28.8" cy="22.8" r="7.7" fill="#E6FFF6" opacity=".9"/>
 <g transform="translate(64 84) scale(1.18) translate(-64 -84)">
 <rect x="12" y="74" width="12" height="22" rx="5" fill="#4A5A55"/>
 <rect x="104" y="74" width="12" height="22" rx="5" fill="#4A5A55"/>
