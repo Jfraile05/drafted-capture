@@ -3,7 +3,7 @@
 // their animation CSS lives in styles.css under `.mascot`.
 
 import { type Ref, type RefObject, useEffect, useRef, useState } from 'react';
-import { STORAGE_KEYS } from './constants';
+import { IS_BETA, STORAGE_KEYS } from './constants';
 import { useLiveSession } from './hooks';
 import type { Settings } from './types';
 
@@ -408,8 +408,11 @@ export default function Brand({
         <Mascot ref={ref} state={state} className="h-full w-full" />
       </button>
       <div className="flex flex-col leading-none text-left">
-        <span className={`wordmark ${size}`}>
-          sidekick<span className="dot">.</span>
+        <span className="flex items-center gap-2">
+          <span className={`wordmark ${size}`}>
+            sidekick<span className="dot">.</span>
+          </span>
+          {IS_BETA && <span className="beta-tag">Beta</span>}
         </span>
         <span className="byline">By Drafted Labs</span>
       </div>

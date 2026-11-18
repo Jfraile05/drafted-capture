@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useRef } from 'react';
 import Brand from '../shared/Brand';
-import { EXTENSION_VERSION } from '../shared/constants';
+import { EXTENSION_VERSION, IS_BETA } from '../shared/constants';
 import { useSettings } from '../shared/hooks';
 
 export function Options() {
@@ -174,7 +174,10 @@ export function Options() {
               Show welcome again
             </button>
           </div>
-          <p className="text-xs text-text-faint">Sidekick {EXTENSION_VERSION} by Drafted Labs</p>
+          <p className="text-xs text-text-faint">
+            Sidekick {EXTENSION_VERSION}
+            {IS_BETA && ' beta'} by Drafted Labs
+          </p>
         </footer>
       </div>
     </div>
