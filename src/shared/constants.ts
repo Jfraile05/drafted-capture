@@ -2,7 +2,7 @@ import type { AnnotationTag, Settings, TaskCategory } from './types';
 
 import { IDLE_CONFIG } from '../config/idle';
 
-export const EXTENSION_VERSION = '1.0.15';
+export const EXTENSION_VERSION = '1.0.16';
 /** Shows the Beta tag next to the wordmark and in the version line. */
 export const IS_BETA = true;
 
