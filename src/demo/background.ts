@@ -3,6 +3,18 @@ import { checkInputIdle } from '../background/idle';
 import { enforceSessionCap } from '../background/session';
 import { MAX_SESSION_MS } from '../shared/constants';
 import { getLiveSession, setLiveSession, withLiveLock } from '../shared/storage/live';
+import { SYNTHETIC_STORAGE } from './storage';
+
+// Storage reads and writes for demo code in the offscreen page.
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type !== SYNTHETIC_STORAGE) return;
+  const { key, value, write } = message as { key: string; value?: unknown; write?: boolean };
+  const done = write
+    ? chrome.storage.local.set({ [key]: value }).then(() => ({ ok: true }))
+    : chrome.storage.local.get(key).then((items) => ({ value: items[key] }));
+  done.then(sendResponse, (error) => sendResponse({ error: String(error) }));
+  return true;
+});
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (!['synthetic-test-idle', 'synthetic-test-cap'].includes(alarm.name)) return;

@@ -52,6 +52,7 @@ export default defineConfig({
     transform(code,id) {
       if (id === resolve(root,'src/background/session.ts')) return "import { isDemoUrl } from '../demo/siteAccess';\n" + code.replace('if (tab.id === undefined) return;', "if (tab.id === undefined || !isDemoUrl(tab.url ?? '')) return;");
       if (id === resolve(root,'src/background/privacy.ts')) return "import { isDemoUrl } from '../demo/siteAccess';\n" + code.replace("if (tab.id === undefined || tab.incognito", "if (!isDemoUrl(url) || tab.id === undefined || tab.incognito");
+      if (id === resolve(root,'src/background/index.ts')) return code.replace("if (['RECORDING_SAVED', 'RECORDING_FAILED'].includes(message.type)) return;", "if (['RECORDING_SAVED', 'RECORDING_FAILED', 'SYNTHETIC_STORAGE'].includes(message.type)) return;");
       if (id === resolve(root,'src/shared/Brand.tsx')) return code.replace('>By Drafted Labs<','>Synthetic project<');
       if (id === resolve(root,'src/popup/App.tsx')) return code.replace('                Sign out','                Test controls');
       if (id === resolve(root,'src/shared/SyncStatus.tsx')) return code.replace("pending ? 'Uploading' : 'Synced'","pending ? 'Simulating upload' : 'Simulated sync'");
