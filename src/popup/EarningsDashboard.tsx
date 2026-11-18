@@ -116,8 +116,8 @@ export default function EarningsDashboard({ uid, localOnly }: { uid: string; loc
           {localOnly
             ? 'Local estimate from saved tasks.'
             : 'Estimate from tasks saved on this device.'}{' '}
-          Pay is based on your time and quality. Open the review panel to see what raised or lowered
-          each score.
+          Pay is based on your active time. Open the review panel to see what raised or lowered each
+          quality score.
         </p>
       )}
     </section>

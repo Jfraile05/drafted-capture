@@ -59,5 +59,5 @@ export default defineConfig({
     },
   },react(),crx({manifest})],
   resolve:{alias:{'@':resolve(root,'src')}},
-  build:{target:'esnext',outDir:'dist-demo',rollupOptions:{input:{popup:resolve(root,'src/popup/index.html'),panel:resolve(root,'src/panel/index.html'),options:resolve(root,'src/options/index.html'),offscreen:resolve(root,'src/offscreen/index.html')}}},
+  build:{target:'esnext',outDir:'dist-demo',rollupOptions:{input:{popup:resolve(root,'src/popup/index.html'),panel:resolve(root,'src/panel/index.html'),options:resolve(root,'src/options/index.html'),terms:resolve(root,'src/terms/index.html'),offscreen:resolve(root,'src/offscreen/index.html')}}},
 });
