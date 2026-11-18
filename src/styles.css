@@ -228,6 +228,56 @@ summary:focus-visible {
   transform-origin: center;
   animation: sk-blink 6.8s infinite;
 }
+/* Mint eyes glow; the antenna bulb breathes, faster while recording or saving,
+   and dims while paused. */
+.ms-eyes {
+  filter: drop-shadow(0 0 6px rgba(92, 255, 196, 0.7));
+}
+.ms-bulb,
+.ms-bulb-glow {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.ms-bulb {
+  animation: sk-bulb 4s ease-in-out infinite;
+}
+.ms-bulb-glow {
+  animation: sk-bulb-glow 4s ease-in-out infinite;
+}
+.mascot[data-state="watching"] .ms-bulb,
+.mascot[data-state="watching"] .ms-bulb-glow {
+  animation-duration: 2s;
+}
+.mascot[data-state="capturing"] .ms-bulb,
+.mascot[data-state="capturing"] .ms-bulb-glow {
+  animation-duration: 0.9s;
+}
+.mascot[data-state="paused"] .ms-bulb {
+  fill: #0c3a2c;
+  animation: none;
+}
+.mascot[data-state="paused"] .ms-bulb-glow {
+  opacity: 0;
+  animation: none;
+}
+@keyframes sk-bulb {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes sk-bulb-glow {
+  0%,
+  100% {
+    transform: scale(0.8);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
 .mascot[data-state="waiting"] .ms-character {
   transform: rotate(-8deg);
 }

@@ -93,7 +93,7 @@ export function Terms() {
     <div className="min-h-screen px-6 py-10">
       <article className="mx-auto max-w-2xl">
         <header className="space-y-3">
-          <Brand size="text-[28px]" />
+          <Brand size="text-[28px]" flat />
           <h1 className="pt-4 text-2xl font-semibold text-text">Sidekick Terms of Use</h1>
           <p className="text-sm text-text-muted">Last updated: {LAST_UPDATED}</p>
         </header>

@@ -3,6 +3,7 @@ import { activeElapsed, nextTimerTick } from '../shared/activeTime';
 import { STORAGE_KEYS } from '../shared/constants';
 import { formatEarnings } from '../shared/earnings';
 import { type EarningsClock, liveEarnings } from '../shared/liveEarnings';
+import { SIDEKICK_ICON_SVG } from '../shared/sidekickIcon';
 import type { Settings } from '../shared/types';
 import { fmtDuration } from '../shared/utils/format';
 
@@ -86,6 +87,7 @@ export function createOverlay(next: EarningsClock | null): void {
   const style = document.createElement('style');
   style.textContent = `
     .overlay-pill{display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(18,8,46,.85);backdrop-filter:blur(12px);border-radius:20px;border:1px solid rgba(77,255,160,.2);pointer-events:auto;user-select:none;color:#fff;font:11px/1.4 system-ui,sans-serif;white-space:nowrap}
+    .icon{display:block;width:21px;height:18px;margin:-2px -2px -2px -4px}.icon svg{display:block;width:100%;height:100%}
     .wordmark{font-family:'Poppins',system-ui,sans-serif;font-weight:800;letter-spacing:.02em}
     .amount,.elapsed{font-variant-numeric:tabular-nums}.amount{font-weight:600}.elapsed{color:#BFC5C1}
     .dot{width:6px;height:6px;border-radius:50%;background:#4DFFA0;flex-shrink:0;animation:pulse 2s ease-in-out infinite}
@@ -107,7 +109,10 @@ export function createOverlay(next: EarningsClock | null): void {
   elapsed = document.createElement('span');
   elapsed.className = 'elapsed';
   elapsed.title = 'Active recording time';
-  pill.append(wordmark, dot, amount, elapsed);
+  const icon = document.createElement('span');
+  icon.className = 'icon';
+  icon.innerHTML = SIDEKICK_ICON_SVG; // static markup from the extension, never page data
+  pill.append(icon, wordmark, dot, amount, elapsed);
   idleNotice = document.createElement('div');
   idleNotice.style.cssText =
     'max-width:260px;margin-top:8px;padding:12px;border-radius:12px;background:#0B0D0C;color:#F2F4F3;font:12px/1.5 system-ui;pointer-events:auto;';
