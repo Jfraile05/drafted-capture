@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+<defs><radialGradient id="bg" cx="50%" cy="40%" r="75%"><stop offset="0" stop-color="#16302A"/><stop offset="1" stop-color="#0B1210"/></radialGradient>
+<radialGradient id="shell" cx="38%" cy="28%" r="80%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#E6ECE9"/><stop offset="1" stop-color="#B9C4BF"/></radialGradient></defs>
+<rect width="128" height="128" rx="28" fill="url(#bg)"/>
+<path d="M64 52 C64 36 52 26 38.8 26" fill="none" stroke="#C9D3CF" stroke-width="6" stroke-linecap="round"/>
+<circle cx="34" cy="26" r="24" fill="#5CFFC4" opacity=".28"/><circle cx="34" cy="26" r="12" fill="#5CFFC4"/><circle cx="30" cy="22" r="4.199999999999999" fill="#E6FFF6" opacity=".9"/>
+<g transform="translate(64 84) scale(1) translate(-64 -84)">
+<rect x="14" y="74" width="12" height="22" rx="5" fill="#4A5A55"/>
+<rect x="102" y="74" width="12" height="22" rx="5" fill="#4A5A55"/>
+<ellipse cx="64" cy="85" rx="45" ry="33" fill="url(#shell)"/>
+<rect x="53" y="50" width="22" height="6" rx="2.5" fill="#3A4743"/>
+<rect x="30" y="68" width="68" height="34" rx="17" fill="#3A4743"/>
+<rect x="33" y="71" width="62" height="28" rx="14" fill="#030807"/>
+<rect x="49" y="76" width="9" height="18" rx="4.5" fill="#5CFFC4"/>
+<rect x="70" y="76" width="9" height="18" rx="4.5" fill="#5CFFC4"/>
+</g></svg>

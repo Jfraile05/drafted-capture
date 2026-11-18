@@ -37,6 +37,7 @@ import { clearIdleNotices, showIdleNotice } from './idleNotice';
 import { checkCurrentScreen, prepareResume } from './privacy';
 import { pauseRecording, resumeRecording, stopRecording } from './recorder';
 import { wakeSync } from './sync';
+import { setRecordingIcon } from './toolbarIcon';
 import { getWorkflowAccess } from './workflows';
 
 // State writes stay immediate. Slow tab, video and alarm updates run in order,
@@ -70,6 +71,7 @@ function syncCaptureEffects(): Promise<void> {
     await chrome.action.setBadgeBackgroundColor({
       color: capturing ? BADGE_ON_COLOR : BADGE_PAUSED_COLOR,
     });
+    await setRecordingIcon(capturing);
     if (capturing) {
       // Visible pages drive the fast cadence. Alarms are only a recovery path;
       // Chrome 116 requires a full minute between packaged-extension alarms.
@@ -276,6 +278,7 @@ async function finishCapture(request: CaptureControlRequest): Promise<string | n
   await withCaptureEffects(async () => {
     await stopRecording().catch(() => {});
     await chrome.action.setBadgeText({ text: '' }).catch(() => {});
+    await setRecordingIcon(false);
     await chrome.alarms.clear(ALARM_SCREENSHOT).catch(() => {});
     await chrome.alarms.clear(ALARM_SESSION_CAP).catch(() => {});
     await chrome.alarms.clear(IDLE_CONFIG.alarmName).catch(() => {});
