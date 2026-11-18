@@ -115,7 +115,7 @@ export default function EarningsDashboard({ uid, localOnly }: { uid: string; loc
         <p className="mt-2 text-[11px] text-text-faint">
           {localOnly
             ? 'Local estimate from saved tasks.'
-            : 'Estimate from tasks saved on this device.'}{' '}
+            : 'Estimate from your tasks sent to Drafted.'}{' '}
           Pay is based on your active time. Open the review panel to see what raised or lowered each
           quality score.
         </p>
