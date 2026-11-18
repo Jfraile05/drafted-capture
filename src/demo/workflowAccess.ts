@@ -1,10 +1,11 @@
 import { putScreenshot, putSession } from '../shared/storage/db';
 import { DEMO, DEMO_WORKFLOWS } from './config';
 import { fixtureImage, fixtureSessions } from './fixtures';
+import { readLocal, writeLocal } from './storage';
 
 export async function seedDemo(): Promise<void> {
   await navigator.locks.request('synthetic-seed', async () => {
-    if ((await chrome.storage.local.get(DEMO.seedKey))[DEMO.seedKey]) return;
+    if (await readLocal(DEMO.seedKey)) return;
     for (const session of fixtureSessions(Date.now())) {
       for (const step of session.steps) {
         const blob = fixtureImage(session, step);
@@ -15,7 +16,7 @@ export async function seedDemo(): Promise<void> {
       }
       await putSession(session);
     }
-    await chrome.storage.local.set({ [DEMO.seedKey]: true });
+    await writeLocal(DEMO.seedKey, true);
   });
 }
 

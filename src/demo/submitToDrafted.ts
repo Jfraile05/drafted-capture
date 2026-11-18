@@ -2,6 +2,7 @@ import { earningsForSession } from '../shared/earnings';
 import type { EnrichmentMap, SubmitResult } from '../shared/submitToDrafted';
 import type { Session } from '../shared/types';
 import { DEMO, DEMO_WORKFLOWS } from './config';
+import { readLocal, writeLocal } from './storage';
 export type { EnrichmentMap } from '../shared/submitToDrafted';
 
 export interface SyntheticReceipt {
@@ -42,7 +43,7 @@ export function makeReceipt(session: Session, thoughts: EnrichmentMap = {}): Syn
 }
 
 export async function readReceipts(): Promise<Record<string, SyntheticReceipt>> {
-  return (await chrome.storage.local.get(DEMO.ledgerKey))[DEMO.ledgerKey] ?? {};
+  return (await readLocal<Record<string, SyntheticReceipt>>(DEMO.ledgerKey)) ?? {};
 }
 
 export async function submitSessionToDrafted(
@@ -50,15 +51,15 @@ export async function submitSessionToDrafted(
   enrich?: EnrichmentMap,
 ): Promise<SubmitResult> {
   const receipt = makeReceipt(session, enrich);
-  if ((await chrome.storage.local.get(DEMO.offlineKey))[DEMO.offlineKey] || !navigator.onLine)
+  if ((await readLocal(DEMO.offlineKey)) || !navigator.onLine)
     throw new Error('Synthetic receiver offline. Retained for retry.');
   await new Promise((resolve) => setTimeout(resolve, DEMO.latencyMs));
-  if ((await chrome.storage.local.get(DEMO.offlineKey))[DEMO.offlineKey] || !navigator.onLine)
+  if ((await readLocal(DEMO.offlineKey)) || !navigator.onLine)
     throw new Error('Synthetic receiver went offline.');
   await navigator.locks.request('synthetic-ledger', async () => {
     const receipts = await readReceipts();
     if ((receipts[receipt.id]?.revision ?? 0) <= receipt.revision) receipts[receipt.id] = receipt;
-    await chrome.storage.local.set({ [DEMO.ledgerKey]: receipts });
+    await writeLocal(DEMO.ledgerKey, receipts);
   });
   return {
     taskId: receipt.id,
