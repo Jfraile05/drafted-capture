@@ -1,7 +1,7 @@
 import { idleThreshold } from '../config/idle';
 import { PRIVACY_CONFIG } from '../config/privacy';
 import { scanPrivacy } from '../content/privacyScan';
-import type { PrivacyGate, PrivacyPermit, PrivacyReason } from '../shared/privacy';
+import type { PrivacyGate, PrivacyPermit, PrivacyPolicy, PrivacyReason } from '../shared/privacy';
 import { privacyReasonsForUrl } from '../shared/privacy';
 import { getLiveSession, getSettings, setLiveSession, withLiveLock } from '../shared/storage/live';
 import type { LiveSession } from '../shared/types';
@@ -33,10 +33,18 @@ function leftGatedPage(gate: PrivacyGate, screen: Inspection): boolean {
     : gate.tab_id !== screen.tab_id || gate.domain !== screen.domain;
 }
 
+const SITE_PAUSE_REASONS = new Set<PrivacyReason>(PRIVACY_CONFIG.sitePauseReasons);
+/** Only an inbox on the page itself pauses. Fields are masked, not paused. */
+const PAGE_PAUSE_REASONS = new Set<PrivacyReason>(['messaging', 'unavailable']);
+
+function sitePauseReasons(url: string, policy: PrivacyPolicy): PrivacyReason[] {
+  return privacyReasonsForUrl(url, policy).filter((reason) => SITE_PAUSE_REASONS.has(reason));
+}
+
 async function inspect(tab: chrome.tabs.Tab, url = tab.url ?? ''): Promise<Inspection | null> {
   if (tab.id === undefined || tab.incognito || !/^https?:\/\//.test(url)) return null;
   const policy = await getPrivacyPolicy();
-  const reasons = new Set(privacyReasonsForUrl(url, policy));
+  const reasons = new Set(sitePauseReasons(url, policy));
   const host = new URL(url).hostname;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -61,10 +69,10 @@ async function inspect(tab: chrome.tabs.Tab, url = tab.url ?? ''): Promise<Inspe
       const scan = frame.result;
       // A child frame that is still loading has nothing on screen yet.
       if (!scan || !scan.ready) continue;
-      for (const reason of [...scan.reasons, ...privacyReasonsForUrl(scan.url, policy)])
-        reasons.add(reason);
+      for (const reason of scan.reasons) if (PAGE_PAUSE_REASONS.has(reason)) reasons.add(reason);
+      for (const reason of sitePauseReasons(scan.url, policy)) reasons.add(reason);
       for (const frameUrl of scan.frames)
-        for (const reason of privacyReasonsForUrl(frameUrl, policy)) reasons.add(reason);
+        for (const reason of sitePauseReasons(frameUrl, policy)) reasons.add(reason);
     }
   } catch {
     reasons.add('unavailable');

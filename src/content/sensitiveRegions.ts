@@ -1,11 +1,13 @@
 // Finds the parts of the visible page that must not appear in a screenshot:
-// sensitive fields, text inputs when "mask all inputs" is on, and any text that
-// matches the redaction detectors (emails, cards, SSNs, keys). Rects are in CSS
+// sensitive fields, text inputs when "mask all inputs" is on, payment provider
+// iframes, and any text that matches the redaction detectors (emails, phones,
+// cards, SSNs, keys). Rects are in CSS
 // pixels relative to the viewport. Limits: top frame only, and text drawn in a
 // canvas or inside a closed shadow root is not seen.
 
 import { findSensitiveSpans } from '../shared/utils/redact';
 import type { Rect } from '../shared/utils/screenshotMask';
+import { isSensitiveFrame } from '../shared/utils/sensitiveFrames';
 import { isSensitiveField } from './dom';
 
 // Cheap test so most text nodes skip the full detectors.
@@ -41,6 +43,12 @@ export function findSensitiveRegions(maskAllInputs: boolean): SensitiveRegions {
     ) {
       add(field.getBoundingClientRect());
     }
+  }
+
+  for (const frame of Array.from(document.querySelectorAll('iframe, frame'))) {
+    const el = frame as HTMLIFrameElement;
+    if (isSensitiveFrame({ src: el.src, title: el.title, name: el.name }))
+      add(el.getBoundingClientRect());
   }
 
   const root = document.body ?? document.documentElement;
