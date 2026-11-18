@@ -50,6 +50,19 @@ body {
 .wordmark .dot {
   color: var(--text-muted);
 }
+/* Small outlined tag beside the wordmark while Sidekick is in beta. */
+.beta-tag {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  border-radius: 999px;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
 
 /* Plain background. The mascot carries the color; surfaces stay quiet. */
 .atmosphere {
