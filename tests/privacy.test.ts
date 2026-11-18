@@ -34,7 +34,7 @@ beforeEach((t) => {
   t.mock.method(chrome.tabs, 'query', async () => [tab]);
   t.mock.method(chrome.tabs, 'get', async () => tab);
   t.mock.method(chrome.tabs, 'sendMessage', async (_id: any, message: any) =>
-    message.type === 'GET_SENSITIVE_REGIONS' ? { rects: [], viewportWidth: 800 } : { ok: true });
+    message.type === 'GET_SENSITIVE_REGIONS' ? { rects: [], viewportWidth: 800, complete: true } : { ok: true });
   t.mock.method(chrome.scripting, 'executeScript', async () => [{
     frameId: 0, documentId,
     result: { url: tab.url, reasons: [...reasons], ready: tab.status === 'complete', frames: childFrames.map((f) => f.result.url) },
