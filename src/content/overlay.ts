@@ -97,7 +97,7 @@ export function createOverlay(next: EarningsClock | null): void {
   pill.className = 'overlay-pill';
   const wordmark = document.createElement('span');
   wordmark.className = 'wordmark';
-  wordmark.textContent = 'drafted.';
+  wordmark.textContent = 'sidekick.';
   dot = document.createElement('span');
   dot.className = 'dot';
   dot.setAttribute('role', 'img');

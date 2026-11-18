@@ -17,6 +17,39 @@ export function isSensitiveField(
   return SENSITIVE_NAME.test(`${el.name} ${el.id}`);
 }
 
+/** The page's own label for a form field: its <label>, aria-labelledby, or
+ *  placeholder. Never the field's value. */
+export function fieldLabel(el: Element): string | null {
+  if (
+    !(el instanceof HTMLInputElement) &&
+    !(el instanceof HTMLTextAreaElement) &&
+    !(el instanceof HTMLSelectElement)
+  ) {
+    return null;
+  }
+  let raw = '';
+  const label = el.labels?.[0];
+  if (label) {
+    // A label can wrap the field itself; drop the controls so no value or
+    // option text is read.
+    const copy = label.cloneNode(true) as HTMLElement;
+    for (const control of copy.querySelectorAll('input, select, textarea')) control.remove();
+    raw = copy.textContent ?? '';
+  }
+  if (!raw.trim()) {
+    raw = (el.getAttribute('aria-labelledby') ?? '')
+      .split(/\s+/)
+      .map((id) => (id ? (document.getElementById(id)?.textContent ?? '') : ''))
+      .join(' ');
+  }
+  if (!raw.trim()) raw = el.getAttribute('placeholder') ?? '';
+  const clean = raw
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[\s:*]+$/, '');
+  return clean ? clean.slice(0, 80) : null;
+}
+
 export function extractDOMContext(element: Element): DOMContext | null {
   if (
     element === document.documentElement ||
@@ -61,6 +94,8 @@ export function extractDOMContext(element: Element): DOMContext | null {
       }
     }
 
+    const label = fieldLabel(element);
+
     const textNode = Array.from(element.childNodes).find(
       (n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim(),
     );
@@ -84,6 +119,7 @@ export function extractDOMContext(element: Element): DOMContext | null {
       input_type: inputType,
       input_value: inputValue,
       ...(sensitive ? { sensitive } : {}),
+      ...(label ? { field_label: label } : {}),
     };
   } catch (err) {
     console.warn('[drafted.capture] extractDOMContext failed', err);

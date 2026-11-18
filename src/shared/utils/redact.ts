@@ -102,6 +102,7 @@ export function redactStep(step: Step, opts: { maskAllInputs: boolean }): void {
     }
     if (dom.text) dom.text = redactText(dom.text);
     if (dom.aria_label) dom.aria_label = redactText(dom.aria_label);
+    if (dom.field_label) dom.field_label = redactText(dom.field_label);
   }
 
   origin.url = redactUrl(origin.url);
