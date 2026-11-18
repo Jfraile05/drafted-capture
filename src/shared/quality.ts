@@ -31,6 +31,17 @@ function strings(value: unknown): string[] {
     : [];
 }
 
+/**
+ * The review the student sees: the agent's, with an admin's hand score in its
+ * place when there is one.
+ */
+export function reviewForStudent(agentReview: unknown, override: unknown): QualityReview | null {
+  const review = parseQualityReview(agentReview);
+  const score = (override as { quality_score?: unknown } | null)?.quality_score;
+  if (!review || typeof score !== 'number' || !Number.isFinite(score)) return review;
+  return { ...review, quality_score: Math.max(0, Math.min(100, Math.round(score))) };
+}
+
 /** Validates `agent_review` from the task document. Failed reviews return null. */
 export function parseQualityReview(raw: unknown): QualityReview | null {
   if (!raw || typeof raw !== 'object') return null;

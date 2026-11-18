@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { beforeEach, describe, it } from 'node:test';
 import { local } from './stubs/chrome';
 import { qualityReviews } from '../src/background/quality';
-import { parseQualityReview, summarizeQuality } from '../src/shared/quality';
+import { parseQualityReview, reviewForStudent, summarizeQuality } from '../src/shared/quality';
 import type { Session } from '../src/shared/types';
 import { WORKFLOWS } from '../src/shared/workflows';
 
@@ -89,5 +89,40 @@ describe('quality reviews', () => {
       throw new Error('offline');
     });
     assert.deepEqual(await qualityReviews(['a', 'b']), { a: review(90) });
+  });
+
+  it('refetches saved reviews after an hour so hand scores and re-reviews show up', async (t) => {
+    let now = 1_000_000;
+    t.mock.method(Date, 'now', () => now);
+    let score = 40;
+    const asked: string[][] = [];
+    t.mock.method(chrome.runtime, 'sendMessage', async (message: any) => {
+      if (message.type !== 'QUALITY_REVIEWS') return { ok: true };
+      asked.push(message.taskIds);
+      return { a: review(score) };
+    });
+    assert.equal((await qualityReviews(['a'])).a.quality_score, 40);
+    score = 85;
+    now += 30 * 60_000;
+    assert.equal((await qualityReviews(['a'])).a.quality_score, 40);
+    now += 31 * 60_000;
+    assert.equal((await qualityReviews(['a'])).a.quality_score, 85);
+    assert.deepEqual(asked, [['a'], ['a']]);
+  });
+
+  it('drops the old forever cache', async (t) => {
+    local.data.quality_reviews = { a: review(10) };
+    t.mock.method(chrome.runtime, 'sendMessage', async () => ({ a: review(70) }));
+    assert.equal((await qualityReviews(['a'])).a.quality_score, 70);
+    assert.equal(local.data.quality_reviews, undefined);
+  });
+});
+
+describe('hand scores', () => {
+  it('shows students an admin hand score in place of the agent score', () => {
+    assert.equal(reviewForStudent(review(40), { quality_score: 77.4 })?.quality_score, 77);
+    assert.equal(reviewForStudent(review(40), null)?.quality_score, 40);
+    assert.equal(reviewForStudent(review(40), { note: 'no score' })?.quality_score, 40);
+    assert.equal(reviewForStudent({ error: 'failed' }, { quality_score: 90 }), null);
   });
 });

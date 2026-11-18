@@ -16,9 +16,10 @@ const area = () => {
   const clone = <T>(v: T): T => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
   return {
     data,
-    get: async (k: string) => {
+    get: async (k: string | string[]) => {
       await Promise.resolve();
-      return k in data ? { [k]: clone(data[k]) } : {};
+      const keys = Array.isArray(k) ? k : [k];
+      return Object.fromEntries(keys.filter((key) => key in data).map((key) => [key, clone(data[key])]));
     },
     set: async (o: Record<string, unknown>) => {
       await Promise.resolve();

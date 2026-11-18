@@ -1,15 +1,26 @@
 import type { QualityReview } from '../shared/quality';
 import { ensureOffscreen } from './offscreen';
 
-const CACHE_KEY = 'quality_reviews';
+const CACHE_KEY = 'quality_reviews_v2';
+/** Held reviews forever with no refresh time. */
+const OLD_CACHE_KEY = 'quality_reviews';
 /** Keeps one popup open from reading hundreds of task documents at once. */
 const MAX_FETCH = 50;
+/** Admins can change a score and old uploads get re-reviewed, so saved reviews refresh. */
+const REFRESH_MS = 60 * 60 * 1000;
 
-/** Reviews are written once per upload, so a saved review never goes stale. */
+type Cached = { review: QualityReview; at: number };
+
 export async function qualityReviews(taskIds: string[]): Promise<Record<string, QualityReview>> {
-  const stored = await chrome.storage.local.get(CACHE_KEY);
-  const cache: Record<string, QualityReview> = stored[CACHE_KEY] ?? {};
-  const missing = taskIds.filter((id) => !cache[id]).slice(0, MAX_FETCH);
+  const stored = await chrome.storage.local.get([CACHE_KEY, OLD_CACHE_KEY]);
+  if (stored[OLD_CACHE_KEY]) void chrome.storage.local.remove(OLD_CACHE_KEY);
+  const cache: Record<string, Cached> = stored[CACHE_KEY] ?? {};
+  const now = Date.now();
+  // Never fetched first, then the stalest.
+  const missing = taskIds
+    .filter((id) => !cache[id] || now - cache[id].at > REFRESH_MS)
+    .sort((a, b) => (cache[a]?.at ?? 0) - (cache[b]?.at ?? 0))
+    .slice(0, MAX_FETCH);
   if (missing.length) {
     try {
       await ensureOffscreen();
@@ -23,7 +34,7 @@ export async function qualityReviews(taskIds: string[]): Promise<Record<string, 
       for (const id of missing) {
         const review = fetched?.[id];
         if (review) {
-          cache[id] = review;
+          cache[id] = { review, at: now };
           changed = true;
         }
       }
@@ -32,5 +43,5 @@ export async function qualityReviews(taskIds: string[]): Promise<Record<string, 
       // Offline or signed out. Show what is already saved.
     }
   }
-  return Object.fromEntries(taskIds.filter((id) => cache[id]).map((id) => [id, cache[id]]));
+  return Object.fromEntries(taskIds.filter((id) => cache[id]).map((id) => [id, cache[id].review]));
 }
