@@ -7,6 +7,7 @@
 
 import { IDLE_CONFIG } from '../config/idle';
 import { PRIVACY_CONFIG } from '../config/privacy';
+import { BUILD_ID } from '../shared/buildCheck';
 import { ALARM_SCREENSHOT, ALARM_SESSION_CAP, STORAGE_KEYS } from '../shared/constants';
 import { summarizeEarnings } from '../shared/earnings';
 import { summarizeQuality } from '../shared/quality';
@@ -184,6 +185,9 @@ async function handleMessage(
 
     case 'GET_CAPTURE_STATE':
       return getCaptureState();
+
+    case 'GET_BUILD':
+      return { build: BUILD_ID };
 
     case 'LIST_SESSIONS':
       return listSessions();

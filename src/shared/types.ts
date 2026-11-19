@@ -329,6 +329,7 @@ export type MessageType =
   | 'GET_LIVE_SESSION'
   | 'GET_CAPTURE_STATE'
   | 'LIST_SESSIONS'
+  | 'GET_BUILD'
   | 'GET_EARNINGS'
   | 'GET_QUALITY'
   | 'GET_SESSION_QUALITY'
