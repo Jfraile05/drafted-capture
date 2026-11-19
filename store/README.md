@@ -30,8 +30,12 @@ Everything for version 1.0.16 is in this folder.
 
 ```sh
 npm run build
+rm -f store/release/sidekick-<version>.zip
 cd dist && zip -qrX ../store/release/sidekick-<version>.zip . -x '.DS_Store'
 ```
+
+Delete the old zip first: `zip` adds to an existing file instead of replacing it, so old
+build files would stay in the package.
 
 Bump `version` in `manifest.json` first. The store rejects a package whose version is not
 higher than the last one uploaded.
