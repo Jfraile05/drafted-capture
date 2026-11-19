@@ -17,7 +17,7 @@ import { getRecording } from '../shared/storage/db';
 import type { Session, Step } from '../shared/types';
 import { fmtDuration, stepLabel } from '../shared/utils/format';
 import { nearestScreenshotIndex } from './nearestScreenshot';
-import { feedSteps, pointPercent, rectPercent, typedText } from './replayOverlay';
+import { feedSteps, pointPercent, rectPercent, stepDelay, typedText } from './replayOverlay';
 import { useScreenshot } from './useScreenshot';
 
 interface ReplayProps {
@@ -29,14 +29,10 @@ type ViewMode = 'screenshots' | 'video';
 const CLICKS = new Set(['click', 'double_click', 'right_click']);
 const SCROLL_ICON = { up: ArrowUp, down: ArrowDown, left: ArrowLeft, right: ArrowRight };
 
-function stepDuration(step: Step | undefined, speed: number): number {
-  return Math.max(100, Math.min(5000, (step?.duration_to_next ?? 1000) / speed));
-}
-
 export function Replay({ session }: ReplayProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(2);
+  const [speed, setSpeed] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>('screenshots');
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
@@ -72,10 +68,10 @@ export function Replay({ session }: ReplayProps) {
       () => {
         setCurrentIndex((prev) => Math.min(prev + 1, session.steps.length - 1));
       },
-      stepDuration(session.steps[currentIndex], speed),
+      stepDelay(session.steps, currentIndex, session.started_at, session.pauses, speed),
     );
     return () => clearTimeout(timer);
-  }, [playing, currentIndex, speed, session.steps]);
+  }, [playing, currentIndex, speed, session.steps, session.started_at, session.pauses]);
 
   const goTo = (index: number) => {
     setCurrentIndex(Math.max(0, Math.min(index, session.steps.length - 1)));
@@ -94,7 +90,13 @@ export function Replay({ session }: ReplayProps) {
 
   // Typing plays out over most of the step while playing, and quickly when stepping by hand.
   const typeMs = playing
-    ? Math.max(300, Math.min(1500, stepDuration(currentStep, speed) * 0.7))
+    ? Math.max(
+        300,
+        Math.min(
+          1500,
+          stepDelay(session.steps, currentIndex, session.started_at, session.pauses, speed) * 0.7,
+        ),
+      )
     : 700;
 
   return (

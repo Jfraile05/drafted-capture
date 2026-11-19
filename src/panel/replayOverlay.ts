@@ -1,3 +1,4 @@
+import { type Pause, activeOffset } from '../shared/activeTime';
 import type { ScreenshotRef, Step } from '../shared/types';
 
 export interface Box {
@@ -44,4 +45,26 @@ export function typedText(step: Step): string | null {
   if (!text) return null;
   if (text === '[redacted]' || step.dom?.sensitive) return 'Hidden for privacy';
   return text;
+}
+
+/** Longest wait between two steps in replay. A longer gap (reading a page,
+ *  thinking) is shortened to this so the replay never looks frozen. */
+export const MAX_GAP_MS = 15_000;
+
+/** How long replay waits on step `index` before the next one: the real time
+ *  between the two steps, minus any pause, divided by the speed. */
+export function stepDelay(
+  steps: Step[],
+  index: number,
+  startedAt: number,
+  pauses: Pause[] | undefined,
+  speed: number,
+): number {
+  const step = steps[index];
+  const next = steps[index + 1];
+  if (!step || !next) return 1000 / speed;
+  const gap =
+    activeOffset(startedAt, pauses, next.timestamp) -
+    activeOffset(startedAt, pauses, step.timestamp);
+  return Math.max(100, Math.min(MAX_GAP_MS, gap) / speed);
 }

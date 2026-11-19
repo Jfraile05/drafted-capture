@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { feedSteps, pointPercent, rectPercent, typedText } from '../src/panel/replayOverlay';
+import {
+  feedSteps,
+  MAX_GAP_MS,
+  pointPercent,
+  rectPercent,
+  stepDelay,
+  typedText,
+} from '../src/panel/replayOverlay';
 import type { ScreenshotRef, Step } from '../src/shared/types';
 
 const shot = { width: 2000, height: 1000, dpr: 2 } as ScreenshotRef;
@@ -50,5 +57,24 @@ describe('replay typed text', () => {
       ),
       'Hidden for privacy',
     );
+  });
+});
+
+describe('replay timing', () => {
+  const at = (timestamp: number) => ({ action: { type: 'click' }, timestamp }) as unknown as Step;
+  const steps = [at(1000), at(3500), at(3550), at(60_000), at(70_000)];
+
+  it('waits the real time between steps at 1x and divides it by the speed', () => {
+    assert.equal(stepDelay(steps, 0, 0, [], 1), 2500);
+    assert.equal(stepDelay(steps, 0, 0, [], 2), 1250);
+  });
+
+  it('keeps a tiny gap visible and shortens a long idle gap', () => {
+    assert.equal(stepDelay(steps, 1, 0, [], 1), 100);
+    assert.equal(stepDelay(steps, 2, 0, [], 1), MAX_GAP_MS);
+  });
+
+  it('leaves paused time out', () => {
+    assert.equal(stepDelay(steps, 3, 0, [[62_000, 68_000]], 1), 4000);
   });
 });
