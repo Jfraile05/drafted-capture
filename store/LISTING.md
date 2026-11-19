@@ -1,97 +1,116 @@
-# drafted. Capture — Chrome Web Store submission copy
+# Sidekick: Chrome Web Store submission copy (version 1.0.16)
 
-Paste each block into the matching field in the Developer Dashboard. Sections map
-to the dashboard tabs: **Store listing**, **Privacy practices**, **Settings**.
+Paste each block into the matching field in the Developer Dashboard. Sections
+follow the dashboard tabs: Package, Store listing, Privacy, Distribution.
 
-────────────────────────────────────────────────────────────────────────
-## SETTINGS TAB
-────────────────────────────────────────────────────────────────────────
+The live item "drafted. Capture" (ID lpjabpanndaajdijdmlibdamdcjcdnni, version
+1.0.0) is published from Drafted's developer account. If you can open that item,
+upload this package to it so existing installs update. A new item gets a new ID.
 
-**Publisher contact email:** rodrigo@joindrafted.com
-  (You MUST enter this, then click the verification link Google emails you.
-   Publishing is blocked until the email shows "verified".)
+## Package
 
-────────────────────────────────────────────────────────────────────────
-## STORE LISTING TAB
-────────────────────────────────────────────────────────────────────────
+Upload `store/release/sidekick-1.0.16.zip`, built with `npm run build` and zipped
+from inside `dist/` so `manifest.json` sits at the top of the zip.
 
-**Item title**
-drafted. Capture
+The item name and summary come from the manifest:
+- Name: Sidekick by Drafted Labs
+- Summary: Flip it on. Every click, keystroke, scroll, and screen state across
+  every tab becomes structured computer-use training data.
 
-**Summary** (132 chars max)
-Turn any browser session into structured computer-use training data. Flip it on, capture everything, label tasks later.
+## Store listing
 
-**Category**
-Developer Tools
+**Description**
 
-**Language**
-English (United States)
+Sidekick records the work you do in Chrome and turns it into training data for computer-use AI. You get paid for the tasks you send to Drafted.
 
-**Detailed description** (min 25 chars — paste all of it)
-drafted. Capture records what you do in the browser and turns it into clean, structured computer-use training data.
+How it works
+- Sign in with your Drafted account and pick a task.
+- Press Start and work as you normally would. Sidekick saves each click, typed entry, scroll, page change and screenshot as a step.
+- Pause or stop any time. A small on-page pill shows when Sidekick is recording.
+- Open the review panel to go through your steps, replay the session and label the tasks you did.
+- Sessions upload to Drafted on their own, and each one gets a quality review.
 
-Flip it on and it works ambiently: every click with its coordinates, every keystroke, scroll, navigation, and a screenshot of the screen state are captured continuously across all your tabs. There is no task prompt to fill in first and no single-tab limit. You just turn it on, do your work, and turn it off.
+Privacy
+- Nothing is recorded until you press Start, and incognito windows are never recorded.
+- Password, card, contact and address fields are blacked out in screenshots, and what you type in them is never saved.
+- Emails, phone numbers, card numbers and ID numbers on the page are blacked out before a screenshot is saved.
+- Banking, email, login, payment and health pages pause recording until you choose to continue.
+- You can limit recording to sites you pick, or hide everything you type.
 
-Afterward, open the review panel to step through the full timeline, inspect any moment with its screenshot and a crosshair on the exact action point, and draw segments over spans of steps to label them as tasks. Sessions upload automatically to the selected Drafted project.
+Sidekick is in beta. You need a Drafted account to record.
 
-Sign in to record. Sessions sync automatically after a project is selected. Drafted-managed checks pause on detected sensitive screens and ask before resuming. Password fields are masked.
+**Category:** Productivity (Workflow and planning)
 
-Built for students, researchers, and annotation teams producing high-quality human demonstration data for computer-use AI models.
+**Language:** English (United States)
 
-Key features
-- One-click ambient capture across every tab
-- Clicks, coordinates, keystrokes, scrolls, navigation, and screenshots
-- Post-hoc task segmentation: label spans of steps after the fact
-- Timeline, step inspector, and replay
-- Automatic sync with offline queuing and background retries
-- Local capture with privacy controls and automatic Drafted uploads
+**Graphic assets**
+- Store icon (128x128): `store/store-icon-128.png`
+- Screenshots (1280x800):
+  - `store/sidekick-shot-1-record.png`
+  - `store/sidekick-shot-2-review.png`
+  - `store/sidekick-shot-3-privacy.png`
+- Small promo tile (440x280) is optional. `store/promo-small-440x280.png` still
+  shows the old "drafted. Capture" branding, so leave it off for now.
 
-────────────────────────────────────────────────────────────────────────
-## PRIVACY PRACTICES TAB
-────────────────────────────────────────────────────────────────────────
+**Official URL / homepage:** https://joindrafted.com
 
-**Single purpose description**
-drafted. Capture records the user's own browser interactions (clicks, keystrokes, scrolls, navigation, and screenshots) and uploads them automatically to the selected Drafted project as computer-use training data. That is its single purpose.
+**Support URL:** https://joindrafted.com
 
-**Permission justifications** (one box each)
+## Privacy
 
-> tabs
-Used to know which tab and URL each recorded action belongs to, to capture a screenshot of the active tab, and to keep recording continuous as the user moves between tabs during a session. Tab data is only read while the user has capture turned on.
+**Single purpose**
 
-> storage
-Used to save the user's settings and the recorded session locally on their device (extension storage and IndexedDB). Sessions queue locally while offline and upload automatically to Drafted after sign-in and project selection.
+Sidekick records the user's own browser activity (clicks, typed text, scrolls, page changes and screenshots) while the user has recording turned on, and uploads it to the user's Drafted account as computer-use training data.
 
-> alarms
-Used to take a periodic screenshot of the screen state on a fixed interval during an active recording, so passive page changes (a page finishing loading, a timer updating) are captured even when the user is not clicking. Also wakes the automatic upload queue to retry pending sessions.
+**Permission justifications**
 
-> sidePanel
-Used to open the review workspace in Chrome's side panel, where the user steps through their recorded timeline, inspects steps, labels task segments. UI only.
+tabs:
+Used to know which tab and page each recorded step belongs to, to take a screenshot of the active tab, and to keep one recording going as the user moves between tabs. Tab data is read only while recording is on.
 
-> host permission use (<all_urls>)
-The extension records the user's own actions on whatever sites they choose to demonstrate a task on, which cannot be known in advance, so broad host access is required. It injects a passive, dormant content listener that only activates while the user has capture turned on, and managed sensitive-screen checks pause capture on detected private screens. A personal allowlist can restrict capture further. Recorded page context and screenshots upload to Drafted for the selected project.
+scripting:
+Used to add the recording listener to tabs that were already open when the user pressed Start, and to check a page for sensitive content (such as an email inbox or a sign-in form) so recording can pause before anything is saved.
 
-> remote code use
-The extension does NOT use remote code. All scripts, styles, and fonts are bundled in the package and run locally. Select "No, I am not using remote code."
+storage:
+Used to save the user's settings and recorded sessions on the device until they upload, including while offline.
 
-**Data usage / certification checkboxes**
-- Personally identifiable information: the extension can capture whatever is on the user's own screen, stored locally and uploaded to Drafted. Disclose that screenshots and typed text are included.
-- We do NOT sell or transfer user data to third parties.
-- We do NOT use or transfer data for purposes unrelated to the single purpose.
-- We do NOT use or transfer data to determine creditworthiness or for lending.
-- Check the final box certifying compliance with the Developer Program Policies.
+alarms:
+Used to take a screenshot on a fixed interval during a recording so page changes are captured between clicks, to time an idle pause, and to retry uploads that failed.
 
-**Privacy policy URL** (required — host the page in store/privacy.html somewhere public)
-https://joindrafted.com/capture-privacy
+idle:
+Used to pause recording when the user steps away from the computer, so idle time is not recorded or counted.
 
-────────────────────────────────────────────────────────────────────────
-## GRAPHIC ASSETS (Store listing tab)
-────────────────────────────────────────────────────────────────────────
+sidePanel:
+Used to show the review panel in Chrome's side panel, where the user goes through and labels their recorded steps.
 
-- Store icon (128x128):  store/store-icon-128.png
-- Screenshots (1280x800): store/shot-1-flip.png, shot-2-live.png, shot-3-review.png
-- (Optional) small promo tile 440x280 can be added later; not required to publish.
+offscreen:
+Used to process and upload saved screenshots in the background when the popup is closed.
 
-────────────────────────────────────────────────────────────────────────
-## VISIBILITY (after upload)
-────────────────────────────────────────────────────────────────────────
-Set Visibility = Unlisted so only people with the link can install.
+notifications:
+Used to tell the user when recording paused because they were idle, and to offer to start recording a task they have already chosen.
+
+Host permission (<all_urls>):
+Users record tasks on whatever sites the task needs, which cannot be known in advance. The content script stays inactive until the user presses Start. Sensitive fields are blacked out, sensitive pages pause recording, and users can limit recording to sites they pick.
+
+**Remote code:** No, I am not using remote code. All scripts, styles and fonts are in the package.
+
+**Data collected** (tick these):
+- Personally identifiable information (screenshots can show a name or similar details that the masking does not catch)
+- Authentication information (sign-in pages pause recording, but disclose to be safe)
+- Web history (pages visited during a recording)
+- User activity (clicks, mouse position, scrolls, typing)
+- Website content (screenshots and visible page text)
+
+Leave unticked: Health information, Financial and payment information, Personal communications, Location.
+
+**Certify all three:**
+- I do not sell or transfer user data to third parties, outside of the approved use cases
+- I do not use or transfer user data for purposes unrelated to my item's single purpose
+- I do not use or transfer user data to determine creditworthiness or for lending purposes
+
+**Privacy policy URL:** https://joindrafted.com/capture-privacy
+
+## Distribution
+
+**Visibility:** Unlisted (only people with the link can find and install it).
+
+**Regions:** All regions.
