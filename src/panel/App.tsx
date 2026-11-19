@@ -8,6 +8,7 @@ import {
 } from '@phosphor-icons/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Brand from '../shared/Brand';
+import { SovereignUpload } from '../enterprise/SovereignUpload';
 import { SessionSyncStatus } from '../shared/SyncStatus';
 import { sendMessage, useLiveSession } from '../shared/hooks';
 import type { QualityReview } from '../shared/quality';
@@ -342,6 +343,7 @@ export function App() {
 
       {selectedSessionId && selectedSession && (
         <div className="flex flex-1 flex-col overflow-hidden">
+          <SovereignUpload session={selectedSession} />
           <div className="shrink-0 px-4 py-2">
             <SessionSyncStatus session={selectedSession} />
           </div>
