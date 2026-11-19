@@ -228,7 +228,7 @@ export function Replay({ session }: ReplayProps) {
 
           <div className="flex items-center gap-1.5">
             <span className="mr-1 text-xs text-text-muted">Speed</span>
-            {[2, 3, 4, 5, 6].map((s) => (
+            {[1, 2, 3].map((s) => (
               <button
                 type="button"
                 key={s}
