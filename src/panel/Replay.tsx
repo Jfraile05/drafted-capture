@@ -1,10 +1,23 @@
-import { CaretLeft, CaretRight, MonitorPlay, Pause, Play, Target } from '@phosphor-icons/react';
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
+  CaretLeft,
+  CaretRight,
+  Keyboard,
+  MonitorPlay,
+  Pause,
+  Play,
+} from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
+import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
 import { activeOffset } from '../shared/activeTime';
 import { getRecording } from '../shared/storage/db';
-import type { Session } from '../shared/types';
-import { fmtDuration } from '../shared/utils/format';
+import type { Session, Step } from '../shared/types';
+import { fmtDuration, stepLabel } from '../shared/utils/format';
 import { nearestScreenshotIndex } from './nearestScreenshot';
+import { feedSteps, pointPercent, rectPercent, typedText } from './replayOverlay';
 import { useScreenshot } from './useScreenshot';
 
 interface ReplayProps {
@@ -12,6 +25,13 @@ interface ReplayProps {
 }
 
 type ViewMode = 'screenshots' | 'video';
+
+const CLICKS = new Set(['click', 'double_click', 'right_click']);
+const SCROLL_ICON = { up: ArrowUp, down: ArrowDown, left: ArrowLeft, right: ArrowRight };
+
+function stepDuration(step: Step | undefined, speed: number): number {
+  return Math.max(100, Math.min(5000, (step?.duration_to_next ?? 1000) / speed));
+}
 
 export function Replay({ session }: ReplayProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -26,6 +46,7 @@ export function Replay({ session }: ReplayProps) {
   const screenshotUrl = useScreenshot(
     shotIndex === null ? null : session.steps[shotIndex].screenshot?.hash,
   );
+  const feed = feedSteps(session.steps, currentIndex);
 
   useEffect(() => {
     let objectUrl: string | null = null;
@@ -47,25 +68,17 @@ export function Replay({ session }: ReplayProps) {
       setPlaying(false);
       return;
     }
-
-    const step = session.steps[currentIndex];
-    const durationMs = step.duration_to_next ?? 1000;
-    const scaledDuration = Math.max(100, Math.min(5000, durationMs / speed));
-
-    const timer = setTimeout(() => {
-      setCurrentIndex((prev) => Math.min(prev + 1, session.steps.length - 1));
-    }, scaledDuration);
-
+    const timer = setTimeout(
+      () => {
+        setCurrentIndex((prev) => Math.min(prev + 1, session.steps.length - 1));
+      },
+      stepDuration(session.steps[currentIndex], speed),
+    );
     return () => clearTimeout(timer);
   }, [playing, currentIndex, speed, session.steps]);
 
-  const handlePrev = () => {
-    setCurrentIndex((prev) => Math.max(0, prev - 1));
-    setPlaying(false);
-  };
-
-  const handleNext = () => {
-    setCurrentIndex((prev) => Math.min(prev + 1, session.steps.length - 1));
+  const goTo = (index: number) => {
+    setCurrentIndex(Math.max(0, Math.min(index, session.steps.length - 1)));
     setPlaying(false);
   };
 
@@ -76,22 +89,13 @@ export function Replay({ session }: ReplayProps) {
     setPlaying((prev) => !prev);
   };
 
-  const elapsed = currentStep
-    ? activeOffset(session.started_at, session.pauses, currentStep.timestamp)
-    : 0;
+  const offset = (step: Step) => activeOffset(session.started_at, session.pauses, step.timestamp);
+  const elapsed = currentStep ? offset(currentStep) : 0;
 
-  const coord = currentStep?.action.coordinate;
-  let crosshairStyle: React.CSSProperties = {};
-  if (coord && currentStep?.screenshot && screenshotUrl && !borrowed) {
-    const dpr = currentStep.screenshot.dpr;
-    const imgW = currentStep.screenshot.width;
-    const imgH = currentStep.screenshot.height;
-    const pixelX = coord[0] * dpr;
-    const pixelY = coord[1] * dpr;
-    const leftPercent = (pixelX / imgW) * 100;
-    const topPercent = (pixelY / imgH) * 100;
-    crosshairStyle = { left: `${leftPercent}%`, top: `${topPercent}%` };
-  }
+  // Typing plays out over most of the step while playing, and quickly when stepping by hand.
+  const typeMs = playing
+    ? Math.max(300, Math.min(1500, stepDuration(currentStep, speed) * 0.7))
+    : 700;
 
   return (
     <div className="h-full flex flex-col">
@@ -124,31 +128,56 @@ export function Replay({ session }: ReplayProps) {
           >
             Your browser does not support video playback.
           </video>
-        ) : screenshotUrl ? (
-          <div className="relative w-full">
-            <img
-              src={screenshotUrl}
-              alt="Replay frame"
-              className="w-full h-auto rounded-btn border border-white/[0.06]"
-            />
-            {coord && !borrowed && (
-              <div
-                className="absolute"
-                style={{ ...crosshairStyle, transform: 'translate(-50%, -50%)' }}
-              >
-                <Target size={24} weight="bold" className="text-white drop-shadow" />
+        ) : (
+          <>
+            {screenshotUrl ? (
+              <div className="relative w-full overflow-hidden rounded-btn border border-white/[0.06]">
+                <img src={screenshotUrl} alt="Replay frame" className="block w-full h-auto" />
+                {currentStep && !borrowed && (
+                  <ActionOverlay key={currentIndex} step={currentStep} typeMs={typeMs} />
+                )}
               </div>
+            ) : (
+              <p className="flex h-48 w-full items-center justify-center rounded-btn border border-dashed border-white/10 text-xs text-text-faint">
+                No screenshots in this session
+              </p>
             )}
             {borrowed && (
               <p className="mt-1.5 text-xs text-text-faint">
                 No screenshot was taken at this step. Showing step {(shotIndex ?? 0) + 1}.
               </p>
             )}
-          </div>
-        ) : (
-          <p className="flex h-48 w-full items-center justify-center rounded-btn border border-dashed border-white/10 text-xs text-text-faint">
-            No screenshots in this session
-          </p>
+
+            {feed.length > 0 && (
+              <ol className="mt-4 space-y-1" aria-label="Actions so far">
+                {feed.map((i, position) => {
+                  const step = session.steps[i];
+                  const Icon = ACTION_ICON_COMPONENT[step.action.type];
+                  const current = i === currentIndex;
+                  return (
+                    <li key={i} className={position === 0 ? 'replay-drop' : ''}>
+                      <button
+                        type="button"
+                        onClick={() => goTo(i)}
+                        aria-current={current ? 'step' : undefined}
+                        className={`flex w-full items-center gap-2.5 rounded-btn border-l-2 px-2.5 py-1.5 text-left text-xs transition-colors ${
+                          current
+                            ? 'border-green bg-green/[0.08] text-text'
+                            : 'border-transparent text-text-muted hover:bg-white/[0.04]'
+                        }`}
+                      >
+                        <Icon size={14} className={current ? 'text-green' : 'text-text-faint'} />
+                        <span className="min-w-0 flex-1 truncate">{stepLabel(step)}</span>
+                        <span className="tabular-nums text-text-faint">
+                          {fmtDuration(offset(step))}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </>
         )}
       </div>
 
@@ -164,7 +193,7 @@ export function Replay({ session }: ReplayProps) {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={handlePrev}
+              onClick={() => goTo(currentIndex - 1)}
               disabled={currentIndex === 0}
               className="icon-btn disabled:cursor-not-allowed disabled:opacity-30"
               aria-label="Previous step"
@@ -188,7 +217,7 @@ export function Replay({ session }: ReplayProps) {
 
             <button
               type="button"
-              onClick={handleNext}
+              onClick={() => goTo(currentIndex + 1)}
               disabled={currentIndex >= session.steps.length - 1}
               className="icon-btn disabled:cursor-not-allowed disabled:opacity-30"
               aria-label="Next step"
@@ -214,5 +243,117 @@ export function Replay({ session }: ReplayProps) {
         </div>
       )}
     </div>
+  );
+}
+
+/** Shows the step's action on its own screenshot: where a click landed, the
+ *  field that was typed into and what was typed, a scroll, or a key press. */
+function ActionOverlay({ step, typeMs }: { step: Step; typeMs: number }) {
+  const { action, screenshot: shot } = step;
+  if (!shot) return null;
+
+  if (CLICKS.has(action.type) && action.coordinate) {
+    const { left, top } = pointPercent(action.coordinate, shot);
+    return (
+      <span
+        className="replay-click pointer-events-none absolute"
+        style={{ left: `${left}%`, top: `${top}%` }}
+        aria-hidden="true"
+      >
+        <span className="replay-ripple" />
+        <span className="replay-ripple replay-ripple-late" />
+        <span className="replay-dot" />
+      </span>
+    );
+  }
+
+  if (action.type === 'type') {
+    const text = typedText(step);
+    const rect = step.dom?.rect;
+    const box = rect ? rectPercent(rect, shot) : null;
+    const below = !box || box.top + box.height < 78;
+    return (
+      <>
+        {box && (
+          <span
+            className="replay-field pointer-events-none absolute"
+            style={{
+              left: `${box.left}%`,
+              top: `${box.top}%`,
+              width: `${box.width}%`,
+              height: `${box.height}%`,
+            }}
+            aria-hidden="true"
+          />
+        )}
+        {text && (
+          <span
+            className="replay-bubble pointer-events-none absolute"
+            style={
+              box
+                ? {
+                    left: `${Math.min(box.left, 55)}%`,
+                    ...(below
+                      ? { top: `calc(${box.top + box.height}% + 6px)` }
+                      : { bottom: `calc(${100 - box.top}% + 6px)` }),
+                  }
+                : { left: '50%', bottom: '10px', transform: 'translateX(-50%)' }
+            }
+          >
+            <Keyboard size={12} weight="bold" className="shrink-0 text-green" />
+            <Typewriter text={text} durationMs={typeMs} />
+          </span>
+        )}
+      </>
+    );
+  }
+
+  if (action.type === 'scroll' && action.scroll_direction) {
+    const Icon = SCROLL_ICON[action.scroll_direction];
+    return (
+      <span className="replay-chip pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
+        <Icon
+          size={12}
+          weight="bold"
+          className={`text-green replay-nudge-${action.scroll_direction}`}
+        />
+        Scroll {action.scroll_direction}
+      </span>
+    );
+  }
+
+  if (action.type === 'key' && action.key) {
+    return (
+      <span className="replay-chip pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2">
+        <span className="kbd">{action.key}</span>
+      </span>
+    );
+  }
+
+  return null;
+}
+
+function Typewriter({ text, durationMs }: { text: string; durationMs: number }) {
+  const [shown, setShown] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setShown(text.length);
+      return;
+    }
+    setShown(0);
+    const every = Math.max(16, durationMs / Math.max(1, text.length));
+    const timer = setInterval(() => {
+      setShown((n) => {
+        if (n >= text.length) clearInterval(timer);
+        return Math.min(n + 1, text.length);
+      });
+    }, every);
+    return () => clearInterval(timer);
+  }, [text, durationMs]);
+  return (
+    <span className="truncate">
+      {text.slice(0, shown)}
+      <span className="replay-caret" />
+    </span>
   );
 }
