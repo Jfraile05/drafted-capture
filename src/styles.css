@@ -154,6 +154,177 @@ summary:focus-visible {
   animation: ring 1.8s ease-out infinite;
 }
 
+/* Replay: actions drawn on top of the screenshot, and the action feed. */
+.replay-click {
+  width: 0;
+  height: 0;
+}
+.replay-dot,
+.replay-ripple {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+.replay-dot {
+  width: 14px;
+  height: 14px;
+  background: #4dffa0;
+  border: 2px solid #0b0d0c;
+  box-shadow: 0 0 0 2px #fff, 0 0 14px rgba(77, 255, 160, 0.8);
+  animation: replay-tap 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.replay-ripple {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #4dffa0;
+  animation: replay-ripple 1s ease-out both;
+}
+.replay-ripple-late {
+  animation-delay: 0.25s;
+}
+@keyframes replay-tap {
+  from {
+    transform: translate(-50%, -50%) scale(2.2);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+@keyframes replay-ripple {
+  from {
+    width: 14px;
+    height: 14px;
+    opacity: 1;
+  }
+  to {
+    width: 64px;
+    height: 64px;
+    opacity: 0;
+  }
+}
+.replay-field {
+  border: 2px solid #4dffa0;
+  border-radius: 6px;
+  background: rgba(77, 255, 160, 0.12);
+  box-shadow: 0 0 0 3px rgba(77, 255, 160, 0.25);
+  animation: replay-pop 0.25s ease-out both;
+}
+.replay-bubble,
+.replay-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 80%;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(77, 255, 160, 0.4);
+  background: rgba(11, 13, 12, 0.92);
+  color: #f2f4f3;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  animation: replay-pop 0.25s ease-out both;
+}
+@keyframes replay-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.replay-chip {
+  animation-name: replay-fade;
+}
+@keyframes replay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.replay-caret {
+  display: inline-block;
+  width: 1px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: -0.15em;
+  background: #4dffa0;
+  animation: replay-blink 0.9s steps(1) infinite;
+}
+@keyframes replay-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.replay-nudge-down {
+  animation: replay-nudge-y 0.8s ease-in-out infinite;
+}
+.replay-nudge-up {
+  animation: replay-nudge-y 0.8s ease-in-out infinite reverse;
+}
+.replay-nudge-right {
+  animation: replay-nudge-x 0.8s ease-in-out infinite;
+}
+.replay-nudge-left {
+  animation: replay-nudge-x 0.8s ease-in-out infinite reverse;
+}
+@keyframes replay-nudge-y {
+  0%,
+  100% {
+    transform: translateY(-2px);
+  }
+  50% {
+    transform: translateY(2px);
+  }
+}
+@keyframes replay-nudge-x {
+  0%,
+  100% {
+    transform: translateX(-2px);
+  }
+  50% {
+    transform: translateX(2px);
+  }
+}
+/* A new action drops in at the top of the feed. */
+.replay-drop {
+  animation: replay-drop 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+@keyframes replay-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .replay-dot,
+  .replay-ripple,
+  .replay-field,
+  .replay-bubble,
+  .replay-chip,
+  .replay-caret,
+  .replay-drop,
+  [class*="replay-nudge-"] {
+    animation: none !important;
+  }
+  .replay-ripple {
+    display: none;
+  }
+}
+
 @keyframes rise {
   from {
     opacity: 0;
