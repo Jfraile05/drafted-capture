@@ -8,7 +8,12 @@
 import { IDLE_CONFIG } from '../config/idle';
 import { PRIVACY_CONFIG } from '../config/privacy';
 import { BUILD_ID } from '../shared/buildCheck';
-import { ALARM_SCREENSHOT, ALARM_SESSION_CAP, STORAGE_KEYS } from '../shared/constants';
+import {
+  ALARM_ABANDONED,
+  ALARM_SCREENSHOT,
+  ALARM_SESSION_CAP,
+  STORAGE_KEYS,
+} from '../shared/constants';
 import { summarizeEarnings } from '../shared/earnings';
 import { summarizeQuality } from '../shared/quality';
 import { deleteSession, getSession, listSessions, updateSession } from '../shared/storage/db';
@@ -50,9 +55,11 @@ import {
   getCaptureState,
   pauseCapture,
   rebroadcastCaptureState,
+  recoverLostSession,
   resumeCapture,
   startCapture,
   stopCapture,
+  stopIfAbandoned,
   waitForCaptureStop,
 } from './session';
 import { clearStartPrompt, handleStartPromptButton, noteBrowsing } from './startPrompt';
@@ -321,6 +328,8 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     handleIntervalScreenshot().catch((err) => console.error('[bg] alarm screenshot error:', err));
   } else if (alarm.name === ALARM_SESSION_CAP) {
     enforceSessionCap().catch((err) => console.error('[bg] session cap error:', err));
+  } else if (alarm.name === ALARM_ABANDONED) {
+    stopIfAbandoned().catch((err) => console.error('[bg] inactive stop error:', err));
   }
 });
 
@@ -359,6 +368,9 @@ chrome.notifications?.onClicked.addListener((notificationId) => {
 
 chrome.idle.onStateChanged.addListener((state) => {
   pauseIfIdle(state).catch((err) => console.error('[bg] idle pause error:', err));
+  // Coming back from sleep or a locked screen: end a session left for 20 minutes.
+  if (state === 'active')
+    stopIfAbandoned().catch((err) => console.error('[bg] inactive stop error:', err));
 });
 
 applyIdleDetection().catch((err) => console.error('[bg] idle setup error:', err));
@@ -385,6 +397,10 @@ chrome.runtime.onInstalled.addListener(() => {
 // When the worker wakes from eviction, restore badge + alarm if capturing.
 
 (async () => {
+  // Chrome was closed with a session open: finish and submit it first.
+  if (await recoverLostSession()) return;
+  // Or the computer slept past 20 minutes of inactivity.
+  if (await stopIfAbandoned()) return;
   const live = await getLiveSession();
   if (live) {
     console.log('[bg] recovered live capture session:', live.id);

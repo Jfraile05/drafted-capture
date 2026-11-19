@@ -103,7 +103,7 @@ export function Options() {
               className="btn-ghost"
               onClick={() => run(() => simulate('synthetic-test-idle'))}
             >
-              Simulate 3 minutes idle
+              Simulate 2 minutes idle
             </button>
             <button
               type="button"

@@ -1,4 +1,4 @@
-# Sidekick: Chrome Web Store submission copy (version 1.0.16)
+# Sidekick: Chrome Web Store submission copy (version 1.0.17)
 
 Paste each block into the matching field in the Developer Dashboard. Sections
 follow the dashboard tabs: Package, Store listing, Privacy, Distribution.
@@ -9,7 +9,7 @@ upload this package to it so existing installs update. A new item gets a new ID.
 
 ## Package
 
-Upload `store/release/sidekick-1.0.16.zip`, built with `npm run build` and zipped
+Upload `store/release/sidekick-1.0.17.zip`, built with `npm run build` and zipped
 from inside `dist/` so `manifest.json` sits at the top of the zip.
 
 The item name and summary come from the manifest:
@@ -27,6 +27,7 @@ How it works
 - Sign in with your Drafted account and pick a task.
 - Press Start and work as you normally would. Sidekick saves each click, typed entry, scroll, page change and screenshot as a step.
 - Pause or stop any time. A small on-page pill shows when Sidekick is recording.
+- Recording pauses after 2 minutes of inactivity. If you do not come back within 20 minutes, the session is submitted on its own.
 - Open the review panel to go through your steps, replay the session and label the tasks you did.
 - Sessions upload to Drafted on their own, and each one gets a quality review.
 

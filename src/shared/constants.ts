@@ -2,7 +2,7 @@ import type { AnnotationTag, Settings, TaskCategory } from './types';
 
 import { IDLE_CONFIG } from '../config/idle';
 
-export const EXTENSION_VERSION = '1.0.16';
+export const EXTENSION_VERSION = '1.0.17';
 /** Shows the Beta tag next to the wordmark and in the version line. */
 export const IS_BETA = true;
 
@@ -13,6 +13,9 @@ export const STORAGE_KEYS = {
   LIVE_SESSION: 'live_session',
   /** Settings live in chrome.storage.local (persistent). */
   SETTINGS: 'settings',
+  /** Copy of the live session in chrome.storage.local. Chrome clears session storage
+   *  when it closes, so this is what lets a session left open still be submitted. */
+  LIVE_BACKUP: 'live_session_backup',
 } as const;
 
 // ── IndexedDB stores ─────────────────────────────────────────────────────────
@@ -51,6 +54,12 @@ export const ALARM_SCREENSHOT = 'screenshot-tick';
 /** Alarm that force-stops a session at its time limit. Wall clock, so it also
  *  fires on a paused session. */
 export const ALARM_SESSION_CAP = 'session-cap';
+
+/** Alarm that ends a session left inactive too long. */
+export const ALARM_ABANDONED = 'session-abandoned';
+
+/** A session with no activity for this long is stopped and submitted. */
+export const ABANDONED_AFTER_MS = 20 * 60 * 1000;
 
 /** Hard ceiling on one session. No saved setting can raise it. */
 export const MAX_SESSION_MS = 24 * 60 * 60 * 1000;

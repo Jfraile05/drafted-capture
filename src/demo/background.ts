@@ -23,7 +23,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
       const live = await getLiveSession();
       if (!live || live.state !== 'capturing')
         throw new Error('Start or resume a synthetic task first.');
-      if (alarm.name === 'synthetic-test-idle') live.last_activity_at = Date.now() - 180001;
+      if (alarm.name === 'synthetic-test-idle') live.last_activity_at = Date.now() - 120001;
       else {
         live.started_at = Date.now() - MAX_SESSION_MS;
         live.last_activity_at = Date.now();

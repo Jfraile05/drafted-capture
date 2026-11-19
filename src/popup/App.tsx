@@ -8,7 +8,6 @@ import {
   Stop,
 } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
-import { IDLE_CONFIG } from '../config/idle';
 import Brand, { setMascotMoment, useMascotState } from '../shared/Brand';
 import { SyncStatus } from '../shared/SyncStatus';
 import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
@@ -16,6 +15,7 @@ import { activeElapsed, nextTimerTick, pauseTimestamp } from '../shared/activeTi
 import { signOutUser, useAuth } from '../shared/auth';
 import { BUILD_RELOAD_KEY, shouldReloadForBuild } from '../shared/buildCheck';
 import { sendMessage, useLiveSessionState, useSettings } from '../shared/hooks';
+import { pauseNotice } from '../shared/inactivity';
 import type { LiveSession, Session, StepSummary } from '../shared/types';
 import { fmtDuration, hostOf } from '../shared/utils/format';
 import { LOCAL_WORKFLOW_ENABLED, LOCAL_WORKFLOW_UPLOADS } from '../shared/workflows';
@@ -258,8 +258,10 @@ export default function App() {
               )}
             </p>
             <LiveTimer live={displayedSession} />
-            {displayedSession.pause_reason === 'idle' && (
-              <output className="mt-3 block text-sm text-text-muted">{IDLE_CONFIG.notice}</output>
+            {isPaused && !displayedSession.privacy_gate && (
+              <output className="mt-3 block text-sm text-text-muted">
+                {pauseNotice(displayedSession)}
+              </output>
             )}
           </>
         ) : (

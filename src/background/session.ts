@@ -9,16 +9,25 @@
 import { IDLE_CONFIG, idleThreshold } from '../config/idle';
 import { activeOffset, pauseTimestamp } from '../shared/activeTime';
 import {
+  ABANDONED_AFTER_MS,
+  ALARM_ABANDONED,
   ALARM_SCREENSHOT,
   ALARM_SESSION_CAP,
   BADGE_ON_COLOR,
   BADGE_PAUSED_COLOR,
   EXTENSION_VERSION,
   MAX_SESSION_MS,
+  STORAGE_KEYS,
 } from '../shared/constants';
 import { earningsClock } from '../shared/liveEarnings';
-import { clearSteps, getSteps, putSession } from '../shared/storage/db';
-import { getLiveSession, getSettings, setLiveSession, withLiveLock } from '../shared/storage/live';
+import { clearSteps, getSession, getSteps, putSession } from '../shared/storage/db';
+import {
+  getLiveBackup,
+  getLiveSession,
+  getSettings,
+  setLiveSession,
+  withLiveLock,
+} from '../shared/storage/live';
 import type {
   CaptureControlRequest,
   CaptureState,
@@ -72,6 +81,14 @@ function syncCaptureEffects(): Promise<void> {
       color: capturing ? BADGE_ON_COLOR : BADGE_PAUSED_COLOR,
     });
     await setRecordingIcon(capturing);
+    // A paused session is ended 20 minutes after the pause if nobody comes back.
+    if (live.state === 'paused') {
+      await chrome.alarms.create(ALARM_ABANDONED, {
+        when: pauseTimestamp(live) + ABANDONED_AFTER_MS,
+      });
+    } else {
+      await chrome.alarms.clear(ALARM_ABANDONED);
+    }
     if (capturing) {
       // Visible pages drive the fast cadence. Alarms are only a recovery path;
       // Chrome 116 requires a full minute between packaged-extension alarms.
@@ -107,6 +124,53 @@ export async function enforceSessionCap(): Promise<boolean> {
   console.log('[session] time limit reached, stopping:', live.id);
   await stopCapture();
   return true;
+}
+
+// ── Left behind ───────────────────────────────────────────────────────────
+
+/** When the student last did anything: the moment of the pause while paused,
+ *  otherwise their last input. */
+export function lastActiveAt(live: LiveSession): number {
+  return live.state === 'paused'
+    ? pauseTimestamp(live)
+    : (live.last_activity_at ?? live.started_at);
+}
+
+/** Stops and submits a session nobody has touched for 20 minutes. It ends at
+ *  the last moment of activity, so the idle wait is not counted or paid.
+ *  Called by the alarm, when the computer wakes, and when the worker starts.
+ *  Returns true when it stopped one. */
+export async function stopIfAbandoned(now = Date.now()): Promise<boolean> {
+  const live = await getLiveSession();
+  if (!live) return false;
+  const last = lastActiveAt(live);
+  if (now - last < ABANDONED_AFTER_MS) return false;
+  console.log('[session] inactive too long, stopping and submitting:', live.id);
+  await stopCapture({ session_id: live.id, requested_at: last });
+  return true;
+}
+
+/** Chrome empties session storage when it closes, which would leave a session
+ *  recorded just before orphaned and never submitted. At startup, if there is
+ *  a saved copy of a session that is no longer live, finish it where it left
+ *  off so it saves and uploads like any other. Returns true when it did. */
+export function recoverLostSession(): Promise<boolean> {
+  const recovered = (async () => {
+    const backup = await getLiveBackup();
+    if (!backup || (await getLiveSession())) return false;
+    // Already saved, only the copy was left behind.
+    if (await getSession(backup.id)) {
+      await chrome.storage.local.remove(STORAGE_KEYS.LIVE_BACKUP);
+      return false;
+    }
+    console.log('[session] recovering a session left open when Chrome closed:', backup.id);
+    await setLiveSession(backup);
+    await stopCapture({ session_id: backup.id, requested_at: lastActiveAt(backup) });
+    return true;
+  })();
+  // A session started right now must wait for this to finish.
+  stopInFlight = Promise.all([stopInFlight, recovered]).catch(() => undefined);
+  return recovered;
 }
 
 // ── Start ─────────────────────────────────────────────────────────────────
@@ -281,6 +345,7 @@ async function finishCapture(request: CaptureControlRequest): Promise<string | n
     await setRecordingIcon(false);
     await chrome.alarms.clear(ALARM_SCREENSHOT).catch(() => {});
     await chrome.alarms.clear(ALARM_SESSION_CAP).catch(() => {});
+    await chrome.alarms.clear(ALARM_ABANDONED).catch(() => {});
     await chrome.alarms.clear(IDLE_CONFIG.alarmName).catch(() => {});
     await clearIdleNotices().catch(() => {});
     await broadcastCaptureState(false).catch(() => {});

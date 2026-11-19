@@ -1,11 +1,11 @@
 export const IDLE_CONFIG = {
-  defaultMs: 180000,
+  defaultMs: 120000,
   minMs: 120000,
-  maxMs: 180000,
+  maxMs: 120000,
   activityReportMs: 1000,
   alarmName: 'drafted-input-idle',
   notice:
-    'Recording paused while you were away. Continue recording here? Opening a new safe page resumes automatically.',
+    'Paused because you were inactive. Continue recording here? Opening a new safe page resumes automatically. If nobody comes back, this session is submitted after 20 minutes.',
 } as const;
 export function idleThreshold(value: number): number {
   return Number.isFinite(value)

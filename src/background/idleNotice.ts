@@ -14,7 +14,7 @@ export async function showIdleNotice(sessionId: string): Promise<void> {
     iconUrl: chrome.runtime.getURL('icons/icon-128.png'),
     title: 'Sidekick paused',
     message:
-      "You were inactive, so recording paused. Paused time isn't counted. Continue recording? Opening a new page also resumes it.",
+      "Paused because you were inactive. Paused time isn't counted. Continue recording? Opening a new page also resumes it. If you do nothing, this session is submitted after 20 minutes.",
     buttons: [{ title: 'Continue recording' }, { title: 'Keep paused' }],
     requireInteraction: true,
     priority: 2,

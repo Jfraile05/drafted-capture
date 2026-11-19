@@ -23,9 +23,18 @@ export async function getLiveSession(): Promise<LiveSession | null> {
 export async function setLiveSession(session: LiveSession | null): Promise<void> {
   if (session === null) {
     await chrome.storage.session.remove(STORAGE_KEYS.LIVE_SESSION);
+    await chrome.storage.local.remove(STORAGE_KEYS.LIVE_BACKUP);
   } else {
     await chrome.storage.session.set({ [STORAGE_KEYS.LIVE_SESSION]: session });
+    // Session storage is wiped when Chrome closes. Keep a copy that is not.
+    await chrome.storage.local.set({ [STORAGE_KEYS.LIVE_BACKUP]: session });
   }
+}
+
+/** The live session as of its last change, kept across Chrome closing. */
+export async function getLiveBackup(): Promise<LiveSession | null> {
+  const r = await chrome.storage.local.get(STORAGE_KEYS.LIVE_BACKUP);
+  return r[STORAGE_KEYS.LIVE_BACKUP] ?? null;
 }
 
 // ── Serialized access ────────────────────────────────────────────────────

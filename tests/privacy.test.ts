@@ -106,7 +106,7 @@ describe('privacy before persistence', () => {
   });
   it('resumes an idle pause on foreground safe navigation, but preserves manual pauses',async(t)=>{
     let now=1000000;t.mock.method(Date,'now',()=>now);
-    await startCapture(undefined,'productivity');now+=180000;await checkInputIdle();
+    await startCapture(undefined,'productivity');now+=120000;await checkInputIdle();
     await privacy.checkCurrentScreen();assert.equal((await getLiveSession())?.state,'paused');
     await privacy.checkCurrentScreen(99);assert.equal((await getLiveSession())?.state,'paused');
     tab.url='https://example.com/new';await handleTabUpdated(7,{url:tab.url,status:'complete'},tab);
@@ -116,7 +116,7 @@ describe('privacy before persistence', () => {
   });
   it('requires confirmation when an idle student opens a sensitive page',async(t)=>{
     let now=1000000;t.mock.method(Date,'now',()=>now);
-    await startCapture(undefined,'productivity');now+=180000;await checkInputIdle();
+    await startCapture(undefined,'productivity');now+=120000;await checkInputIdle();
     tab.url='https://example.com/inbox';await handleTabUpdated(7,{url:tab.url,status:'complete'},tab);
     assert.equal((await getLiveSession())?.state,'paused');assert.ok((await getLiveSession())?.privacy_gate?.reasons.includes('messaging'));
   });
@@ -335,7 +335,7 @@ describe('pause and resume around privacy prompts', () => {
     tab.url = 'https://secure.chase.com/accounts';
     const live = await startCapture(undefined, 'productivity');
     await resumeCapture({ session_id: live.id }, live.privacy_gate!.id);
-    now += 180000;
+    now += 120000;
     await checkInputIdle();
     assert.equal((await getLiveSession())?.state, 'paused');
     assert.equal((await resumeCapture({ session_id: live.id }))?.state, 'capturing');
