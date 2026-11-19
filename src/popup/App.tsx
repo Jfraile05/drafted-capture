@@ -14,6 +14,7 @@ import { SyncStatus } from '../shared/SyncStatus';
 import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
 import { activeElapsed, nextTimerTick, pauseTimestamp } from '../shared/activeTime';
 import { signOutUser, useAuth } from '../shared/auth';
+import { BUILD_RELOAD_KEY, shouldReloadForBuild } from '../shared/buildCheck';
 import { sendMessage, useLiveSessionState, useSettings } from '../shared/hooks';
 import type { LiveSession, Session, StepSummary } from '../shared/types';
 import { fmtDuration, hostOf } from '../shared/utils/format';
@@ -40,6 +41,23 @@ export default function App() {
   // Known before any click: Chrome only opens the side panel when open() is
   // called right inside the click, with no await before it.
   const windowIdRef = useRef<number | null>(null);
+
+  // Reload Sidekick when its background still runs an older build than this popup.
+  const recording = !!liveSession;
+  useEffect(() => {
+    if (!liveLoaded) return;
+    void (async () => {
+      const answer = await sendMessage<{ build: string }>('GET_BUILD').catch((error: unknown) => ({
+        error: String(error),
+      }));
+      const stored = await chrome.storage.local.get(BUILD_RELOAD_KEY);
+      const now = Date.now();
+      if (shouldReloadForBuild(answer, recording, stored[BUILD_RELOAD_KEY], now)) {
+        await chrome.storage.local.set({ [BUILD_RELOAD_KEY]: now });
+        chrome.runtime.reload();
+      }
+    })();
+  }, [liveLoaded, recording]);
 
   useEffect(() => {
     chrome.windows.getCurrent().then((win) => {
