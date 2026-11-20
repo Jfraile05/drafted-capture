@@ -13,7 +13,7 @@ import { SyncStatus } from '../shared/SyncStatus';
 import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
 import { activeElapsed, nextTimerTick, pauseTimestamp } from '../shared/activeTime';
 import { signOutUser, useAuth } from '../shared/auth';
-import { BUILD_RELOAD_KEY, shouldReloadForBuild } from '../shared/buildCheck';
+import { backgroundIsStale } from '../shared/buildCheck';
 import { sendMessage, useLiveSessionState, useSettings } from '../shared/hooks';
 import { pauseNotice } from '../shared/inactivity';
 import type { LiveSession, Session, StepSummary } from '../shared/types';
@@ -42,22 +42,16 @@ export default function App() {
   // called right inside the click, with no await before it.
   const windowIdRef = useRef<number | null>(null);
 
-  // Reload Sidekick when its background still runs an older build than this popup.
+  // Tell the person when the background still runs an older build than this popup.
+  // Never reload for them: that closes the popup and blanks an open review panel.
   const recording = !!liveSession;
+  const [staleBackground, setStaleBackground] = useState(false);
   useEffect(() => {
     if (!liveLoaded) return;
-    void (async () => {
-      const answer = await sendMessage<{ build: string }>('GET_BUILD').catch((error: unknown) => ({
-        error: String(error),
-      }));
-      const stored = await chrome.storage.local.get(BUILD_RELOAD_KEY);
-      const now = Date.now();
-      if (shouldReloadForBuild(answer, recording, stored[BUILD_RELOAD_KEY], now)) {
-        await chrome.storage.local.set({ [BUILD_RELOAD_KEY]: now });
-        chrome.runtime.reload();
-      }
-    })();
-  }, [liveLoaded, recording]);
+    void sendMessage<{ build: string }>('GET_BUILD')
+      .catch((error: unknown) => ({ error: String(error) }))
+      .then((answer) => setStaleBackground(backgroundIsStale(answer)));
+  }, [liveLoaded]);
 
   useEffect(() => {
     chrome.windows.getCurrent().then((win) => {
@@ -237,6 +231,22 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {staleBackground && (
+        <div
+          role="alert"
+          className="mt-3 rounded-btn border border-orange/40 bg-orange/[0.1] px-3 py-2 text-sm text-text"
+        >
+          Sidekick was updated, but part of it is still running the old version.{' '}
+          {recording ? (
+            'Stop and save your session, then reload it from chrome://extensions.'
+          ) : (
+            <button type="button" className="underline" onClick={() => chrome.runtime.reload()}>
+              Reload Sidekick
+            </button>
+          )}
+        </div>
+      )}
 
       {user && isIdle && !isSaving && (
         <EarningsDashboard key={`${user.uid}-${localOnly}`} uid={user.uid} localOnly={localOnly} />

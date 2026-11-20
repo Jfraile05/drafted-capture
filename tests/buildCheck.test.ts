@@ -1,28 +1,23 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { BUILD_ID, shouldReloadForBuild } from '../src/shared/buildCheck';
+import { BUILD_ID, backgroundIsStale } from '../src/shared/buildCheck';
 
 describe('stale background check', () => {
-  const now = 1_000_000;
-
   it('leaves a matching background alone', () => {
-    assert.equal(shouldReloadForBuild({ build: BUILD_ID }, false, undefined, now), false);
+    assert.equal(backgroundIsStale({ build: BUILD_ID }), false);
   });
 
-  it('reloads when the background runs another build', () => {
-    assert.equal(shouldReloadForBuild({ build: 'older' }, false, undefined, now), true);
+  it('flags a background running another build', () => {
+    assert.equal(backgroundIsStale({ build: 'older' }), true);
   });
 
-  it('reloads when the background is too old to know the check', () => {
-    const error = 'Error: Error: Unknown message type: GET_BUILD';
-    assert.equal(shouldReloadForBuild({ error }, false, undefined, now), true);
+  it('flags a background too old to know the check', () => {
+    assert.equal(backgroundIsStale({ error: 'Error: Error: Unknown message type: GET_BUILD' }), true);
   });
 
-  it('does not reload on other errors, during a recording, or twice in a minute', () => {
-    assert.equal(shouldReloadForBuild({ error: 'offline' }, false, undefined, now), false);
-    assert.equal(shouldReloadForBuild({ build: 'older' }, true, undefined, now), false);
-    assert.equal(shouldReloadForBuild({ build: 'older' }, false, now - 30_000, now), false);
-    assert.equal(shouldReloadForBuild({ build: 'older' }, false, now - 61_000, now), true);
+  it('does not flag other errors, such as being offline or the worker waking up', () => {
+    assert.equal(backgroundIsStale({ error: 'Error: Could not establish connection' }), false);
+    assert.equal(backgroundIsStale({}), false);
   });
 });
