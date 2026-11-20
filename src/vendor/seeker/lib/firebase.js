@@ -10,4 +10,6 @@ export {
   uploadBytes,
   uploadBytesResumable,
   getDownloadURL,
+  getMetadata,
+  getBytes,
 } from '../firebaseInit.js';

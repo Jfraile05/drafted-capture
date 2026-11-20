@@ -8,7 +8,7 @@
 import { doc, getDoc, getDocFromServer, increment, runTransaction } from 'firebase/firestore';
 import { ensureAccountDocument } from './lib/accountSelfHeal';
 import { issueEarnedCertificates } from './lib/certificates/issuance';
-import { auth, db, ref, storage, uploadBytes } from './lib/firebase';
+import { auth, db, getMetadata, ref, storage, uploadBytes } from './lib/firebase';
 import { recordTrainingTask } from './lib/nova/training';
 import { checkBadgeEarned, computeBadgeLevel } from './lib/tasks/badgeComputation';
 import {
@@ -70,13 +70,71 @@ const TASK_TYPE_CONFIG = {
  * Strip and upload base64 screenshots from computer_use trajectories.
  * Returns a cleaned taskData with screenshot URLs instead of base64 blobs.
  */
-async function processComputerUseScreenshots(taskData, userId, taskId) {
+/** Screenshots uploaded at the same time. A long session has about a thousand. */
+const SCREENSHOT_UPLOAD_CONCURRENCY = 6;
+
+/** Like Promise.all over items, but only `limit` run at once and the first
+ *  failure stops the rest from starting. */
+async function mapLimited(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  let failed = null;
+  async function worker() {
+    while (next < items.length && !failed) {
+      const i = next++;
+      try {
+        results[i] = await fn(items[i], i);
+      } catch (err) {
+        failed ??= { err };
+        return;
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  if (failed) throw failed.err;
+  return results;
+}
+
+/** True when this exact image is already in Storage. Screenshots cannot be
+ *  overwritten, so a retry has to skip the ones an earlier attempt finished. */
+async function alreadyStored(storageRef, blob) {
+  try {
+    return (await getMetadata(storageRef)).size === blob.size;
+  } catch {
+    return false;
+  }
+}
+
+async function processComputerUseScreenshots(taskData, userId, taskId, resume = false) {
   if (!taskData.trajectory?.steps) {
     return taskData;
   }
 
-  const cleanedSteps = await Promise.all(
-    taskData.trajectory.steps.map(async (step) => {
+  const cleanedSteps = await mapLimited(
+    taskData.trajectory.steps,
+    SCREENSHOT_UPLOAD_CONCURRENCY,
+    async (step) => {
+      // The extension hands over the stored image itself. Sending a session as
+      // text would put every screenshot in one string, which cannot be built
+      // once a long session passes about half a gigabyte.
+      if (typeof Blob !== 'undefined' && step.screenshot_blob instanceof Blob) {
+        const { screenshot_blob: blob, ...rest } = step;
+        const path = `annotated-screenshots/${userId}/${taskId}/${step.step_index}.jpg`;
+        const storageRef = ref(storage, path);
+        if (!(resume && (await alreadyStored(storageRef, blob)))) {
+          try {
+            await uploadBytes(storageRef, blob, {
+              contentType: 'image/jpeg',
+              customMetadata: { owner: userId, task_id: taskId, step_index: step.step_index },
+            });
+          } catch (err) {
+            // A crash can leave some uploaded without a retry flag. The rules refuse
+            // to overwrite one, which is fine when the stored copy is the same.
+            if (!(await alreadyStored(storageRef, blob))) throw err;
+          }
+        }
+        return { ...rest, screenshot: path, screenshot_storage_path: path };
+      }
       if (!step.screenshot?.startsWith('data:image')) {
         return step; // Not a base64 image, return as-is
       }
@@ -114,7 +172,7 @@ async function processComputerUseScreenshots(taskData, userId, taskId) {
         // A receipt must mean every captured screenshot reached storage.
         throw err;
       }
-    }),
+    },
   );
 
   return {
@@ -127,7 +185,41 @@ async function processComputerUseScreenshots(taskData, userId, taskId) {
 }
 
 
-export async function submitTaskCore(taskType, taskData, behavioralData, submissionId) {
+/** Firestore refuses a record over 1 MiB, which about 1,600 steps reach. Steps
+ *  beyond this size go to one file and the record keeps the first few. The limit
+ *  leaves room, and sessions under it need nothing new on the server. */
+export const STEPS_INLINE_LIMIT = 800_000;
+export const STEPS_KEPT_IN_RECORD = 200;
+
+export function stepsFilePath(userId, taskId) {
+  return `sidekick-steps/${userId}/${taskId}.json`;
+}
+
+export function stepsFileBlob(steps) {
+  return new Blob([JSON.stringify(steps)], { type: 'application/json' });
+}
+
+async function offloadLongSteps(taskData, userId, taskId) {
+  const steps = taskData.trajectory?.steps;
+  if (!steps || JSON.stringify(steps).length <= STEPS_INLINE_LIMIT) return taskData;
+  const path = stepsFilePath(userId, taskId);
+  await uploadBytes(ref(storage, path), stepsFileBlob(steps), {
+    contentType: 'application/json',
+    customMetadata: { owner: userId, task_id: taskId, steps: String(steps.length) },
+  });
+  return {
+    ...taskData,
+    trajectory: {
+      ...taskData.trajectory,
+      steps: steps.slice(0, STEPS_KEPT_IN_RECORD),
+      steps_storage_path: path,
+      steps_truncated: true,
+      steps_stored_count: steps.length,
+    },
+  };
+}
+
+export async function submitTaskCore(taskType, taskData, behavioralData, submissionId, options = {}) {
   try {
     // --- Pre-submission size check ---
     const taskDataSize = new Blob([JSON.stringify(taskData)]).size;
@@ -229,7 +321,13 @@ export async function submitTaskCore(taskType, taskData, behavioralData, submiss
     // --- 5a. For computer_use, extract and upload screenshots to Storage ---
     let cleanedTaskData = taskDataClean;
     if (taskType === 'computer_use_trajectory') {
-      cleanedTaskData = await processComputerUseScreenshots(taskDataClean, userId, taskId);
+      cleanedTaskData = await processComputerUseScreenshots(
+        taskDataClean,
+        userId,
+        taskId,
+        options.resume === true,
+      );
+      cleanedTaskData = await offloadLongSteps(cleanedTaskData, userId, taskId);
     }
 
     // --- 5b. Build and write the task record ---

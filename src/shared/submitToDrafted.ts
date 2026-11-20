@@ -12,11 +12,15 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import { doc, getDocFromServer, updateDoc } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { getBytes, getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 // @ts-expect-error - vendored JS module, no types
 import { auth, db, storage } from '../vendor/seeker/firebaseInit.js';
-// @ts-expect-error - vendored JS module, no types
-import { submitTaskCore } from '../vendor/seeker/submitTaskCore.js';
+import {
+  STEPS_KEPT_IN_RECORD,
+  stepsFileBlob,
+  submitTaskCore,
+  // @ts-expect-error - vendored JS module, no types
+} from '../vendor/seeker/submitTaskCore.js';
 import { activeOffset } from './activeTime';
 import { earningsForSession } from './earnings';
 import { buildEnrichment } from './enrichment';
@@ -24,7 +28,6 @@ import { getRecording, getScreenshot } from './storage/db';
 import { patchStepThoughts, submissionLabelFields } from './submissionLabels';
 import type { Action, Session, Step } from './types';
 import { siteForOrigin, tagSegment } from './urlCategories';
-import { blobToBase64 } from './utils/screenshot';
 
 // ── Action mapping: extension ActionType -> seeker action.action_type ────────
 //
@@ -80,22 +83,39 @@ function mapAction(action: Action): SeekerAction {
   }
 }
 
-// ── Screenshot resolve: ScreenshotRef hash -> base64 data URL ────────────────
-// The vendored processComputerUseScreenshots() expects step.screenshot to be a
-// `data:image/...;base64,...` string; it strips and uploads to Storage at
-// annotated-screenshots/{uid}/{taskId}/{i}.jpg, exactly like the web flow.
+// ── Screenshot resolve: ScreenshotRef hash -> stored image ───────────────────
+// The vendored processComputerUseScreenshots() uploads each stored image to
+// Storage at annotated-screenshots/{uid}/{taskId}/{i}.jpg and keeps only the
+// path on the record, like the web flow. It gets the image itself, a few at a
+// time, rather than a base64 string of every screenshot at once.
 
-async function screenshotDataUrl(step: Step): Promise<string | null> {
+async function screenshotBlob(step: Step): Promise<Blob | null> {
   if (!step.screenshot) return null;
   const blob = await getScreenshot(step.screenshot.hash);
   if (!blob) throw new Error(`Captured screenshot is missing: ${step.screenshot.hash}`);
-  // Service-worker-safe (no FileReader): arrayBuffer + btoa via blobToBase64.
-  const base64 = await blobToBase64(blob);
-  const type = blob.type || 'image/png';
-  return `data:${type};base64,${base64}`;
+  return blob;
 }
 
 // ── Build the seeker taskData from a captured Session ────────────────────────
+
+function hostOf(url: string | undefined): string | null {
+  try {
+    return url ? new URL(url).hostname.replace(/^www\./, '') : null;
+  } catch {
+    return null;
+  }
+}
+
+function domainTimes(
+  steps: Array<{ origin: { url?: string } | null; duration_ms: number }>,
+): Record<string, number> {
+  const times: Record<string, number> = {};
+  for (const step of steps) {
+    const host = hostOf(step.origin?.url);
+    if (host) times[host] = (times[host] ?? 0) + (step.duration_ms || 0);
+  }
+  return times;
+}
 
 export interface EnrichmentMap {
   // step index -> { thought, action overrides } applied when the user labels
@@ -118,7 +138,10 @@ async function buildTaskData(
       return {
         step_index: i,
         timestamp_ms: step.timestamp,
-        screenshot: await screenshotDataUrl(step),
+        screenshot: null,
+        // Uploaded one by one by submitTaskCore, never turned into text: a long
+        // session as one string passes the engine's limit and could not upload.
+        screenshot_blob: await screenshotBlob(step),
         screenshot_dimensions: step.screenshot
           ? { width: step.screenshot.width, height: step.screenshot.height }
           : null,
@@ -161,6 +184,8 @@ async function buildTaskData(
       steps,
       total_steps: steps.length,
       total_frames_captured: steps.length,
+      // Time per site over every step, so the dashboard need not read them all.
+      domain_ms: domainTimes(steps),
       total_duration_ms: activeOffset(session.started_at, session.pauses, session.ended_at),
       urls_visited: urlsVisited,
       recording_url: recordingUrl ?? null,
@@ -264,6 +289,8 @@ export async function submitSessionToDrafted(
     taskData,
     behavioralData,
     session.id,
+    // A retry skips the screenshots an earlier attempt already uploaded.
+    { resume: (session.sync?.attempts ?? 0) > 0 },
   )) as SubmitResult;
   if ((result.captureRevision ?? 0) < (session.sync?.revision ?? 1)) {
     await enrichSubmittedSession(session, result.taskId, enrich ?? buildEnrichment(session));
@@ -301,29 +328,47 @@ export async function enrichSubmittedSession(
   const snap = await getDocFromServer(taskRef);
   if (!snap.exists()) throw new Error('Submitted record not found');
   const existing = snap.data() as {
-    trajectory?: { steps?: Array<{ step_index: number; screenshot?: unknown }> };
+    trajectory?: {
+      steps?: Array<{ step_index: number; screenshot?: unknown }>;
+      steps_storage_path?: string;
+    };
   };
-  const existingSteps = existing.trajectory?.steps ?? [];
+  // A long session keeps its steps in a file; the record holds only the first few.
+  const stepsPath = existing.trajectory?.steps_storage_path;
+  const existingSteps: Array<{ step_index: number; screenshot?: unknown }> = stepsPath
+    ? JSON.parse(new TextDecoder().decode(await getBytes(ref(storage, stepsPath))))
+    : (existing.trajectory?.steps ?? []);
   const segments = session.segments.map((segment) => tagSegment(segment, session.steps));
+  const capturedByIndex = new Map(session.steps.map((item) => [item.index, item]));
+  const segmentsByStart = new Map<number, typeof segments>();
+  for (const segment of segments)
+    segmentsByStart.set(segment.start_index, [
+      ...(segmentsByStart.get(segment.start_index) ?? []),
+      segment,
+    ]);
 
   // Patch thoughts onto the existing steps in place (keep their uploaded
   // screenshot Storage paths untouched).
   const patchedSteps = patchStepThoughts(existingSteps, session, enrich).map((step) => {
-    const captured = session.steps.find((item) => item.index === step.step_index);
+    const captured = capturedByIndex.get(step.step_index);
     return captured
       ? {
           ...step,
           annotation: captured.annotation ?? null,
-          segments: segments.filter((segment) => segment.start_index === captured.index),
+          segments: segmentsByStart.get(captured.index) ?? [],
         }
       : step;
   });
+  if (stepsPath)
+    await uploadBytes(ref(storage, stepsPath), stepsFileBlob(patchedSteps), {
+      contentType: 'application/json',
+    });
 
   const labels = submissionLabelFields(session);
   const now = new Date().toISOString();
 
   await updateDoc(taskRef, {
-    'trajectory.steps': patchedSteps,
+    'trajectory.steps': stepsPath ? patchedSteps.slice(0, STEPS_KEPT_IN_RECORD) : patchedSteps,
     'instruction.text': labels.instruction,
     'instruction.category': labels.category,
     'completion.summary': labels.summary,

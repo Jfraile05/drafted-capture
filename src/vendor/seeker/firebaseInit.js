@@ -18,7 +18,9 @@ import { getApps, initializeApp } from 'firebase/app';
 import { getAuth, indexedDBLocalPersistence, initializeAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import {
+  getBytes,
   getDownloadURL,
+  getMetadata,
   getStorage,
   ref,
   uploadBytes,
@@ -49,4 +51,15 @@ try {
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-export { app, auth, db, storage, ref, uploadBytes, uploadBytesResumable, getDownloadURL };
+export {
+  app,
+  auth,
+  db,
+  storage,
+  ref,
+  uploadBytes,
+  uploadBytesResumable,
+  getDownloadURL,
+  getMetadata,
+  getBytes,
+};

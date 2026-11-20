@@ -21,6 +21,7 @@ import {
 import { DB_RECORDINGS, DB_SCREENSHOTS, DB_SESSIONS, DB_STEPS } from '../constants';
 import type { Session, Step } from '../types';
 import { notifySessionUpdate } from './sessionUpdates';
+import { createStepLog } from './stepChunks';
 
 const screenshotStore = createStore(`drafted-capture-${DB_SCREENSHOTS}`, DB_SCREENSHOTS);
 const stepsStore = createStore(`drafted-capture-${DB_STEPS}`, DB_STEPS);
@@ -54,32 +55,19 @@ export function getScreenshot(hash: string): Promise<Blob | undefined> {
 // ── Live steps (sessionId -> Step[]) ────────────────────────────────────────
 //
 //  The live session's steps are persisted here so they survive service-worker
-//  restarts mid-capture. We read-modify-write the array; appends are cheap
-//  relative to capture cadence (≤ a couple writes/sec) and survive eviction.
+//  restarts mid-capture. They are kept in chunks (see stepChunks.ts) so a
+//  session of any length costs the same to add one step to.
 
-export async function getSteps(sessionId: string): Promise<Step[]> {
-  return (await idbGet<Step[]>(sessionId, stepsStore)) ?? [];
-}
+const stepLog = createStepLog({
+  get: (key) => idbGet(key, stepsStore),
+  set: (key, value) => idbSet(key, value, stepsStore),
+  del: (key) => idbDel(key, stepsStore),
+});
 
-export async function appendStep(sessionId: string, step: Step): Promise<number> {
-  const steps = await getSteps(sessionId);
-  // Stamp the previous step's duration now that we know when the next arrived.
-  if (steps.length > 0) {
-    const prev = steps[steps.length - 1];
-    prev.duration_to_next = step.timestamp - prev.timestamp;
-  }
-  steps.push(step);
-  await idbSet(sessionId, steps, stepsStore);
-  return steps.length;
-}
-
-export function setSteps(sessionId: string, steps: Step[]): Promise<void> {
-  return idbSet(sessionId, steps, stepsStore);
-}
-
-export function clearSteps(sessionId: string): Promise<void> {
-  return idbDel(sessionId, stepsStore);
-}
+export const getSteps = stepLog.get;
+export const appendStep = stepLog.append;
+export const setSteps = stepLog.set;
+export const clearSteps = stepLog.clear;
 
 // ── Archived sessions (sessionId -> Session) ────────────────────────────────
 

@@ -21,6 +21,12 @@ beforeEach(async (t) => {
   __reset();
   backend.records.clear();
   backend.uploads.length = 0;
+  backend.files.clear();
+  backend.denyOverwrite = false;
+  backend.failAfter = Number.POSITIVE_INFINITY;
+  backend.attempts = 0;
+  backend.inFlight = 0;
+  backend.maxInFlight = 0;
   backend.failCommit = false;
   backend.failUpload = false;
   auth.currentUser.uid = 'student';
@@ -54,6 +60,159 @@ describe('automatic upload transport', () => {
     assert.equal(updated.trajectory.steps[0].segments[0].category, 'research');
     assert.deepEqual(updated.trajectory.steps[0].origin, saved.trajectory.steps[0].origin);
     assert.equal(updated.trajectory.steps[0].screenshot, 'annotated-screenshots/student/session-stable-id/0.jpg');
+  });
+
+  it('uploads a session of two thousand screenshots a few at a time, with only paths on the record', async () => {
+    const captured = session();
+    captured.steps = Array.from({ length: 2000 }, (_, i) => ({
+      ...captured.steps[0],
+      index: i,
+      timestamp: 2000 + i * 1000,
+    }));
+    const result = await submitSessionToDrafted(captured);
+    const saved = backend.records.get(`credential_tasks/${result.taskId}`);
+    // This many steps is more than a record holds comfortably, so they went to a file.
+    assert.equal(saved.trajectory.total_steps, 2000);
+    assert.equal(backend.uploads.filter((p) => p.startsWith('annotated-screenshots/')).length, 2000);
+    assert.ok(backend.maxInFlight <= 6, `${backend.maxInFlight} uploads ran at once`);
+    assert.ok(backend.maxInFlight > 1, 'uploads ran in parallel');
+    const text = JSON.stringify(saved);
+    assert.doesNotMatch(text, /data:image/);
+    assert.doesNotMatch(text, /screenshot_blob/);
+    const all = JSON.parse(await backend.files.get(saved.trajectory.steps_storage_path)!.text());
+    assert.equal(all.length, 2000);
+    assert.equal(all[1999].screenshot, 'annotated-screenshots/student/session-stable-id/1999.jpg');
+    assert.equal(all[1999].screenshot_storage_path, all[1999].screenshot);
+  });
+
+  const longSession = (count: number) => {
+    const captured = session();
+    captured.metadata.workflow = { ...WORKFLOWS[0] };
+    captured.ended_at = 2000 + count * 1000;
+    captured.steps = Array.from({ length: count }, (_, i) => ({
+      ...captured.steps[0],
+      index: i,
+      timestamp: 2000 + i * 1000,
+      origin: { tab_id: 1, frame_id: 0, title: 'Chart', url: i % 4 ? 'https://www.tradingview.com/chart/' : 'https://mail.example.com/' },
+    }));
+    return captured;
+  };
+
+  it('uploads a multi-hour session: the record stays small and every step is in the file', async () => {
+    const captured = longSession(12000); // about 3.5 hours at one step a second
+    const result = await submitSessionToDrafted(captured);
+    const saved = backend.records.get(`credential_tasks/${result.taskId}`);
+    assert.ok(JSON.stringify(saved).length < 500_000, `record is ${JSON.stringify(saved).length} bytes`);
+    assert.equal(saved.trajectory.total_steps, 12000);
+    assert.equal(saved.trajectory.steps_truncated, true);
+    assert.equal(saved.trajectory.steps_stored_count, 12000);
+    assert.equal(saved.trajectory.steps.length, 200);
+    assert.equal(saved.trajectory.steps_storage_path, 'sidekick-steps/student/session-stable-id.json');
+    const all = JSON.parse(await backend.files.get(saved.trajectory.steps_storage_path)!.text());
+    assert.equal(all.length, 12000);
+    assert.deepEqual(all.slice(0, 200), saved.trajectory.steps);
+    assert.equal(all[11999].step_index, 11999);
+    // Time per site is on the record, so the dashboard need not read the file.
+    const total = Object.values(saved.trajectory.domain_ms as Record<string, number>).reduce((a, b) => a + b, 0);
+    assert.ok(saved.trajectory.domain_ms['tradingview.com'] > 0);
+    assert.ok(saved.trajectory.domain_ms['mail.example.com'] > 0);
+    assert.equal(total, 11999 * 1000);
+  });
+
+  it('keeps a session of about a thousand steps on the record, which needs nothing new on the server', async () => {
+    const captured = longSession(1040); // Raul's session
+    const result = await submitSessionToDrafted(captured);
+    const saved = backend.records.get(`credential_tasks/${result.taskId}`);
+    assert.equal(saved.trajectory.steps.length, 1040);
+    assert.equal(saved.trajectory.steps_storage_path, undefined);
+    assert.ok(JSON.stringify(saved).length < 1_000_000);
+    assert.equal(backend.uploads.some((p) => p.startsWith('sidekick-steps/')), false);
+  });
+
+  it('keeps a short session inside the record, as before', async () => {
+    const result = await submitSessionToDrafted(session());
+    const saved = backend.records.get(`credential_tasks/${result.taskId}`);
+    assert.equal(saved.trajectory.steps.length, 1);
+    assert.equal(saved.trajectory.steps_storage_path, undefined);
+    assert.equal(backend.uploads.some((p) => p.startsWith('sidekick-steps/')), false);
+  });
+
+  it('resumes after an upload dropped part way, sending only what is missing', async () => {
+    const captured = longSession(300);
+    backend.failAfter = 120;
+    await assert.rejects(submitSessionToDrafted(captured), /Storage offline/);
+    const stored = backend.uploads.length;
+    assert.ok(stored >= 100 && stored < 300, `${stored} stored before the drop`);
+    // Screenshots cannot be overwritten, so the retry must skip the stored ones.
+    backend.failAfter = Number.POSITIVE_INFINITY;
+    backend.denyOverwrite = true;
+    captured.sync = { revision: 1, synced_revision: 0, attempts: 1, retry_at: 0 };
+    const result = await submitSessionToDrafted(captured);
+    const screenshots = backend.uploads.filter((p) => p.startsWith('annotated-screenshots/'));
+    assert.equal(screenshots.length, 300, 'each screenshot uploaded exactly once');
+    assert.equal(new Set(screenshots).size, 300);
+    assert.equal(backend.records.get(`credential_tasks/${result.taskId}`).trajectory.total_steps, 300);
+  });
+
+  it('recovers when a crash left screenshots stored and the retry flag was never set', async () => {
+    const captured = longSession(50);
+    backend.failAfter = 20;
+    await assert.rejects(submitSessionToDrafted(captured), /Storage offline/);
+    backend.failAfter = Number.POSITIVE_INFINITY;
+    backend.denyOverwrite = true; // attempts is still 0, so nothing is skipped up front
+    const result = await submitSessionToDrafted(captured);
+    assert.equal(backend.records.get(`credential_tasks/${result.taskId}`).trajectory.total_steps, 50);
+    assert.equal(backend.uploads.filter((p) => p.startsWith('annotated-screenshots/')).length, 50);
+  });
+
+  it('does not hide a real failure behind the overwrite check', async () => {
+    const captured = longSession(5);
+    backend.failUpload = true;
+    await assert.rejects(submitSessionToDrafted(captured), /Storage offline/);
+  });
+
+  it('edits to a multi-hour session update the file and the first steps on the record', async () => {
+    const captured = longSession(1500);
+    const result = await submitSessionToDrafted(captured);
+    captured.segments = [{ id: 'task', start_index: 0, end_index: 1499, label: 'Trade review', category: 'research', notes: '', created_at: '2026-11-13' }];
+    await enrichSubmittedSession(captured, result.taskId, { 1400: { thought: 'checked the chart' } });
+    const record = backend.records.get(`credential_tasks/${result.taskId}`);
+    const all = JSON.parse(await backend.files.get(record.trajectory.steps_storage_path)!.text());
+    assert.equal(all.length, 1500);
+    assert.equal(all[1400].thought, 'checked the chart');
+    assert.equal(all[0].segments.length, 1);
+    assert.equal(record.trajectory.steps.length, 200);
+    assert.equal(record.trajectory.steps[0].segments.length, 1);
+    assert.equal(record.instruction.text, 'Trade review');
+  });
+
+  it('uploads a long session whose screenshots are too large to send as one string', async () => {
+    // Glaul's 20 minute TradingView session: about a thousand large screenshots.
+    // Sent as base64 text in one record these pass the engine's string limit.
+    await putScreenshot('big', new Blob([new Uint8Array(650 * 1024)], { type: 'image/png' }));
+    const captured = session();
+    captured.steps = Array.from({ length: 1040 }, (_, i) => ({
+      ...captured.steps[0],
+      index: i,
+      timestamp: 2000 + i * 1000,
+      screenshot: { hash: 'big', width: 1920, height: 1080, dpr: 1 },
+    }));
+    const result = await submitSessionToDrafted(captured);
+    assert.equal(backend.records.get(`credential_tasks/${result.taskId}`).trajectory.steps.length, 1040);
+    assert.equal(backend.uploads.length, 1040);
+  });
+
+  it('stops starting uploads after the first one fails, so a bad connection fails fast', async () => {
+    const captured = session();
+    captured.steps = Array.from({ length: 1000 }, (_, i) => ({
+      ...captured.steps[0],
+      index: i,
+      timestamp: 2000 + i * 1000,
+    }));
+    backend.failUpload = true;
+    await assert.rejects(submitSessionToDrafted(captured), /Storage offline/);
+    assert.ok(backend.attempts <= 6, `${backend.attempts} uploads were started`);
+    assert.equal(backend.records.has('credential_tasks/session-stable-id'), false);
   });
 
   it('rejects a device-only Generalist session before uploading files or creating a receipt', async () => {

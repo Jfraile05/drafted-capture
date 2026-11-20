@@ -1,6 +1,16 @@
 export const backend = {
   records: new Map<string, any>(),
   uploads: [] as string[],
+  /** What is in Storage, by path. */
+  files: new Map<string, Blob>(),
+  /** Refuse an upload to a path that already has a file, like the screenshot rules. */
+  denyOverwrite: false,
+  /** Fail every upload after this many have succeeded. */
+  failAfter: Number.POSITIVE_INFINITY,
+  /** Upload attempts, including failed ones, and the most running at once. */
+  attempts: 0,
+  inFlight: 0,
+  maxInFlight: 0,
   failUpload: false,
   failCommit: false,
   failRead: false,
@@ -19,9 +29,26 @@ export const getDocFromServer = async (path: string) => {
   return snapshot(path);
 };
 export const ref = (_storage: unknown, path: string) => path;
-export async function uploadBytes(path: string) {
-  if (backend.failUpload) throw new Error('Storage offline');
+export async function uploadBytes(path: string, blob?: Blob) {
+  backend.attempts++;
+  if (backend.failUpload || backend.uploads.length >= backend.failAfter)
+    throw new Error('Storage offline');
+  if (backend.denyOverwrite && backend.files.has(path)) throw new Error('storage/unauthorized');
+  backend.maxInFlight = Math.max(backend.maxInFlight, ++backend.inFlight);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  backend.inFlight--;
   backend.uploads.push(path);
+  if (blob) backend.files.set(path, blob);
+}
+export async function getMetadata(path: string) {
+  const file = backend.files.get(path);
+  if (!file) throw new Error('storage/object-not-found');
+  return { size: file.size };
+}
+export async function getBytes(path: string) {
+  const file = backend.files.get(path);
+  if (!file) throw new Error('storage/object-not-found');
+  return file.arrayBuffer();
 }
 export const getDownloadURL = async (path: string) => `https://storage.example.invalid/${path}`;
 export const increment = (value: number) => ({ increment: value });
