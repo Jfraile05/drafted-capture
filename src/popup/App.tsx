@@ -4,6 +4,7 @@ import {
   Pause,
   Play,
   Plus,
+  Question,
   SignOut,
   Stop,
 } from '@phosphor-icons/react';
@@ -20,6 +21,7 @@ import type { LiveSession, Session, StepSummary } from '../shared/types';
 import { fmtDuration, hostOf } from '../shared/utils/format';
 import { LOCAL_WORKFLOW_ENABLED, LOCAL_WORKFLOW_UPLOADS } from '../shared/workflows';
 import EarningsDashboard from './EarningsDashboard';
+import Guide from './Guide';
 import Login from './Login';
 import Onboarding from './Onboarding';
 import { PrivacyPrompt } from './PrivacyPrompt';
@@ -28,9 +30,10 @@ import WorkflowPicker from './WorkflowPicker';
 export default function App() {
   const { session: liveSession, loaded: liveLoaded } = useLiveSessionState();
   const mascotState = useMascotState();
-  const [settings] = useSettings();
+  const [settings, updateSettings] = useSettings();
   const { user, loading: authLoading } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
+  const [replayGuide, setReplayGuide] = useState(false);
   const [controlBusy, setControlBusy] = useState<string | null>(null);
   const [controlError, setControlError] = useState('');
   const [controlPreview, setControlPreview] = useState<LiveSession | null>(null);
@@ -96,6 +99,18 @@ export default function App() {
         onCancel={() => setShowLogin(false)}
         onSuccess={() => {
           setShowLogin(false);
+        }}
+      />
+    );
+  }
+
+  // Right after sign-in, and never over a session that is already recording.
+  if (user && liveLoaded && !liveSession && (!settings.guide_seen || replayGuide)) {
+    return (
+      <Guide
+        onDone={() => {
+          updateSettings({ guide_seen: true });
+          setReplayGuide(false);
         }}
       />
     );
@@ -211,6 +226,15 @@ export default function App() {
       <header className="flex items-center justify-between">
         <Brand size="text-[32px]" />
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setReplayGuide(true)}
+            className="icon-btn"
+            title="How it works"
+            aria-label="How it works"
+          >
+            <Question size={18} />
+          </button>
           <button
             type="button"
             onClick={handleOpenPanel}

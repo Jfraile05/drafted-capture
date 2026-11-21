@@ -2,7 +2,7 @@ import type { AnnotationTag, Settings, TaskCategory } from './types';
 
 import { IDLE_CONFIG } from '../config/idle';
 
-export const EXTENSION_VERSION = '1.0.19';
+export const EXTENSION_VERSION = '1.0.20';
 /** Shows the Beta tag next to the wordmark and in the version line. */
 export const IS_BETA = true;
 
@@ -91,6 +91,7 @@ export const DEFAULT_SETTINGS: Settings = {
   drafted_org_id: '',
   drafted_project_id: '',
   onboarding_complete: false,
+  guide_seen: false,
   consent_accepted: false,
   consent_accepted_at: null,
 };

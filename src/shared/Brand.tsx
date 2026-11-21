@@ -401,6 +401,53 @@ function canShow3D(): boolean {
   }
 }
 
+/**
+ * The same Sidekick as the one in the header (3D where WebGL works, the flat one
+ * otherwise), but showing the mood you give it instead of the live capture state.
+ * It does not follow the cursor. Click it for a boop.
+ */
+export function SidekickFigure({
+  state,
+  className = '',
+}: {
+  state: MascotState;
+  className?: string;
+}) {
+  const handle = useRef<Sidekick3DHandle>(null);
+  const [Three, setThree] = useState<ComponentType<Parameters<typeof Sidekick3DType>[0]> | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!canShow3D()) return;
+    let live = true;
+    import('./Sidekick3D').then((m) => {
+      if (live) setThree(() => m.default);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const fallBackTo2D = useCallback(() => setThree(null), []);
+  const noLook = useCallback(() => null, []);
+
+  return (
+    <button
+      type="button"
+      onClick={() => handle.current?.boop()}
+      className={`${className} shrink-0 cursor-pointer`}
+      aria-label="Sidekick"
+    >
+      {Three ? (
+        <span className="block h-full w-full" aria-hidden="true">
+          <Three ref={handle} state={state} getLook={noLook} onError={fallBackTo2D} />
+        </span>
+      ) : (
+        <Mascot state={state} follow={false} className="h-full w-full" />
+      )}
+    </button>
+  );
+}
+
 /** Mascot and wordmark, top left on every page. The mascot shows the live capture state. */
 export default function Brand({
   size = 'text-xl',

@@ -306,6 +306,8 @@ export interface Settings {
   drafted_org_id: string;
   drafted_project_id: string;
   onboarding_complete: boolean;
+  /** The start, stop and check guide shown after sign-in has been finished or skipped. */
+  guide_seen: boolean;
   /** One-time legal consent captured on first run. */
   consent_accepted: boolean;
   consent_accepted_at: string | null;
