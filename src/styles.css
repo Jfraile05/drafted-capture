@@ -47,6 +47,8 @@
   --gloss-shadow-lift: inset 0 1px 0 #fff, 0 10px 22px rgba(0, 0, 0, 0.5);
   --on-gloss: #111;
   --shot-shadow: 6px 6px 16px rgba(0, 0, 0, 0.4);
+  /* Around the rounded card in the popup and side panel (see .framed). */
+  --frame: color-mix(in srgb, rgb(var(--c-bg)) 55%, #000);
 
   /* Motion: one rhythm for the whole extension. */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -96,6 +98,7 @@
   --gloss-shadow-lift: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 10px 22px rgba(20, 30, 25, 0.3);
   --on-gloss: #f6f7f6;
   --shot-shadow: 5px 6px 16px rgba(30, 42, 36, 0.14);
+  --frame: color-mix(in srgb, rgb(var(--c-bg)) 88%, #000);
 }
 
 /* Values built from the ones above. Declared on every themed element so they
@@ -178,6 +181,26 @@ body {
 .atmosphere {
   background: var(--atmosphere);
   background-attachment: fixed;
+}
+
+/* Chrome draws the popup and side panel windows square, and an extension can't
+   change that. The page sits inside them as a rounded card on a plain frame. */
+html.framed {
+  background: var(--frame);
+}
+html.framed body {
+  background: transparent;
+  padding: 8px;
+}
+html.framed #root {
+  position: relative;
+  overflow: hidden;
+  border-radius: clamp(12px, calc(var(--radius) + 6px), 24px);
+  background: var(--atmosphere);
+  box-shadow: 0 0 0 1px rgb(var(--c-ink) / 0.09), 0 4px 14px rgb(0 0 0 / 0.22);
+}
+html.framed-full #root {
+  height: calc(100vh - 16px);
 }
 
 button {
@@ -336,7 +359,7 @@ summary:focus-visible {
      setups where the selection is a solid color. */
   .peer:checked + .option,
   .option.is-on,
-  .chip-on,
+  .chip.chip-on,
   .row-on {
     --c-text: var(--c-sel-text);
     --c-text-muted: var(--c-sel-muted);
