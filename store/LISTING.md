@@ -50,8 +50,8 @@ Sidekick is in beta. You need a Drafted account to record.
   - `store/sidekick-shot-1-record.png`
   - `store/sidekick-shot-2-review.png`
   - `store/sidekick-shot-3-privacy.png`
-- Small promo tile (440x280) is optional. `store/promo-small-440x280.png` still
-  shows the old "drafted. Capture" branding, so leave it off for now.
+- Small promo tile (440x280): `store/promo-small-440x280.png`
+- Marquee promo tile (1400x560): `store/promo-marquee-1400x560.png`
 
 **Official URL / homepage:** https://joindrafted.com
 

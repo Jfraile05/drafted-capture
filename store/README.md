@@ -8,6 +8,7 @@ Everything for version 1.0.26 is in this folder.
 | Every dashboard field, ready to paste | `LISTING.md` |
 | Store icon (128x128) | `store-icon-128.png` |
 | Screenshots (1280x800) | `sidekick-shot-1-record.png`, `sidekick-shot-2-review.png`, `sidekick-shot-3-privacy.png` |
+| Promo tiles | `promo-small-440x280.png`, `promo-marquee-1400x560.png` |
 
 ## Steps
 
@@ -17,7 +18,7 @@ Everything for version 1.0.26 is in this folder.
    `release/sidekick-1.0.26.zip`. Uploading to this item (instead of creating a new one) keeps
    the same ID, so current installs update on their own.
 3. **Store listing**: paste the description, set the category, and replace the icon and
-   screenshots with the files above. Remove the old "drafted. Capture" screenshots and promo tile.
+   screenshots and promo tiles with the files above. Remove the old "drafted. Capture" screenshots.
 4. **Privacy**: paste the single purpose and the permission justifications from `LISTING.md`.
    This version adds four permissions that need a justification: `scripting`, `idle`,
    `offscreen` and `notifications`. Tick the data types listed there and the three
