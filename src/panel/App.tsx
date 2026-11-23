@@ -6,9 +6,10 @@ import {
   TagSimple,
   Trash,
 } from '@phosphor-icons/react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import Brand from '../shared/Brand';
 import { SessionSyncStatus } from '../shared/SyncStatus';
+import ThemeToggle from '../shared/ThemeToggle';
 import { sendMessage, useLiveSession } from '../shared/hooks';
 import type { QualityReview } from '../shared/quality';
 import { ARCHIVED_SESSION_CHANGE } from '../shared/storage/sessionUpdates';
@@ -21,6 +22,7 @@ import { Segments } from './Segments';
 import { Timeline } from './Timeline';
 
 type Tab = 'timeline' | 'replay' | 'segments';
+const TABS: Tab[] = ['timeline', 'replay', 'segments'];
 
 export function App() {
   const liveSession = useLiveSession();
@@ -33,6 +35,15 @@ export function App() {
   const [rangeStart, setRangeStart] = useState<number | null>(null);
   const [rangeEnd, setRangeEnd] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('timeline');
+  // Which way the tab content slides in: right for a tab further along, left
+  // for one before it. Only updated when the tab changes.
+  const tabMotion = useRef({ tab: activeTab, dir: 1 });
+  if (tabMotion.current.tab !== activeTab) {
+    tabMotion.current = {
+      tab: activeTab,
+      dir: TABS.indexOf(activeTab) < TABS.indexOf(tabMotion.current.tab) ? -1 : 1,
+    };
+  }
   const [review, setReview] = useState<QualityReview | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -215,28 +226,33 @@ export function App() {
   };
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden bg-bg">
-      <header className="flex h-[72px] shrink-0 items-center justify-between gap-2 border-b border-white/[0.06] px-3">
-        <Brand size="text-[28px]" className="pl-1" />
-        {!selectedSession && (
-          <button
-            type="button"
-            onClick={() => loadSessions()}
-            className="icon-btn"
-            aria-label="Refresh sessions"
-            title="Refresh"
-          >
-            <ArrowsClockwise size={18} />
-          </button>
-        )}
+    <div className="flex h-screen w-full flex-col overflow-hidden">
+      <header className="flex h-[76px] shrink-0 items-center justify-between gap-2 border-b border-ink/[0.07] px-4">
+        <Brand size="text-[24px]" />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <ThemeToggle />
+          {!selectedSession && (
+            <button
+              type="button"
+              onClick={() => loadSessions()}
+              className="icon-btn"
+              data-motion="spin"
+              aria-label="Refresh sessions"
+              title="Refresh"
+            >
+              <ArrowsClockwise size={18} />
+            </button>
+          )}
+        </div>
       </header>
 
       {selectedSession && (
-        <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.06] px-2 py-1.5">
+        <div className="flex shrink-0 items-center gap-1.5 border-b border-ink/[0.07] px-2.5 py-2">
           <button
             type="button"
             onClick={closeSession}
             className="icon-btn"
+            data-motion="back"
             aria-label="Back to all sessions"
             title="All sessions"
           >
@@ -248,21 +264,21 @@ export function App() {
           >
             {workflowTitle(selectedSession)}
           </h1>
-          <span className="shrink-0 text-xs text-text-muted">
+          <span className="shrink-0 rounded-pill bg-ink/[0.06] px-2.5 py-1 text-xs text-text-muted">
             {selectedSession.outcome.total_steps} steps
           </span>
         </div>
       )}
 
       {liveSession && liveSession.state === 'capturing' && (
-        <p className="flex shrink-0 items-center gap-2 border-b border-white/[0.06] px-4 py-2 text-xs text-text-muted">
-          <span className="h-2 w-2 rounded-full bg-green pulse-dot" />
+        <p className="view-in mx-3 mt-3 flex shrink-0 items-center gap-2 rounded-[14px] bg-green/10 px-3.5 py-2.5 text-xs text-green-ink">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-green pulse-dot" />
           Recording. Stop from the popup to review it here.
         </p>
       )}
 
       {!selectedSessionId && (
-        <div className="flex-1 overflow-y-auto">
+        <div className="view-in flex-1 overflow-y-auto">
           {loading && <p className="py-10 text-center text-sm text-text-muted">Loading sessions</p>}
           {!loading && loadError && (
             <div className="space-y-3 px-4 py-10 text-center">
@@ -283,25 +299,22 @@ export function App() {
           )}
           {!loading && sessions.length > 0 && (
             <>
-              <h1 className="px-4 pb-1 pt-4 text-xs font-medium text-text-muted">
+              <h1 className="px-4 pb-2.5 pt-4 text-xs font-semibold text-text-muted">
                 {sessions.length} {sessions.length === 1 ? 'session' : 'sessions'}
               </h1>
-              <ul>
+              <ul className="stagger space-y-2 px-3">
                 {sessions.map((s) => (
-                  <li
-                    key={s.id}
-                    className="group flex items-center gap-2 border-b border-white/[0.06] pr-2"
-                  >
+                  <li key={s.id} className="surface lift group flex items-center gap-1 pr-1.5">
                     <button
                       type="button"
                       onClick={() => handleSessionSelect(s.id)}
-                      className="flex min-w-0 flex-1 items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.03]"
+                      className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-l-[16px] px-3.5 py-3 text-left transition-colors hover:bg-ink/[0.03]"
                     >
                       <span className="min-w-0">
-                        <span className="block truncate text-sm font-medium text-text">
+                        <span className="block truncate text-sm font-semibold text-text">
                           {workflowTitle(s)}
                         </span>
-                        <span className="block text-xs text-text-muted">
+                        <span className="mt-0.5 block text-xs text-text-muted">
                           {fmtSessionDate(s.started_at)}, {s.outcome.total_steps} steps
                           {s.segments.length > 0
                             ? `, ${s.segments.length} ${s.segments.length === 1 ? 'task' : 'tasks'}`
@@ -318,6 +331,7 @@ export function App() {
                       type="button"
                       onClick={() => handleDeleteSession(s.id)}
                       className="icon-btn text-text-faint hover:text-coral"
+                      data-motion="tilt"
                       aria-label="Delete session"
                       title="Delete session"
                     >
@@ -326,11 +340,11 @@ export function App() {
                   </li>
                 ))}
               </ul>
-              <div className="px-4 py-4">
+              <div className="px-4 pb-5 pt-4">
                 <button
                   type="button"
                   onClick={handleClearAllSessions}
-                  className="text-xs text-text-faint hover:text-coral"
+                  className="text-xs text-text-faint transition-colors hover:text-coral"
                 >
                   Delete all sessions
                 </button>
@@ -341,43 +355,49 @@ export function App() {
       )}
 
       {selectedSessionId && selectedSession && (
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <div className="shrink-0 px-4 py-2">
+        <div className="view-in flex flex-1 flex-col overflow-hidden" style={slideFrom(1)}>
+          <div className="shrink-0 px-4 pb-1 pt-3">
             <SessionSyncStatus session={selectedSession} />
           </div>
           {review ? (
             <QualityCard review={review} />
           ) : (
             taskId && (
-              <p className="shrink-0 border-b border-white/[0.06] px-4 py-2.5 text-xs text-text-muted">
+              <p className="surface-pressed mx-3 my-2 shrink-0 px-3.5 py-2.5 text-xs leading-relaxed text-text-muted">
                 Quality review in progress. It shows up here a few minutes after upload.
               </p>
             )
           )}
           <nav
-            className="flex shrink-0 gap-1 border-b border-white/[0.06] px-2"
+            className="segmented mx-3 mb-2 mt-1 shrink-0"
             aria-label="Session views"
+            style={{ '--tabs': TABS.length, '--tab': TABS.indexOf(activeTab) } as CSSProperties}
           >
-            {(['timeline', 'replay', 'segments'] as Tab[]).map((tab) => (
+            <span className="segmented-thumb" aria-hidden="true" />
+            {TABS.map((tab) => (
               <button
                 type="button"
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 aria-current={activeTab === tab ? 'page' : undefined}
-                className={`-mb-px min-w-0 flex-1 border-b-2 px-1 py-2.5 text-sm font-medium transition-colors ${
-                  activeTab === tab
-                    ? 'border-text text-text'
-                    : 'border-transparent text-text-muted hover:text-text'
-                }`}
+                className="segmented-btn"
               >
                 {tabLabels[tab]}
               </button>
             ))}
           </nav>
 
-          <div className="flex-1 overflow-hidden">
+          <div
+            key={activeTab}
+            className="view-in flex-1 overflow-hidden"
+            style={slideFrom(tabMotion.current.dir)}
+          >
             {activeTab === 'timeline' && (
-              <div className="flex h-full flex-col">
+              <div
+                key={selectedStepIndex === null ? 'steps' : 'step'}
+                className="view-in flex h-full flex-col"
+                style={slideFrom(selectedStepIndex === null ? -1 : 1)}
+              >
                 {selectedStepIndex === null ? (
                   <Timeline
                     session={selectedSession}
@@ -393,7 +413,7 @@ export function App() {
                   // One step at a time, full height, so the list and the
                   // screenshot never squeeze each other.
                   <>
-                    <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.06] px-2 py-1.5">
+                    <div className="flex shrink-0 items-center gap-1 border-y border-ink/[0.07] px-2.5 py-1.5">
                       <button
                         type="button"
                         onClick={() => {
@@ -401,6 +421,7 @@ export function App() {
                           setSelectedStepIndex(null);
                         }}
                         className="icon-btn"
+                        data-motion="back"
                         aria-label="Back to all steps"
                         title="All steps"
                       >
@@ -414,6 +435,7 @@ export function App() {
                         onClick={() => setSelectedStepIndex(selectedStepIndex - 1)}
                         disabled={selectedStepIndex === 0}
                         className="icon-btn disabled:cursor-not-allowed disabled:opacity-30"
+                        data-motion="prev"
                         aria-label="Previous step"
                       >
                         <CaretLeft size={18} weight="bold" />
@@ -423,6 +445,7 @@ export function App() {
                         onClick={() => setSelectedStepIndex(selectedStepIndex + 1)}
                         disabled={selectedStepIndex >= selectedSession.steps.length - 1}
                         className="icon-btn disabled:cursor-not-allowed disabled:opacity-30"
+                        data-motion="next"
                         aria-label="Next step"
                       >
                         <CaretRight size={18} weight="bold" />
@@ -474,6 +497,11 @@ export function App() {
       )}
     </div>
   );
+}
+
+/** Slide direction for .view-in: 1 from the right, -1 from the left. */
+function slideFrom(dir: number): CSSProperties {
+  return { '--dir': dir } as CSSProperties;
 }
 
 /** "Nov 4, 2:14 PM" */

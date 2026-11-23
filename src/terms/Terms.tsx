@@ -98,7 +98,7 @@ export function Terms() {
           <p className="text-sm text-text-muted">Last updated: {LAST_UPDATED}</p>
         </header>
 
-        <section className="mt-8 rounded-xl border border-white/[0.08] p-4">
+        <section className="mt-8 rounded-xl border border-ink/[0.08] p-4">
           <h2 className="text-sm font-semibold text-text">Words used on this page</h2>
           <dl className="mt-2 space-y-1.5 text-sm leading-relaxed text-text-muted">
             {TERMS.map(([term, meaning]) => (

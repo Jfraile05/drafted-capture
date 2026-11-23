@@ -30,7 +30,7 @@ export class CrashGuard extends Component<{ children: ReactNode }, State> {
           Your recordings are safe on this computer. Try again, and if it keeps happening, reload
           Sidekick and send this message to the team.
         </p>
-        <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-btn border border-white/10 p-3 text-xs text-text-muted">
+        <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded-btn border border-ink/10 p-3 text-xs text-text-muted">
           {error.message}
         </pre>
         <div className="mt-4 flex gap-2">

@@ -6,22 +6,109 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Dark (Soft graphite) is the default. Colors are RGB channels so Tailwind
+   classes like bg-green/10 work in both themes. */
 :root {
-  --bg: #0b0d0c;
-  --bg-card: #141716;
-  --bg-card-hover: #1b1f1d;
-  --bg-input: #101312;
-  --border: rgba(255, 255, 255, 0.12);
-  --border-active: rgba(77, 255, 160, 0.25);
-  --green: #4dffa0;
-  --green-dim: rgba(77, 255, 160, 0.12);
-  --green-glow: 0 0 24px rgba(77, 255, 160, 0.35);
-  --violet: #9b7fff;
-  --orange: #f5a623;
-  --coral: #ff6b8a;
-  --text: #f2f4f3;
-  --text-muted: #a6aca9;
-  --text-faint: #7d8380;
+  color-scheme: dark;
+  --c-bg: 11 13 12;
+  --c-bg-card: 20 23 22;
+  --c-bg-card-hover: 27 31 29;
+  --c-bg-input: 16 19 18;
+  --c-green: 77 255 160;
+  --c-green-ink: 125 255 185;
+  --c-violet: 155 127 255;
+  --c-orange: 245 166 35;
+  --c-coral: 255 107 138;
+  --c-text: 242 244 243;
+  --c-text-muted: 166 172 169;
+  --c-text-faint: 125 131 128;
+  --c-ink: 255 255 255;
+
+  --bg: rgb(var(--c-bg));
+  --bg-card: rgb(var(--c-bg-card));
+  --bg-card-hover: rgb(var(--c-bg-card-hover));
+  --bg-input: rgb(var(--c-bg-input));
+  --border: rgb(var(--c-ink) / 0.12);
+  --border-active: rgb(var(--c-green) / 0.25);
+  --green: rgb(var(--c-green));
+  --green-dim: rgb(var(--c-green) / 0.12);
+  --green-glow: 0 0 24px rgb(var(--c-green) / 0.35);
+  --violet: rgb(var(--c-violet));
+  --orange: rgb(var(--c-orange));
+  --coral: rgb(var(--c-coral));
+  --text: rgb(var(--c-text));
+  --text-muted: rgb(var(--c-text-muted));
+  --text-faint: rgb(var(--c-text-faint));
+
+  /* Soft graphite: graphite glass surfaces with clay depth. */
+  --graphite: #0c0d0f;
+  --atmosphere: radial-gradient(70% 45% at 85% 0%, rgba(77, 255, 160, 0.09), transparent 70%),
+    radial-gradient(80% 55% at 0% 0%, #2a2e33, transparent 70%), var(--graphite);
+  --surface: linear-gradient(145deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0.015));
+  --surface-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.16), 6px 6px 14px rgba(0, 0, 0, 0.35),
+    -2px -2px 8px rgba(255, 255, 255, 0.03);
+  --surface-shadow-lift: inset 1px 1px 0 rgba(255, 255, 255, 0.18), 9px 10px 20px
+    rgba(0, 0, 0, 0.42), -2px -2px 8px rgba(255, 255, 255, 0.04);
+  --raised: linear-gradient(145deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.02));
+  --raised-shadow: inset 1px 1px 0 rgba(255, 255, 255, 0.18), 5px 5px 12px rgba(0, 0, 0, 0.35);
+  --raised-shadow-lift: inset 1px 1px 0 rgba(255, 255, 255, 0.22), 7px 8px 16px rgba(0, 0, 0, 0.42);
+  --pressed-bg: rgba(0, 0, 0, 0.22);
+  --pressed-shadow: inset 3px 3px 8px rgba(0, 0, 0, 0.45), inset -2px -2px 6px
+    rgba(255, 255, 255, 0.05);
+  --gloss: linear-gradient(180deg, #fafbfa, #dde2df);
+  --gloss-shadow: inset 0 1px 0 #fff, 0 6px 16px rgba(0, 0, 0, 0.45);
+  --gloss-shadow-lift: inset 0 1px 0 #fff, 0 10px 22px rgba(0, 0, 0, 0.5);
+  --on-gloss: #111;
+  --shot-shadow: 6px 6px 16px rgba(0, 0, 0, 0.4);
+
+  /* Motion: one rhythm for the whole extension. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-fast: 140ms;
+  --dur: 240ms;
+  --dur-slow: 420ms;
+  /* biome-ignore lint/correctness/noUnknownProperty: Chrome 129+ property that lets details open to auto height. */
+  interpolate-size: allow-keywords;
+}
+
+/* Light (Soft porcelain): the same glass and clay, lit from above. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --c-bg: 238 240 239;
+  --c-bg-card: 255 255 255;
+  --c-bg-card-hover: 246 247 246;
+  --c-bg-input: 244 245 244;
+  --c-green: 16 168 94;
+  --c-green-ink: 8 122 67;
+  --c-violet: 110 84 214;
+  --c-orange: 184 112 0;
+  --c-coral: 208 56 90;
+  --c-text: 22 25 24;
+  --c-text-muted: 86 93 90;
+  --c-text-faint: 122 129 125;
+  --c-ink: 22 28 25;
+
+  --graphite: #e8ebe9;
+  --atmosphere: radial-gradient(70% 45% at 85% 0%, rgba(16, 168, 94, 0.1), transparent 70%),
+    radial-gradient(80% 55% at 0% 0%, #ffffff, transparent 70%), var(--graphite);
+  --surface: linear-gradient(145deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.62));
+  --surface-shadow: inset 1px 1px 0 #fff, 6px 6px 16px rgba(30, 42, 36, 0.1), -3px -3px 10px
+    rgba(255, 255, 255, 0.75);
+  --surface-shadow-lift: inset 1px 1px 0 #fff, 9px 11px 22px rgba(30, 42, 36, 0.14), -3px -3px 10px
+    rgba(255, 255, 255, 0.8);
+  --raised: linear-gradient(145deg, #ffffff, rgba(255, 255, 255, 0.72));
+  --raised-shadow: inset 1px 1px 0 #fff, 4px 4px 10px rgba(30, 42, 36, 0.12), -2px -2px 6px
+    rgba(255, 255, 255, 0.8);
+  --raised-shadow-lift: inset 1px 1px 0 #fff, 6px 8px 16px rgba(30, 42, 36, 0.16), -2px -2px 6px
+    rgba(255, 255, 255, 0.85);
+  --pressed-bg: rgba(30, 42, 36, 0.05);
+  --pressed-shadow: inset 2px 2px 6px rgba(30, 42, 36, 0.13), inset -2px -2px 5px
+    rgba(255, 255, 255, 0.9);
+  --gloss: linear-gradient(180deg, #2c3134, #131618);
+  --gloss-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 6px 16px rgba(20, 30, 25, 0.24);
+  --gloss-shadow-lift: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 10px 22px rgba(20, 30, 25, 0.3);
+  --on-gloss: #f6f7f6;
+  --shot-shadow: 5px 6px 16px rgba(30, 42, 36, 0.14);
 }
 
 * {
@@ -32,7 +119,8 @@
 
 html,
 body {
-  background: var(--bg);
+  background: var(--atmosphere);
+  background-attachment: fixed;
   color: var(--text);
   font-family: "Inter", sans-serif;
   font-size: 14px;
@@ -50,25 +138,27 @@ body {
 .wordmark .dot {
   color: var(--text-muted);
 }
-/* Small outlined tag beside the wordmark while Sidekick is in beta. */
+/* Small tag on the byline row while Sidekick is in beta. */
 .beta-tag {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   line-height: 1;
-  letter-spacing: 0.02em;
-  color: var(--text-muted);
-  border: 1px solid rgb(255 255 255 / 0.18);
+  color: rgb(var(--c-green-ink));
+  background: rgb(var(--c-green) / 0.11);
   border-radius: 999px;
-  padding: 3px 7px;
+  padding: 3px 6px;
   white-space: nowrap;
 }
 
-/* Plain background. The mascot carries the color; surfaces stay quiet. */
+/* Graphite with a faint green glow, the same on every page. */
 .atmosphere {
-  background: var(--bg);
+  background: var(--atmosphere);
+  background-attachment: fixed;
 }
 
+button {
+  -webkit-tap-highlight-color: transparent;
+}
 button:focus-visible,
 summary:focus-visible {
   outline: 2px solid var(--text-muted);
@@ -77,41 +167,382 @@ summary:focus-visible {
 
 .card {
   background: var(--bg-card);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid rgb(var(--c-ink) / 0.07);
   border-radius: 12px;
 }
 
-/* Shared controls so every screen uses the same buttons and fields. */
+/* Shared controls so every screen uses the same buttons and fields.
+   Buttons lift on hover, sink on press and spring back on release. */
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-btn px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-pill px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40;
+    transition:
+      transform var(--dur) var(--ease-spring), box-shadow var(--dur) var(--ease-out),
+      filter var(--dur-fast) ease, background-color var(--dur-fast) ease, color var(--dur-fast) ease,
+      opacity var(--dur) ease;
   }
+  .btn svg {
+    transition: transform var(--dur) var(--ease-spring);
+  }
+  .btn:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+  .btn:not(:disabled):hover svg {
+    transform: scale(1.12);
+  }
+  .btn:not(:disabled):active {
+    transform: translateY(0) scale(0.97);
+    transition-duration: 90ms;
+  }
+  /* Glossy pill: white on graphite, graphite on porcelain. */
   .btn-primary {
-    @apply btn bg-text text-bg hover:bg-white;
+    @apply btn;
+    color: var(--on-gloss);
+    background: var(--gloss);
+    box-shadow: var(--gloss-shadow);
   }
+  .btn-primary:not(:disabled):hover {
+    filter: brightness(1.04);
+    box-shadow: var(--gloss-shadow-lift);
+  }
+  /* Raised glass pill. */
   .btn-ghost {
-    @apply btn border border-white/10 text-text hover:bg-white/[0.06];
+    @apply btn text-text;
+    background: var(--raised);
+    box-shadow: var(--raised-shadow);
+  }
+  .btn-ghost:not(:disabled):hover {
+    box-shadow: var(--raised-shadow-lift);
+  }
+  .btn-primary:not(:disabled):active,
+  .btn-ghost:not(:disabled):active {
+    box-shadow: var(--pressed-shadow);
   }
   .btn-danger {
     @apply btn border border-coral/30 text-coral hover:bg-coral/10;
   }
+  /* The main action on a screen: taller, larger text. */
+  .btn-lg {
+    @apply h-[46px] px-3 text-[15px];
+  }
   .icon-btn {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-btn text-text-muted transition-colors hover:bg-white/[0.06] hover:text-text;
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-full text-text-muted hover:bg-ink/[0.07] hover:text-text;
+    transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, transform
+      var(--dur) var(--ease-spring), opacity var(--dur) ease;
+  }
+  .icon-btn svg {
+    transition: transform var(--dur-slow) var(--ease-spring);
+  }
+  .icon-btn:not(:disabled):active {
+    transform: scale(0.86);
+    transition-duration: 90ms;
+  }
+  /* Small hints on what an icon does: gears turn, refresh spins, arrows lean. */
+  .icon-btn[data-motion="turn"]:hover svg {
+    transform: rotate(60deg);
+  }
+  .icon-btn[data-motion="spin"]:hover svg {
+    transform: rotate(180deg);
+  }
+  .icon-btn[data-motion="back"]:hover svg,
+  .icon-btn[data-motion="prev"]:not(:disabled):hover svg {
+    transform: translateX(-2px);
+  }
+  .icon-btn[data-motion="next"]:not(:disabled):hover svg {
+    transform: translateX(2px);
+  }
+  .icon-btn[data-motion="tilt"]:hover svg {
+    transform: rotate(-14deg) scale(1.08);
   }
   .field {
-    @apply w-full rounded-btn border border-white/10 bg-bg-input px-3 py-2.5 text-sm text-text placeholder:text-text-faint outline-none transition-colors focus:border-white/30;
+    @apply w-full rounded-[12px] px-3 py-2.5 text-sm text-text placeholder:text-text-faint outline-none;
+    background: var(--pressed-bg);
+    box-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-ink) / 0.05);
+    transition: box-shadow var(--dur) var(--ease-out), background-color var(--dur) ease;
+  }
+  .field:focus {
+    box-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-green) / 0.5), 0 0 0 4px
+      rgb(var(--c-green) / 0.1);
+  }
+  /* Raised tile: glass sheen with a soft clay shadow. */
+  .surface {
+    background: var(--surface);
+    box-shadow: var(--surface-shadow);
+    border-radius: 16px;
+  }
+  /* A tile you can open: rises a little under the pointer. */
+  .lift {
+    transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out);
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--surface-shadow-lift);
+  }
+  .lift:active {
+    transform: translateY(0) scale(0.99);
+    transition-duration: 90ms;
+  }
+  /* Pressed-in tile, for numbers set into the page. */
+  .surface-pressed {
+    background: var(--pressed-bg);
+    box-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-ink) / 0.04);
+    border-radius: 16px;
+  }
+  /* A selectable row: raised until chosen, then pressed in with a green ring.
+     Follows a visually hidden radio input with the `peer` class. */
+  .option {
+    @apply flex min-h-[52px] items-center gap-3 rounded-[16px] px-3.5 py-2.5;
+    background: var(--surface);
+    box-shadow: var(--surface-shadow);
+    transition: box-shadow var(--dur) var(--ease-out), transform var(--dur) var(--ease-spring);
+  }
+  .peer:not(:checked):not(:disabled) + .option:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--surface-shadow-lift);
+  }
+  .peer:not(:disabled) + .option:active {
+    transform: scale(0.985);
+    transition-duration: 90ms;
+  }
+  .peer:checked + .option {
+    background: var(--pressed-bg);
+    box-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-green) / 0.45);
+  }
+  .peer:focus-visible + .option {
+    outline: 2px solid var(--text-muted);
+    outline-offset: 2px;
+  }
+  .option-radio {
+    @apply grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full;
+    box-shadow: inset 0 0 0 1.5px rgb(var(--c-ink) / 0.28);
+    transition: background-color var(--dur) ease, box-shadow var(--dur) ease;
+  }
+  /* The dot pops in with a small overshoot when a row is chosen. */
+  .option-radio::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: #06291a;
+    transform: scale(0);
+    transition: transform var(--dur-slow) var(--ease-spring);
+  }
+  .peer:checked + .option .option-radio {
+    background: var(--green);
+    box-shadow: 0 0 0 4px rgb(var(--c-green) / 0.14);
+  }
+  .peer:checked + .option .option-radio::after {
+    transform: scale(1);
+  }
+  /* Status pill, for example "Recording  Research". */
+  .live-chip {
+    @apply inline-flex h-7 items-center gap-2 rounded-pill pl-2.5 pr-3 text-[12.5px] font-semibold text-green-ink;
+    background: rgb(var(--c-green) / 0.11);
+    transition: background-color var(--dur) ease, color var(--dur) ease;
   }
   .field-label {
     @apply mb-1.5 block text-xs font-medium text-text-muted;
   }
+  /* Small raised pill; .chip-on presses it in with a green ring. */
   .chip {
-    @apply rounded-pill border border-white/10 px-3 py-1 text-xs text-text-muted transition-colors hover:text-text;
+    @apply rounded-pill px-3 py-1 text-xs text-text-muted hover:text-text;
+    background: var(--raised);
+    box-shadow: var(--raised-shadow);
+    transition: transform var(--dur) var(--ease-spring), box-shadow var(--dur) var(--ease-out),
+      color var(--dur-fast) ease;
+  }
+  .chip:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+  .chip:not(:disabled):active {
+    transform: scale(0.94);
+    transition-duration: 90ms;
   }
   .kbd {
-    @apply inline-block min-w-[1.5em] rounded border border-white/15 bg-white/[0.04] px-1 text-center font-inter text-[11px] leading-[1.6] text-text-muted;
+    @apply inline-block min-w-[1.5em] rounded border border-ink/15 bg-ink/[0.04] px-1 text-center font-inter text-[11px] leading-[1.6] text-text-muted;
   }
   .chip-on {
-    @apply border-white/40 bg-white/10 text-text;
+    @apply text-text;
+    background: var(--pressed-bg);
+    box-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-green) / 0.45);
+  }
+  .chip-on:not(:disabled):hover {
+    transform: none;
+  }
+  /* Pill tab switcher: a pressed track with a raised thumb that slides to the
+     current view. Set --tabs and --tab on the track. */
+  .segmented {
+    @apply relative flex rounded-pill p-1;
+    background: var(--pressed-bg);
+    box-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-ink) / 0.04);
+  }
+  .segmented-thumb {
+    @apply pointer-events-none absolute bottom-1 left-1 top-1 rounded-pill;
+    width: calc((100% - 0.5rem) / var(--tabs, 3));
+    transform: translateX(calc(var(--tab, 0) * 100%));
+    background: var(--raised);
+    box-shadow: var(--raised-shadow);
+    transition: transform var(--dur-slow) var(--ease-spring);
+  }
+  .segmented-btn {
+    @apply relative min-w-0 flex-1 rounded-pill px-2 py-1.5 text-sm font-semibold text-text-muted hover:text-text;
+    transition: color var(--dur) ease, transform var(--dur) var(--ease-spring);
+  }
+  .segmented-btn:active {
+    transform: scale(0.96);
+  }
+  .segmented-btn[aria-current="page"] {
+    @apply text-text;
+  }
+  /* A screenshot, framed like a raised tile. */
+  .shot {
+    @apply rounded-[14px];
+    box-shadow: 0 0 0 1px rgb(var(--c-ink) / 0.08), var(--shot-shadow);
+  }
+  /* The step currently open in a list: pressed in. */
+  .row-on {
+    background: var(--pressed-bg);
+    box-shadow: var(--pressed-shadow);
+  }
+}
+
+/* Expanding sections open and close smoothly instead of snapping. */
+details::details-content {
+  block-size: 0;
+  overflow-y: clip;
+  transition: block-size var(--dur-slow) var(--ease-out), content-visibility var(--dur-slow)
+    allow-discrete;
+}
+details[open]::details-content {
+  block-size: auto;
+}
+
+/* Screens and panels arrive with a short fade and slide. Set --dir to -1 to
+   slide in from the left when going back. */
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--dir, 0) * 16px))
+      translateY(calc((1 - var(--dir, 0) * var(--dir, 0)) * 6px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.view-in {
+  animation: view-in var(--dur-slow) var(--ease-out) backwards;
+}
+/* Lists cascade in, one item after another. */
+.stagger > * {
+  animation: view-in var(--dur-slow) var(--ease-out) backwards;
+}
+.stagger > :nth-child(2) {
+  animation-delay: 40ms;
+}
+.stagger > :nth-child(3) {
+  animation-delay: 80ms;
+}
+.stagger > :nth-child(4) {
+  animation-delay: 120ms;
+}
+.stagger > :nth-child(5) {
+  animation-delay: 160ms;
+}
+.stagger > :nth-child(6) {
+  animation-delay: 200ms;
+}
+.stagger > :nth-child(n + 7) {
+  animation-delay: 240ms;
+}
+/* A number that just changed rolls up into place. */
+@keyframes tick {
+  from {
+    opacity: 0.2;
+    transform: translateY(40%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tick {
+  display: inline-block;
+  animation: tick var(--dur) var(--ease-out) backwards;
+}
+
+/* A check mark that bounces in when something is saved. */
+@keyframes pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.pop {
+  animation: pop 520ms var(--ease-out) backwards;
+}
+
+/* Theme switch: the new theme grows out of the button in a circle (see
+   shared/theme.ts), so the default cross fade is turned off. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Sun and moon icon. The core grows and a shadow disc slides over it to carve
+   a crescent while the rays spin away. */
+.theme-icon {
+  color: rgb(var(--c-orange));
+  transform: rotate(0deg);
+  transition: transform 700ms var(--ease-spring), color 700ms ease;
+}
+.theme-icon .ti-core {
+  r: 5px;
+  transition: r 700ms var(--ease-out);
+}
+.theme-icon .ti-cut {
+  transform: translate(9px, -9px);
+  transition: transform 700ms var(--ease-out);
+}
+.theme-icon .ti-rays {
+  transform-origin: 12px 12px;
+  transition: transform 700ms var(--ease-out), opacity 450ms ease;
+}
+:root:not([data-theme="light"]) .theme-icon {
+  color: #c9d3ff;
+  transform: rotate(-40deg);
+}
+:root:not([data-theme="light"]) .theme-icon .ti-core {
+  r: 9px;
+}
+:root:not([data-theme="light"]) .theme-icon .ti-cut {
+  transform: translate(0, 0);
+}
+:root:not([data-theme="light"]) .theme-icon .ti-rays {
+  transform: rotate(90deg) scale(0.4);
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .view-in,
+  .stagger > *,
+  .tick,
+  .pop {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after,
+  details::details-content {
+    transition-duration: 1ms !important;
   }
 }
 
@@ -120,7 +551,7 @@ summary:focus-visible {
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(var(--c-ink) / 0.1);
   border-radius: 999px;
 }
 ::-webkit-scrollbar-track {
@@ -341,13 +772,10 @@ summary:focus-visible {
 
 /* Sidekick brand byline: small and thin under the wordmark. */
 .byline {
-  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-  font-size: 12.5px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  color: var(--text);
-  opacity: 0.8;
-  margin-top: 4px;
+  font-size: 11.5px;
+  line-height: 1;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 /* Sidekick flat-shape mascots. */

@@ -1,10 +1,10 @@
 # Publishing Sidekick to the Chrome Web Store
 
-Everything for version 1.0.20 is in this folder.
+Everything for version 1.0.21 is in this folder.
 
 | What | File |
 | --- | --- |
-| Package to upload | `release/sidekick-1.0.20.zip` |
+| Package to upload | `release/sidekick-1.0.21.zip` |
 | Every dashboard field, ready to paste | `LISTING.md` |
 | Store icon (128x128) | `store-icon-128.png` |
 | Screenshots (1280x800) | `sidekick-shot-1-record.png`, `sidekick-shot-2-review.png`, `sidekick-shot-3-privacy.png` |
@@ -14,7 +14,7 @@ Everything for version 1.0.20 is in this folder.
 1. Open the Developer Dashboard (https://chrome.google.com/webstore/devconsole) with the account that owns
    "drafted. Capture" (item ID `lpjabpanndaajdijdmlibdamdcjcdnni`, live at version 1.0.0).
 2. Open that item, go to **Package**, click **Upload new package**, and pick
-   `release/sidekick-1.0.20.zip`. Uploading to this item (instead of creating a new one) keeps
+   `release/sidekick-1.0.21.zip`. Uploading to this item (instead of creating a new one) keeps
    the same ID, so current installs update on their own.
 3. **Store listing**: paste the description, set the category, and replace the icon and
    screenshots with the files above. Remove the old "drafted. Capture" screenshots and promo tile.

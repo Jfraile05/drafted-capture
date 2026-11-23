@@ -33,8 +33,8 @@ export default function Guide({ onDone }: { onDone: () => void }) {
             <li
               key={item.id}
               aria-current={i === index ? 'step' : undefined}
-              className={`h-1.5 rounded-full transition-all ${
-                i === index ? 'w-6 bg-green' : i < index ? 'w-1.5 bg-green/60' : 'w-1.5 bg-white/15'
+              className={`h-1.5 rounded-full transition-all duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                i === index ? 'w-6 bg-green' : i < index ? 'w-1.5 bg-green/60' : 'w-1.5 bg-ink/15'
               }`}
             />
           ))}
@@ -44,12 +44,14 @@ export default function Guide({ onDone }: { onDone: () => void }) {
         </button>
       </header>
 
-      <div className="mt-4 flex items-center gap-3">
+      <div key={`${step.id}-title`} className="view-in mt-4 flex items-center gap-3">
         <SidekickFigure state={MOOD[step.id][didTry ? 1 : 0]} className="h-14 w-[60px]" />
         <h1 className="text-lg font-semibold leading-tight text-text">{step.title}</h1>
       </div>
 
-      <p className="mt-3 text-[15px] leading-snug text-text/80">{step.body}</p>
+      <p key={`${step.id}-body`} className="view-in mt-3 text-[15px] leading-snug text-text/80">
+        {step.body}
+      </p>
 
       <div className="mt-4">
         {step.id === 'start' && (
@@ -71,7 +73,7 @@ export default function Guide({ onDone }: { onDone: () => void }) {
                 </li>
               ))}
             </ul>
-            <p className="mt-4 rounded-btn border border-white/10 px-3 py-2.5 text-sm text-text">
+            <p className="mt-4 rounded-btn border border-ink/10 px-3 py-2.5 text-sm text-text">
               {CLOSING_CHECK}
             </p>
           </>
@@ -109,7 +111,7 @@ export default function Guide({ onDone }: { onDone: () => void }) {
 /** A small card that looks like the popup, so the buttons feel real without recording anything. */
 function Demo({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-btn border border-white/10 bg-white/[0.03] p-3">
+    <div className="rounded-btn border border-ink/10 bg-ink/[0.03] p-3">
       {children}
       <p className="mt-3 text-center text-xs text-text-faint">Practice only, nothing is recorded</p>
     </div>
@@ -184,7 +186,7 @@ function StopPractice({ done, onTry }: { done: boolean; onTry: () => void }) {
 function CheckPractice({ done, onTry }: { done: boolean; onTry: () => void }) {
   return (
     <Demo>
-      <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] pb-3 text-xs text-text-muted">
+      <div className="flex items-center justify-between gap-3 border-b border-ink/[0.06] pb-3 text-xs text-text-muted">
         <span>Signed in as you@school.edu</span>
         <output className="inline-flex items-center gap-1.5">
           <span

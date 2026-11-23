@@ -16,7 +16,7 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="flex flex-col px-5 pb-5 pt-4">
+    <div className="view-in flex flex-col px-5 pb-5 pt-4">
       <header>
         <Brand size="text-[32px]" />
         <h1 className="mt-6 text-base font-semibold text-text">How Sidekick works</h1>
@@ -34,7 +34,7 @@ export default function Onboarding() {
         </Step>
       </ol>
 
-      <label className="mt-6 flex cursor-pointer items-start gap-3 border-t border-white/[0.06] pt-4">
+      <label className="mt-6 flex cursor-pointer items-start gap-3 border-t border-ink/[0.06] pt-4">
         <input
           type="checkbox"
           checked={consented}
@@ -51,7 +51,7 @@ export default function Onboarding() {
             href={chrome.runtime.getURL('src/terms/index.html')}
             target="_blank"
             rel="noreferrer"
-            className="text-text underline underline-offset-2 hover:text-white"
+            className="text-text underline underline-offset-2 hover:text-text"
           >
             Sidekick Terms of Use
           </a>
@@ -74,7 +74,7 @@ export default function Onboarding() {
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
   return (
     <li className="flex items-start gap-3">
-      <span className="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/15 text-xs font-semibold tabular-nums text-text-muted">
+      <span className="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-ink/15 text-xs font-semibold tabular-nums text-text-muted">
         {n}
       </span>
       <div>

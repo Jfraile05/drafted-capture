@@ -113,12 +113,8 @@ export function Timeline({
                 data-step={idx}
                 onClick={(e) => handleClick(idx, e)}
                 aria-pressed={selected}
-                className={`flex w-full items-center gap-3 border-l-2 py-2 pl-3.5 pr-4 text-left transition-colors ${
-                  selected
-                    ? 'bg-white/[0.08]'
-                    : inRange
-                      ? 'bg-white/[0.04]'
-                      : 'hover:bg-white/[0.03]'
+                className={`flex w-[calc(100%-0.5rem)] items-center gap-3 rounded-r-[12px] border-l-2 py-2.5 pl-3.5 pr-3.5 text-left transition-[background-color,box-shadow,transform] duration-200 active:scale-[0.99] ${
+                  selected ? 'row-on' : inRange ? 'bg-ink/[0.05]' : 'hover:bg-ink/[0.04]'
                 }`}
                 style={{ borderLeftColor: segColor ?? 'transparent' }}
               >

@@ -50,16 +50,12 @@ export default function EarningsDashboard({ uid, localOnly }: { uid: string; loc
   }, [uid, localOnly, retry]);
 
   return (
-    <section
-      aria-label="Earnings summary"
-      aria-busy={!summary && !failed}
-      className="mt-5 border-b border-white/[0.06] pb-4"
-    >
-      <dl className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)] items-end gap-3">
+    <section aria-label="Earnings summary" aria-busy={!summary && !failed} className="view-in mt-5">
+      <dl className="surface-pressed grid grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)_minmax(0,1fr)] px-3.5 py-3.5">
         <div>
-          <dt className="mb-1.5 text-xs text-text-muted">Estimated earnings</dt>
+          <dt className="truncate text-[11px] text-text-muted">Estimated earnings</dt>
           <dd
-            className="truncate text-[30px] font-semibold leading-none tracking-tight tabular-nums text-text"
+            className="mt-1.5 truncate text-[22px] font-semibold leading-none tracking-tight tabular-nums text-text"
             title={
               summary
                 ? formatEarnings(
@@ -75,19 +71,19 @@ export default function EarningsDashboard({ uid, localOnly }: { uid: string; loc
                 : '...'}
           </dd>
         </div>
-        <div>
-          <dt className="mb-1.5 text-xs text-text-muted">Active hours</dt>
+        <div className="border-l border-ink/[0.07] pl-3">
+          <dt className="truncate text-[11px] text-text-muted">Active hours</dt>
           <dd
-            className="truncate text-[22px] font-medium leading-none tracking-tight tabular-nums text-text"
+            className="mt-1.5 truncate text-[22px] font-semibold leading-none tracking-tight tabular-nums text-text"
             title={summary ? `${fmtDuration(summary.active_ms)} recorded` : undefined}
           >
             {summary ? formatHours(summary.active_ms) : failed ? 'N/A' : '...'}
           </dd>
         </div>
-        <div className="text-right">
-          <dt className="mb-1.5 text-xs text-text-muted">Quality</dt>
+        <div className="border-l border-ink/[0.07] pl-3">
+          <dt className="truncate text-[11px] text-text-muted">Quality</dt>
           <dd
-            className={`truncate text-[22px] font-medium leading-none tracking-tight tabular-nums ${qualityColor(quality?.average)}`}
+            className={`mt-1.5 truncate text-[22px] font-semibold leading-none tracking-tight tabular-nums ${qualityColor(quality?.average)}`}
             title={qualityTitle(quality)}
           >
             {quality?.average ?? (quality ? 'Soon' : '...')}
@@ -95,13 +91,16 @@ export default function EarningsDashboard({ uid, localOnly }: { uid: string; loc
         </div>
       </dl>
       {summary?.annotation_bonus_micro_usd !== undefined && (
-        <p className="mt-2 text-xs text-text-muted">
+        <p className="mt-2.5 px-1 text-xs text-text-muted">
           Base {formatEarnings(summary.base_earnings_micro_usd)} · Annotation bonus{' '}
           {formatEarnings(summary.annotation_bonus_micro_usd)}
         </p>
       )}
       {failed ? (
-        <p className="mt-2 flex items-center justify-between text-xs text-text-muted" role="alert">
+        <p
+          className="mt-2.5 flex items-center justify-between px-1 text-xs text-text-muted"
+          role="alert"
+        >
           Totals couldn't load.
           <button
             type="button"
@@ -112,7 +111,7 @@ export default function EarningsDashboard({ uid, localOnly }: { uid: string; loc
           </button>
         </p>
       ) : (
-        <p className="mt-2 text-[11px] text-text-faint">
+        <p className="mt-2.5 px-1 text-[11px] leading-relaxed text-text-faint">
           {localOnly
             ? 'Local estimate from saved tasks.'
             : 'Estimate from your tasks sent to Drafted.'}{' '}

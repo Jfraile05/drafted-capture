@@ -92,7 +92,7 @@ export function Options() {
         >
           Open test workspace
         </a>
-        <section className="space-y-3 rounded-card border border-white/10 p-4">
+        <section className="space-y-3 rounded-card border border-ink/10 p-4">
           <h2 className="font-medium">Test controls</h2>
           <div className="flex flex-wrap gap-2">
             <button type="button" className="btn-ghost" onClick={() => run(setConnection)}>
@@ -142,7 +142,7 @@ export function Options() {
             delivery to Drafted. Label edits should update the same receipt, not add another.
           </p>
           {receipts.map((r) => (
-            <details key={r.id} className="rounded-card border border-white/10 p-3">
+            <details key={r.id} className="rounded-card border border-ink/10 p-3">
               <summary className="cursor-pointer text-sm">
                 {r.labels[0] || 'Recorded task'} · revision {r.revision} · {r.steps} steps
               </summary>

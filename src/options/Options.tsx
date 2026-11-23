@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef } from 'react';
 import Brand from '../shared/Brand';
+import ThemeToggle from '../shared/ThemeToggle';
 import { EXTENSION_VERSION, IS_BETA } from '../shared/constants';
 import { useSettings } from '../shared/hooks';
 
@@ -38,11 +39,14 @@ export function Options() {
 
   return (
     <div className="min-h-screen px-6 py-10">
-      <div className="mx-auto max-w-xl space-y-10">
+      <div className="stagger mx-auto max-w-xl space-y-10">
         <header className="space-y-3">
-          <h1>
-            <Brand size="text-[32px]" />
-          </h1>
+          <div className="flex items-center justify-between gap-3">
+            <h1>
+              <Brand size="text-[32px]" />
+            </h1>
+            <ThemeToggle />
+          </div>
           <p className="text-sm text-text-muted">
             Make Sidekick yours. Changes save as soon as you make them.
           </p>
@@ -110,10 +114,12 @@ export function Options() {
 
         <details className="group">
           <summary className="cursor-pointer list-none text-sm text-text-muted hover:text-text">
-            <span className="inline-block transition-transform group-open:rotate-90">›</span>{' '}
+            <span className="inline-block transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-open:rotate-90">
+              ›
+            </span>{' '}
             Advanced
           </summary>
-          <div className="mt-2 divide-y divide-white/[0.06] border-t border-white/[0.06]">
+          <div className="mt-2 divide-y divide-ink/[0.06] border-t border-ink/[0.06]">
             <Toggle
               title="Screenshot on every action"
               description="Take a screenshot each time you click, type or scroll."
@@ -161,7 +167,7 @@ export function Options() {
           </div>
         </details>
 
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/[0.06] pt-6">
+        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/[0.06] pt-6">
           <div className="flex gap-2">
             <button type="button" onClick={handleOpenPanel} className="btn-ghost">
               Open review panel
@@ -188,9 +194,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
       <h2 className="text-base font-semibold text-text">{title}</h2>
-      <div className="mt-2 divide-y divide-white/[0.06] border-t border-white/[0.06]">
-        {children}
-      </div>
+      <div className="mt-2 divide-y divide-ink/[0.06] border-t border-ink/[0.06]">{children}</div>
     </section>
   );
 }
@@ -222,7 +226,7 @@ function Toggle({
       />
       <span
         aria-hidden="true"
-        className="relative mt-0.5 h-5 w-9 shrink-0 rounded-pill bg-white/15 transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:bg-green peer-checked:after:translate-x-4 peer-checked:after:bg-bg peer-focus-visible:ring-2 peer-focus-visible:ring-green/60 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg motion-reduce:transition-none motion-reduce:after:transition-none"
+        className="relative mt-0.5 h-5 w-9 shrink-0 rounded-pill bg-ink/15 transition-colors duration-300 after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:shadow-[0_1px_3px_rgba(0,0,0,0.25)] after:transition-transform after:duration-300 after:ease-[cubic-bezier(0.34,1.56,0.64,1)] peer-checked:bg-green peer-checked:after:translate-x-4 peer-checked:after:bg-bg peer-focus-visible:ring-2 peer-focus-visible:ring-green/60 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg motion-reduce:transition-none motion-reduce:after:transition-none"
       />
     </label>
   );

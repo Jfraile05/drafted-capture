@@ -102,7 +102,7 @@ export function Replay({ session }: ReplayProps) {
   return (
     <div className="h-full flex flex-col">
       {videoUrl && (
-        <div className="border-b border-white/[0.06] px-4 py-2 flex items-center gap-2">
+        <div className="flex items-center gap-2 px-4 py-2">
           {(['screenshots', 'video'] as ViewMode[]).map((mode) => (
             <button
               type="button"
@@ -122,25 +122,20 @@ export function Replay({ session }: ReplayProps) {
       <div className="flex-1 overflow-y-auto p-4">
         {viewMode === 'video' && videoUrl ? (
           // biome-ignore lint/a11y/useMediaCaption: screen recordings have no audio to caption
-          <video
-            controls
-            controlsList="nodownload"
-            className="w-full h-auto rounded-btn border border-white/[0.06]"
-            src={videoUrl}
-          >
+          <video controls controlsList="nodownload" className="shot h-auto w-full" src={videoUrl}>
             Your browser does not support video playback.
           </video>
         ) : (
           <>
             {screenshotUrl ? (
-              <div className="relative w-full overflow-hidden rounded-btn border border-white/[0.06]">
+              <div className="shot relative w-full overflow-hidden">
                 <img src={screenshotUrl} alt="Replay frame" className="block w-full h-auto" />
                 {currentStep && !borrowed && (
                   <ActionOverlay key={currentIndex} step={currentStep} typeMs={typeMs} />
                 )}
               </div>
             ) : (
-              <p className="flex h-48 w-full items-center justify-center rounded-btn border border-dashed border-white/10 text-xs text-text-faint">
+              <p className="flex h-48 w-full items-center justify-center rounded-btn border border-dashed border-ink/10 text-xs text-text-faint">
                 No screenshots in this session
               </p>
             )}
@@ -165,7 +160,7 @@ export function Replay({ session }: ReplayProps) {
                         className={`flex w-full items-center gap-2.5 rounded-btn border-l-2 px-2.5 py-1.5 text-left text-xs transition-colors ${
                           current
                             ? 'border-green bg-green/[0.08] text-text'
-                            : 'border-transparent text-text-muted hover:bg-white/[0.04]'
+                            : 'border-transparent text-text-muted hover:bg-ink/[0.04]'
                         }`}
                       >
                         <Icon size={14} className={current ? 'text-green' : 'text-text-faint'} />
@@ -184,7 +179,7 @@ export function Replay({ session }: ReplayProps) {
       </div>
 
       {viewMode === 'screenshots' && (
-        <div className="border-t border-white/[0.06] p-4 space-y-3">
+        <div className="space-y-3 border-t border-ink/[0.07] p-4">
           <div className="flex items-center justify-between text-xs tabular-nums text-text-muted">
             <span>
               Step {currentIndex + 1} of {session.steps.length}
@@ -203,7 +198,7 @@ export function Replay({ session }: ReplayProps) {
               <CaretLeft size={18} weight="bold" />
             </button>
 
-            <button type="button" onClick={handleTogglePlay} className="btn-primary flex-1">
+            <button type="button" onClick={handleTogglePlay} className="btn-primary btn-lg flex-1">
               {playing ? (
                 <>
                   <Pause size={16} weight="fill" />

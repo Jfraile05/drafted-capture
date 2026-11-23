@@ -11,6 +11,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import Brand, { setMascotMoment, useMascotState } from '../shared/Brand';
 import { SyncStatus } from '../shared/SyncStatus';
+import ThemeToggle from '../shared/ThemeToggle';
 import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
 import { activeElapsed, nextTimerTick, pauseTimestamp } from '../shared/activeTime';
 import { signOutUser, useAuth } from '../shared/auth';
@@ -222,23 +223,30 @@ export default function App() {
                 : 'Sign in to start';
 
   return (
-    <div className="flex flex-col px-5 pb-4 pt-4">
-      <header className="flex items-center justify-between">
-        <Brand size="text-[32px]" />
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setReplayGuide(true)}
-            className="icon-btn"
-            title="How it works"
-            aria-label="How it works"
-          >
-            <Question size={18} />
-          </button>
+    <div className="flex flex-col px-5 pb-4 pt-5">
+      <header className="flex items-center justify-between gap-2">
+        <Brand size="text-[24px]" />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <ThemeToggle />
+          {/* The guide never opens over a session, so the button only shows
+              before starting or after the session is saved. */}
+          {!recording && (
+            <button
+              type="button"
+              onClick={() => setReplayGuide(true)}
+              className="icon-btn"
+              data-motion="tilt"
+              title="How it works"
+              aria-label="How it works"
+            >
+              <Question size={18} />
+            </button>
+          )}
           <button
             type="button"
             onClick={handleOpenPanel}
             className="icon-btn"
+            data-motion="tilt"
             title="Review sessions"
             aria-label="Review sessions"
           >
@@ -248,6 +256,7 @@ export default function App() {
             type="button"
             onClick={handleOpenOptions}
             className="icon-btn"
+            data-motion="turn"
             title="Settings"
             aria-label="Settings"
           >
@@ -279,14 +288,16 @@ export default function App() {
       <section className="pt-5">
         {(isCapturing || isPaused) && displayedSession ? (
           <>
-            <p className="flex items-center gap-2 text-sm font-medium text-text-muted">
+            <p
+              className={`live-chip view-in max-w-full ${isPaused ? 'bg-orange/15 text-orange' : ''}`}
+            >
               <span
                 aria-hidden="true"
-                className={`h-2 w-2 rounded-full ${isCapturing ? 'pulse-dot bg-green' : 'bg-orange'}`}
+                className={`h-2 w-2 shrink-0 rounded-full ${isCapturing ? 'pulse-dot bg-green' : 'bg-orange'}`}
               />
               {statusTitle}
               {displayedSession.metadata.workflow && (
-                <span className="truncate text-xs text-text-faint">
+                <span className="truncate font-normal text-text-muted">
                   {displayedSession.metadata.workflow.name}
                 </span>
               )}
@@ -299,10 +310,15 @@ export default function App() {
             )}
           </>
         ) : (
-          <h1 className="text-xl font-semibold text-text">{statusTitle}</h1>
+          <h1
+            key={statusTitle}
+            className="view-in text-[17px] font-semibold tracking-tight text-text"
+          >
+            {statusTitle}
+          </h1>
         )}
         {!(isCapturing || isPaused) && (!isIdle || isSaving || isSaved) && (
-          <p className="mt-1 text-[15px] leading-snug text-text/80">
+          <p className="mt-1 text-sm leading-relaxed text-text-muted">
             {!liveLoaded
               ? 'Checking your current session.'
               : isSaving
@@ -322,11 +338,15 @@ export default function App() {
       )}
 
       {isSaved && (
-        <div className="mt-5 space-y-2.5">
-          <button type="button" onClick={handleOpenPanel} className="btn-primary w-full">
+        <div className="stagger mt-5 space-y-2.5">
+          <button type="button" onClick={handleOpenPanel} className="btn-primary btn-lg w-full">
             Review session
           </button>
-          <button type="button" onClick={() => setMascotMoment(null)} className="btn-ghost w-full">
+          <button
+            type="button"
+            onClick={() => setMascotMoment(null)}
+            className="btn-ghost btn-lg w-full"
+          >
             <Plus size={16} weight="bold" />
             New task
           </button>
@@ -346,7 +366,7 @@ export default function App() {
         ) : (
           <button
             type="button"
-            className="btn-primary mt-4 w-full"
+            className="btn-primary btn-lg mt-4 w-full"
             disabled={authLoading}
             onClick={() => setShowLogin(true)}
           >
@@ -355,7 +375,7 @@ export default function App() {
         ))}
 
       {(isCapturing || isPaused) && liveSession && (
-        <div className="mt-5 space-y-5">
+        <div className="view-in mt-4 space-y-3">
           {liveSession.privacy_gate ? (
             <PrivacyPrompt
               key={liveSession.privacy_gate.id}
@@ -366,7 +386,7 @@ export default function App() {
             />
           ) : (
             <>
-              <dl className="grid grid-cols-3 divide-x divide-white/[0.06] rounded-btn border border-white/[0.06] py-2.5 text-center">
+              <dl className="stagger grid grid-cols-3 gap-2">
                 <Stat label="Steps" value={liveSession.step_count} />
                 <Stat label="Clicks" value={liveSession.stats.clicks} />
                 <Stat label="Keys" value={liveSession.stats.keystrokes} />
@@ -379,7 +399,7 @@ export default function App() {
                       type="button"
                       onClick={handlePause}
                       disabled={!!controlBusy}
-                      className="btn-ghost"
+                      className="btn-ghost btn-lg"
                     >
                       <Pause size={16} weight="fill" />
                       Pause
@@ -388,7 +408,7 @@ export default function App() {
                       type="button"
                       onClick={handleStop}
                       disabled={controlBusy === 'STOP_CAPTURE'}
-                      className="btn-primary"
+                      className="btn-primary btn-lg"
                     >
                       <Stop size={16} weight="fill" />
                       Stop and save
@@ -400,7 +420,7 @@ export default function App() {
                       type="button"
                       onClick={handleResume}
                       disabled={!!controlBusy}
-                      className="btn-primary"
+                      className="btn-primary btn-lg"
                     >
                       <Play size={16} weight="fill" />
                       {liveSession.pause_reason === 'idle' ? 'Continue' : 'Resume'}
@@ -409,7 +429,7 @@ export default function App() {
                       type="button"
                       onClick={handleStop}
                       disabled={controlBusy === 'STOP_CAPTURE'}
-                      className="btn-ghost"
+                      className="btn-ghost btn-lg"
                     >
                       <Stop size={16} weight="fill" />
                       Stop and save
@@ -429,8 +449,8 @@ export default function App() {
                 </button>
               )}
               {liveSession.recent.length > 0 && (
-                <div>
-                  <h2 className="mb-1 text-xs font-medium text-text-muted">Recent steps</h2>
+                <div className="pt-3">
+                  <h2 className="mb-1 text-xs font-semibold text-text-muted">Recent steps</h2>
                   <ul className="max-h-[132px] overflow-y-auto">
                     {liveSession.recent
                       .slice()
@@ -447,7 +467,7 @@ export default function App() {
       )}
 
       {!authLoading && (
-        <footer className="mt-6 flex items-center justify-between gap-3 border-t border-white/[0.06] pt-3 text-xs text-text-muted">
+        <footer className="mt-5 flex items-center justify-between gap-3 border-t border-ink/[0.07] pt-3.5 text-xs text-text-muted">
           {user ? (
             <>
               <span className="truncate">Signed in as {user.email}</span>
@@ -456,7 +476,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleSignOut}
-                  className="flex items-center gap-1 hover:text-text"
+                  className="-mr-2 flex items-center gap-1 rounded-full px-2 py-1 font-semibold text-text transition-[background-color,transform] duration-200 hover:bg-ink/[0.07] active:scale-95"
                 >
                   <SignOut size={14} />
                   Sign out
@@ -516,7 +536,7 @@ function LiveTimer({ live }: { live: LiveSession }) {
 
   return (
     <p
-      className={`mt-1 text-[40px] font-semibold leading-none tracking-tight tabular-nums ${
+      className={`mt-3.5 text-[52px] font-semibold leading-none tracking-[-0.04em] tabular-nums ${
         isPaused ? 'text-text-muted' : 'text-text'
       }`}
     >
@@ -527,9 +547,13 @@ function LiveTimer({ live }: { live: LiveSession }) {
 
 function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div>
-      <dd className="text-xl font-semibold tabular-nums text-text">{value}</dd>
-      <dt className="text-xs text-text-muted">{label}</dt>
+    <div className="surface flex flex-col-reverse px-3.5 py-3">
+      <dd className="mt-1 overflow-hidden text-xl font-semibold leading-none tabular-nums text-text">
+        <span key={value} className="tick">
+          {value}
+        </span>
+      </dd>
+      <dt className="text-[11.5px] leading-none text-text-muted">{label}</dt>
     </div>
   );
 }
@@ -538,7 +562,7 @@ function StepRow({ step }: { step: StepSummary }) {
   const IconComponent = ACTION_ICON_COMPONENT[step.type];
 
   return (
-    <li className="flex items-center gap-2 border-t border-white/[0.06] py-2 first:border-t-0">
+    <li className="view-in flex h-10 items-center gap-2.5 border-t border-ink/[0.07] first:border-t-0">
       {IconComponent && <IconComponent size={16} className="shrink-0 text-text-muted" />}
       <span className="flex-1 truncate text-sm text-text">{step.label}</span>
       <span className="shrink-0 text-xs text-text-faint">{hostOf(step.url)}</span>

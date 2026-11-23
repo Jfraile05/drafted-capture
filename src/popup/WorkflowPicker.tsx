@@ -63,7 +63,7 @@ export default function WorkflowPicker({
   }, [uid, retry]);
 
   return (
-    <div className="mt-4 space-y-3">
+    <div className="view-in mt-3 space-y-4">
       {status === 'loading' ? (
         <output className="block py-3 text-sm text-text-muted">Loading your workflows...</output>
       ) : status === 'error' ? (
@@ -84,7 +84,7 @@ export default function WorkflowPicker({
           No workflows assigned yet. Drafted will assign your first task here.
         </p>
       ) : (
-        <fieldset className="space-y-2" disabled={busy}>
+        <fieldset className="stagger space-y-2" disabled={busy}>
           <legend className="sr-only">Choose a workflow</legend>
           {workflows.map((workflow) => (
             <label key={workflow.id} className="block cursor-pointer">
@@ -99,9 +99,12 @@ export default function WorkflowPicker({
                 }}
                 className="peer sr-only"
               />
-              <span className="flex min-h-12 items-center justify-between gap-3 rounded-card border border-white/10 px-3.5 py-3 transition-colors peer-checked:border-white/40 peer-checked:bg-white/[0.07] peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-text-muted hover:bg-white/[0.04]">
-                <span className="text-sm font-medium text-text">{workflow.name}</span>
-                <span className="shrink-0 text-xs tabular-nums text-text-muted">
+              <span className="option">
+                <span className="option-radio" aria-hidden="true" />
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-text">
+                  {workflow.name}
+                </span>
+                <span className="shrink-0 text-right text-[13px] tabular-nums text-text-muted">
                   {workflowRateLabel(workflow.hourly_rate_cents)}
                   {annotationAvailable(workflow) && (
                     <span className="block text-[10px]">
@@ -115,7 +118,7 @@ export default function WorkflowPicker({
         </fieldset>
       )}
       {selectedDefinition && annotationAvailable(selectedDefinition) && (
-        <label className="flex items-center gap-2 text-xs text-text-muted">
+        <label className="flex items-center gap-2 px-1 text-xs text-text-muted">
           <input
             type="checkbox"
             checked={annotationOptIn}
@@ -129,7 +132,7 @@ export default function WorkflowPicker({
         type="button"
         onClick={() => selected && onStart(selected, annotationOptIn)}
         disabled={busy || status !== 'ready' || !selected}
-        className="btn-primary w-full"
+        className="btn-primary btn-lg w-full"
       >
         <Play size={16} weight="fill" />
         {busy ? 'Starting...' : 'Start a task'}

@@ -172,7 +172,7 @@ export function Inspector({
           <img
             src={screenshotUrl}
             alt={`Screenshot of step ${(shotIndex ?? stepIndex) + 1}`}
-            className="h-auto w-full rounded-btn border border-white/[0.06]"
+            className="shot h-auto w-full"
           />
           {coord && !borrowed && (
             <div
@@ -189,7 +189,7 @@ export function Inspector({
           )}
         </div>
       ) : (
-        <p className="flex h-24 items-center justify-center rounded-btn border border-dashed border-white/10 text-xs text-text-faint">
+        <p className="flex h-24 items-center justify-center rounded-btn border border-dashed border-ink/10 text-xs text-text-faint">
           No screenshots in this session
         </p>
       )}
@@ -306,9 +306,14 @@ export function Inspector({
           type="button"
           onClick={handleSaveAnnotation}
           disabled={saving}
-          className="btn-primary w-full"
+          className="btn-primary btn-lg w-full"
         >
-          <CheckCircle size={16} />
+          <CheckCircle
+            key={saved ? 'saved' : 'unsaved'}
+            size={16}
+            weight={saved ? 'fill' : 'regular'}
+            className={saved ? 'pop' : undefined}
+          />
           <span aria-live="polite" aria-atomic="true">
             {saving ? 'Saving' : saved ? 'Rating saved' : 'Save rating'}
           </span>

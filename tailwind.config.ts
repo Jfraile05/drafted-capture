@@ -4,18 +4,22 @@ export default {
   content: ['./src/**/*.{ts,tsx,html}'],
   theme: {
     extend: {
+      // Colors come from CSS variables so the light and dark themes share every class.
       colors: {
-        bg: '#0B0D0C',
-        'bg-card': '#141716',
-        'bg-card-hover': '#1B1F1D',
-        'bg-input': '#101312',
-        green: '#4DFFA0',
-        violet: '#9B7FFF',
-        orange: '#F5A623',
-        coral: '#FF6B8A',
-        text: '#F2F4F3',
-        'text-muted': '#A6ACA9',
-        'text-faint': '#7D8380',
+        bg: 'rgb(var(--c-bg) / <alpha-value>)',
+        'bg-card': 'rgb(var(--c-bg-card) / <alpha-value>)',
+        'bg-card-hover': 'rgb(var(--c-bg-card-hover) / <alpha-value>)',
+        'bg-input': 'rgb(var(--c-bg-input) / <alpha-value>)',
+        green: 'rgb(var(--c-green) / <alpha-value>)',
+        'green-ink': 'rgb(var(--c-green-ink) / <alpha-value>)',
+        violet: 'rgb(var(--c-violet) / <alpha-value>)',
+        orange: 'rgb(var(--c-orange) / <alpha-value>)',
+        coral: 'rgb(var(--c-coral) / <alpha-value>)',
+        text: 'rgb(var(--c-text) / <alpha-value>)',
+        'text-muted': 'rgb(var(--c-text-muted) / <alpha-value>)',
+        'text-faint': 'rgb(var(--c-text-faint) / <alpha-value>)',
+        // Hairlines and faint tints: white on dark, near black on light.
+        ink: 'rgb(var(--c-ink) / <alpha-value>)',
       },
       fontFamily: {
         poppins: ['Poppins', 'sans-serif'],

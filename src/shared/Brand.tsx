@@ -535,14 +535,15 @@ export default function Brand({
           <Mascot ref={ref} state={state} className="h-full w-full" />
         )}
       </button>
-      <div className="flex flex-col leading-none text-left">
-        <span className="flex items-center gap-2">
-          <span className={`wordmark ${size}`}>
-            sidekick<span className="dot">.</span>
-          </span>
+      <div className="flex min-w-0 flex-col leading-none text-left">
+        <span className={`wordmark whitespace-nowrap ${size}`}>
+          sidekick<span className="dot">.</span>
+        </span>
+        {/* Beta sits on the byline row so it never runs into the header icons. */}
+        <span className="mt-1.5 flex items-center gap-1.5">
+          <span className="byline">By Drafted Labs</span>
           {IS_BETA && <span className="beta-tag">Beta</span>}
         </span>
-        <span className="byline">By Drafted Labs</span>
       </div>
     </div>
   );

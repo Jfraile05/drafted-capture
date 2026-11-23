@@ -6,7 +6,7 @@ export function QualityCard({ review }: { review: QualityReview }) {
   const hasDetails =
     review.overview || review.went_well.length > 0 || review.hurt_quality.length > 0;
   return (
-    <details className="group shrink-0 border-b border-white/[0.06] px-4 py-2.5">
+    <details className="surface group mx-3 my-2 shrink-0 px-3.5 py-2.5">
       <summary
         className={`flex list-none items-center gap-2 text-sm ${hasDetails ? 'cursor-pointer' : ''}`}
       >

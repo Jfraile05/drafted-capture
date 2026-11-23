@@ -152,8 +152,8 @@ export function Segments({
     <div className="h-full space-y-6 overflow-y-auto px-4 py-4">
       {session.segments.length > 0 && (
         <section>
-          <h2 className="mb-2 text-xs font-medium text-text-muted">Tasks in this session</h2>
-          <ul>
+          <h2 className="mb-2.5 text-xs font-semibold text-text-muted">Tasks in this session</h2>
+          <ul className="surface px-3.5 py-3">
             {[...session.segments]
               .sort((a, b) => a.start_index - b.start_index)
               .map((seg) => {
@@ -161,7 +161,7 @@ export function Segments({
                 return (
                   <li
                     key={seg.id}
-                    className="flex items-start gap-3 border-t border-white/[0.06] py-3 first:border-t-0 first:pt-0"
+                    className="flex items-start gap-3 border-t border-ink/[0.07] py-3 first:border-t-0 first:pt-0 last:pb-0"
                   >
                     <span
                       className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
@@ -222,8 +222,8 @@ export function Segments({
       )}
 
       {notice && (
-        <output className="flex items-center gap-2 text-xs text-green">
-          <CheckCircle size={16} weight="fill" />
+        <output key={notice} className="view-in flex items-center gap-2 text-xs text-green">
+          <CheckCircle size={16} weight="fill" className="pop" />
           {notice}
         </output>
       )}
@@ -350,7 +350,11 @@ export function Segments({
             </select>
           </details>
 
-          <button type="submit" disabled={!canCreate || saving} className="btn-primary w-full">
+          <button
+            type="submit"
+            disabled={!canCreate || saving}
+            className="btn-primary btn-lg w-full"
+          >
             {editing ? <CheckCircle size={16} /> : <Plus size={16} weight="bold" />}
             {saving ? 'Saving' : editing ? 'Save changes' : 'Save task'}
           </button>

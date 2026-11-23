@@ -40,7 +40,7 @@ export default function Login({
   };
 
   return (
-    <div className="flex min-h-[440px] flex-col px-5 pb-5 pt-4">
+    <div className="view-in flex min-h-[440px] flex-col px-5 pb-5 pt-4">
       <header>
         <Brand size="text-[32px]" />
         <h1 className="mt-6 text-base font-semibold text-text">Sign in to Sidekick</h1>

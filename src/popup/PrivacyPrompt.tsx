@@ -29,7 +29,7 @@ export function PrivacyPrompt({
     }
   };
   return (
-    <section aria-label="Recording paused for privacy" className="space-y-3">
+    <section aria-label="Recording paused for privacy" className="view-in space-y-3">
       <p className="text-sm leading-relaxed text-text">{PRIVACY_CONFIG.prompt}</p>
       <button
         type="button"
