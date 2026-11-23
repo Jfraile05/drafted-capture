@@ -229,7 +229,7 @@ export function App() {
   };
 
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden">
+    <div className="relative flex h-screen w-full flex-col overflow-hidden">
       <header className="flex h-[76px] shrink-0 items-center justify-between gap-2 border-b border-ink/[0.07] px-4">
         <Brand size="text-[24px]" />
         <div className="flex shrink-0 items-center gap-0.5">
