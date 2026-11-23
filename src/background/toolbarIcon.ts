@@ -1,7 +1,8 @@
 // The toolbar icon's antenna orb shows whether the student is recording: lit
 // mint while capturing, dark otherwise. The dark icons are the manifest icons;
 // the lit ones live in public/icons so the build copies them as they are. Both
-// sets are drawn from the SVGs in icons/src.
+// sets come from the 128px Sidekick logo; the lit set adds a glowing orb at the
+// antenna tip.
 const iconSet = (suffix: string) => ({
   16: `icons/icon${suffix}-16.png`,
   48: `icons/icon${suffix}-48.png`,

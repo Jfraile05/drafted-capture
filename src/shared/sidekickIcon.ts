@@ -1,7 +1,7 @@
 // The 2D Sidekick head as a standalone SVG string, for places that cannot use
 // the React mascot, such as the recording pill drawn into web pages. Same
 // drawing as the 2D mascot in Brand.tsx, cropped to the head. (The toolbar
-// icons have their own bolder drawing in icons/src.)
+// icons use the Sidekick logo instead.)
 export const SIDEKICK_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="30 14 260 220" aria-hidden="true">
 <defs><radialGradient id="sk-icon-shell" cx="38%" cy="28%" r="80%"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".6" stop-color="#E6ECE9"/><stop offset="1" stop-color="#B9C4BF"/></radialGradient></defs>
 <path d="M160 72 C160 42 148 24 124 22 C106 21 96 32 98 46" fill="none" stroke="#1B2422" stroke-width="9" stroke-linecap="round"/>
