@@ -1,14 +1,17 @@
 /* Fonts are self-hosted (see src/fonts.css + src/fonts/). No remote fetch:
    the extension renders fully offline and uses zero remote code. */
 @import url("./fonts.css");
+@import url("./setups.css");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* Dark (Soft graphite) is the default. Colors are RGB channels so Tailwind
-   classes like bg-green/10 work in both themes. */
-:root {
+   classes like bg-green/10 work in every theme. Any element can carry
+   data-theme (and data-setup, see setups.css) so previews can wear another look. */
+:root,
+[data-theme="dark"] {
   color-scheme: dark;
   --c-bg: 11 13 12;
   --c-bg-card: 20 23 22;
@@ -23,22 +26,6 @@
   --c-text-muted: 166 172 169;
   --c-text-faint: 125 131 128;
   --c-ink: 255 255 255;
-
-  --bg: rgb(var(--c-bg));
-  --bg-card: rgb(var(--c-bg-card));
-  --bg-card-hover: rgb(var(--c-bg-card-hover));
-  --bg-input: rgb(var(--c-bg-input));
-  --border: rgb(var(--c-ink) / 0.12);
-  --border-active: rgb(var(--c-green) / 0.25);
-  --green: rgb(var(--c-green));
-  --green-dim: rgb(var(--c-green) / 0.12);
-  --green-glow: 0 0 24px rgb(var(--c-green) / 0.35);
-  --violet: rgb(var(--c-violet));
-  --orange: rgb(var(--c-orange));
-  --coral: rgb(var(--c-coral));
-  --text: rgb(var(--c-text));
-  --text-muted: rgb(var(--c-text-muted));
-  --text-faint: rgb(var(--c-text-faint));
 
   /* Soft graphite: graphite glass surfaces with clay depth. */
   --graphite: #0c0d0f;
@@ -71,8 +58,8 @@
   interpolate-size: allow-keywords;
 }
 
-/* Light (Soft porcelain): the same glass and clay, lit from above. */
-:root[data-theme="light"] {
+/* Light (Pearl): the same glass and clay, lit from above. */
+[data-theme="light"] {
   color-scheme: light;
   --c-bg: 238 240 239;
   --c-bg-card: 255 255 255;
@@ -111,6 +98,38 @@
   --shot-shadow: 5px 6px 16px rgba(30, 42, 36, 0.14);
 }
 
+/* Values built from the ones above. Declared on every themed element so they
+   follow that element's colors, not the page's. */
+:root,
+[data-theme] {
+  --bg: rgb(var(--c-bg));
+  --bg-card: rgb(var(--c-bg-card));
+  --bg-card-hover: rgb(var(--c-bg-card-hover));
+  --bg-input: rgb(var(--c-bg-input));
+  --border: rgb(var(--c-ink) / 0.12);
+  --border-active: rgb(var(--c-green) / 0.25);
+  --green: rgb(var(--c-green));
+  --green-dim: rgb(var(--c-green) / 0.12);
+  --green-glow: 0 0 24px rgb(var(--c-green) / 0.35);
+  --violet: rgb(var(--c-violet));
+  --orange: rgb(var(--c-orange));
+  --coral: rgb(var(--c-coral));
+  --text: rgb(var(--c-text));
+  --text-muted: rgb(var(--c-text-muted));
+  --text-faint: rgb(var(--c-text-faint));
+  --accent: var(--green);
+  --on-accent: #06291a;
+  --accent-soft: rgb(var(--c-green) / 0.11);
+  --raised-fg: rgb(var(--c-text));
+  --c-sel-text: var(--c-text);
+  --c-sel-muted: var(--c-text-muted);
+  --selected-bg: var(--pressed-bg);
+  --selected-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-green) / 0.45);
+  --radius: 16px;
+  --radius-btn: 999px;
+  --font: "Inter", sans-serif;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -122,10 +141,15 @@ body {
   background: var(--atmosphere);
   background-attachment: fixed;
   color: var(--text);
-  font-family: "Inter", sans-serif;
+  font-family: var(--font);
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+}
+
+/* A themed preview carries its own font, like the page does. */
+[data-theme] {
+  font-family: var(--font);
 }
 
 /* Sidekick wordmark: Poppins 800 with a muted dot. */
@@ -144,7 +168,7 @@ body {
   font-weight: 600;
   line-height: 1;
   color: rgb(var(--c-green-ink));
-  background: rgb(var(--c-green) / 0.11);
+  background: var(--accent-soft);
   border-radius: 999px;
   padding: 3px 6px;
   white-space: nowrap;
@@ -175,7 +199,8 @@ summary:focus-visible {
    Buttons lift on hover, sink on press and spring back on release. */
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-pill px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40;
+    border-radius: var(--radius-btn);
     transition:
       transform var(--dur) var(--ease-spring), box-shadow var(--dur) var(--ease-out),
       filter var(--dur-fast) ease, background-color var(--dur-fast) ease, color var(--dur-fast) ease,
@@ -207,7 +232,8 @@ summary:focus-visible {
   }
   /* Raised glass pill. */
   .btn-ghost {
-    @apply btn text-text;
+    @apply btn;
+    color: var(--raised-fg);
     background: var(--raised);
     box-shadow: var(--raised-shadow);
   }
@@ -255,7 +281,8 @@ summary:focus-visible {
     transform: rotate(-14deg) scale(1.08);
   }
   .field {
-    @apply w-full rounded-[12px] px-3 py-2.5 text-sm text-text placeholder:text-text-faint outline-none;
+    @apply w-full px-3 py-2.5 text-sm text-text placeholder:text-text-faint outline-none;
+    border-radius: calc(var(--radius) * 0.75);
     background: var(--pressed-bg);
     box-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-ink) / 0.05);
     transition: box-shadow var(--dur) var(--ease-out), background-color var(--dur) ease;
@@ -268,7 +295,7 @@ summary:focus-visible {
   .surface {
     background: var(--surface);
     box-shadow: var(--surface-shadow);
-    border-radius: 16px;
+    border-radius: var(--radius);
   }
   /* A tile you can open: rises a little under the pointer. */
   .lift {
@@ -286,12 +313,13 @@ summary:focus-visible {
   .surface-pressed {
     background: var(--pressed-bg);
     box-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-ink) / 0.04);
-    border-radius: 16px;
+    border-radius: var(--radius);
   }
   /* A selectable row: raised until chosen, then pressed in with a green ring.
      Follows a visually hidden radio input with the `peer` class. */
   .option {
-    @apply flex min-h-[52px] items-center gap-3 rounded-[16px] px-3.5 py-2.5;
+    @apply flex min-h-[52px] items-center gap-3 px-3.5 py-2.5;
+    border-radius: var(--radius);
     background: var(--surface);
     box-shadow: var(--surface-shadow);
     transition: box-shadow var(--dur) var(--ease-out), transform var(--dur) var(--ease-spring);
@@ -304,9 +332,17 @@ summary:focus-visible {
     transform: scale(0.985);
     transition-duration: 90ms;
   }
-  .peer:checked + .option {
-    background: var(--pressed-bg);
-    box-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-green) / 0.45);
+  /* Anything chosen: a selected row, chip or step. Text colors switch too, for
+     setups where the selection is a solid color. */
+  .peer:checked + .option,
+  .option.is-on,
+  .chip-on,
+  .row-on {
+    --c-text: var(--c-sel-text);
+    --c-text-muted: var(--c-sel-muted);
+    color: rgb(var(--c-text));
+    background: var(--selected-bg);
+    box-shadow: var(--selected-shadow);
   }
   .peer:focus-visible + .option {
     outline: 2px solid var(--text-muted);
@@ -323,21 +359,23 @@ summary:focus-visible {
     width: 6px;
     height: 6px;
     border-radius: 999px;
-    background: #06291a;
+    background: var(--on-accent);
     transform: scale(0);
     transition: transform var(--dur-slow) var(--ease-spring);
   }
-  .peer:checked + .option .option-radio {
-    background: var(--green);
-    box-shadow: 0 0 0 4px rgb(var(--c-green) / 0.14);
+  .peer:checked + .option .option-radio,
+  .option.is-on .option-radio {
+    background: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-soft);
   }
-  .peer:checked + .option .option-radio::after {
+  .peer:checked + .option .option-radio::after,
+  .option.is-on .option-radio::after {
     transform: scale(1);
   }
   /* Status pill, for example "Recording  Research". */
   .live-chip {
     @apply inline-flex h-7 items-center gap-2 rounded-pill pl-2.5 pr-3 text-[12.5px] font-semibold text-green-ink;
-    background: rgb(var(--c-green) / 0.11);
+    background: var(--accent-soft);
     transition: background-color var(--dur) ease, color var(--dur) ease;
   }
   .field-label {
@@ -345,7 +383,8 @@ summary:focus-visible {
   }
   /* Small raised pill; .chip-on presses it in with a green ring. */
   .chip {
-    @apply rounded-pill px-3 py-1 text-xs text-text-muted hover:text-text;
+    @apply px-3 py-1 text-xs text-text-muted hover:text-text;
+    border-radius: var(--radius-btn);
     background: var(--raised);
     box-shadow: var(--raised-shadow);
     transition: transform var(--dur) var(--ease-spring), box-shadow var(--dur) var(--ease-out),
@@ -361,23 +400,20 @@ summary:focus-visible {
   .kbd {
     @apply inline-block min-w-[1.5em] rounded border border-ink/15 bg-ink/[0.04] px-1 text-center font-inter text-[11px] leading-[1.6] text-text-muted;
   }
-  .chip-on {
-    @apply text-text;
-    background: var(--pressed-bg);
-    box-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-green) / 0.45);
-  }
   .chip-on:not(:disabled):hover {
     transform: none;
   }
   /* Pill tab switcher: a pressed track with a raised thumb that slides to the
      current view. Set --tabs and --tab on the track. */
   .segmented {
-    @apply relative flex rounded-pill p-1;
+    @apply relative flex p-1;
+    border-radius: var(--radius-btn);
     background: var(--pressed-bg);
     box-shadow: var(--pressed-shadow), inset 0 0 0 1px rgb(var(--c-ink) / 0.04);
   }
   .segmented-thumb {
-    @apply pointer-events-none absolute bottom-1 left-1 top-1 rounded-pill;
+    @apply pointer-events-none absolute bottom-1 left-1 top-1;
+    border-radius: var(--radius-btn);
     width: calc((100% - 0.5rem) / var(--tabs, 3));
     transform: translateX(calc(var(--tab, 0) * 100%));
     background: var(--raised);
@@ -385,24 +421,20 @@ summary:focus-visible {
     transition: transform var(--dur-slow) var(--ease-spring);
   }
   .segmented-btn {
-    @apply relative min-w-0 flex-1 rounded-pill px-2 py-1.5 text-sm font-semibold text-text-muted hover:text-text;
+    @apply relative min-w-0 flex-1 px-2 py-1.5 text-sm font-semibold text-text-muted hover:text-text;
     transition: color var(--dur) ease, transform var(--dur) var(--ease-spring);
   }
   .segmented-btn:active {
     transform: scale(0.96);
   }
-  .segmented-btn[aria-current="page"] {
+  .segmented-btn[aria-current="page"],
+  .segmented-btn[aria-pressed="true"] {
     @apply text-text;
   }
   /* A screenshot, framed like a raised tile. */
   .shot {
     @apply rounded-[14px];
     box-shadow: 0 0 0 1px rgb(var(--c-ink) / 0.08), var(--shot-shadow);
-  }
-  /* The step currently open in a list: pressed in. */
-  .row-on {
-    background: var(--pressed-bg);
-    box-shadow: var(--pressed-shadow);
   }
 }
 
@@ -531,7 +563,157 @@ details[open]::details-content {
   opacity: 0;
 }
 
+/* Choose your setup. The preview card tilts toward the pointer with a moving
+   shine, and a new card swings in from the side you moved toward. */
+.setup-stage {
+  perspective: 800px;
+}
+.setup-card {
+  --rx: 0deg;
+  --ry: 0deg;
+  --mx: 50%;
+  --my: 0%;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--text);
+  background: var(--atmosphere);
+  border-radius: max(var(--radius), 14px);
+  box-shadow: 0 0 0 1px rgb(var(--c-ink) / 0.1), 0 18px 40px rgb(0 0 0 / 0.28);
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transition: transform var(--dur-slow) var(--ease-out);
+  animation: setup-card-in var(--dur-slow) var(--ease-out) backwards;
+}
+.setup-card.is-tracking {
+  transition-duration: 80ms;
+}
+.setup-shine {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: radial-gradient(
+    60% 60% at var(--mx) var(--my),
+    rgb(255 255 255 / 0.18),
+    transparent 70%
+  );
+  mix-blend-mode: soft-light;
+}
+@keyframes setup-card-in {
+  from {
+    opacity: 0;
+    transform: translateX(calc(var(--dir, 0) * 28px)) rotateY(calc(var(--dir, 0) * -16deg))
+      scale(0.94);
+  }
+}
+/* Equipping flashes the card once. */
+.setup-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 2px var(--accent);
+  animation: setup-flash 700ms var(--ease-out) forwards;
+}
+@keyframes setup-flash {
+  from {
+    opacity: 1;
+    background: rgb(255 255 255 / 0.22);
+  }
+  to {
+    opacity: 0;
+    background: transparent;
+  }
+}
+/* The tile button stays in the page's look; the swatch inside wears the setup. */
+.setup-tile {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  box-shadow: 0 0 0 1px rgb(var(--c-ink) / 0.12);
+  transition: transform var(--dur) var(--ease-spring), box-shadow var(--dur) var(--ease-out);
+}
+.setup-tile:hover {
+  transform: translateY(-2px) scale(1.04);
+}
+.setup-tile:active {
+  transform: scale(0.92);
+  transition-duration: 90ms;
+}
+.setup-tile[aria-checked="true"] {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text);
+}
+.setup-tile:focus-visible {
+  outline: 2px solid var(--text-muted);
+  outline-offset: 5px;
+}
+.setup-swatch {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  background: var(--atmosphere);
+}
+/* A small slab of the setup's own surface with its main button on it. */
+.setup-chip {
+  position: absolute;
+  inset: 24% 18% 18% 18%;
+  border-radius: min(var(--radius), 6px);
+  background: var(--surface);
+  box-shadow: var(--surface-shadow);
+}
+.setup-chip::after {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: 18%;
+  height: 26%;
+  border-radius: min(var(--radius-btn), 4px);
+  background: var(--gloss);
+}
+.setup-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  z-index: 1;
+}
+/* The small launcher: three cards fanned out, spreading wider on hover. */
+.setup-fan {
+  position: relative;
+  display: block;
+  width: calc(var(--s) * 1.7);
+  height: calc(var(--s) * 1.15);
+}
+.setup-fan-card {
+  position: absolute;
+  bottom: 0;
+  left: calc(50% - var(--s) / 2);
+  width: var(--s);
+  height: var(--s);
+  border-radius: calc(var(--s) * 0.3);
+  box-shadow: 0 0 0 1px rgb(var(--c-ink) / 0.16), 0 1px 3px rgb(0 0 0 / 0.25);
+  transform-origin: 50% 110%;
+  transform: translateX(calc(var(--i) * var(--s) * 0.34)) rotate(calc(var(--i) * 12deg));
+  transition: transform var(--dur) var(--ease-spring);
+}
+:hover > .setup-fan > .setup-fan-card {
+  transform: translateX(calc(var(--i) * var(--s) * 0.5)) rotate(calc(var(--i) * 20deg))
+    translateY(-1px);
+}
+
+/* The dice roll highlights tiles one by one before it lands. */
+.setup-tile.is-rolling {
+  transform: scale(1.12) rotate(-4deg);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .setup-card {
+    animation: none !important;
+    transform: none !important;
+  }
   .view-in,
   .stagger > *,
   .tick,
@@ -770,8 +952,10 @@ details[open]::details-content {
   animation: rise 0.35s ease both;
 }
 
-/* Sidekick brand byline: small and thin under the wordmark. */
+/* Sidekick brand byline: small and thin under the wordmark. Keeps its font in
+   every setup so the header never grows wider. */
 .byline {
+  font-family: "Inter", sans-serif;
   font-size: 11.5px;
   line-height: 1;
   color: var(--text-muted);

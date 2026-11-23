@@ -1,51 +1,87 @@
-// Light or dark look for the popup, side panel and settings. The choice lives
-// in localStorage (shared by every extension page, read synchronously so the
-// first paint is already right) and pages that are open together stay in sync.
+// The look of the popup, side panel and settings: a setup (see setups.ts) in
+// its light or dark version. Both choices live in localStorage (shared by every
+// extension page, read synchronously so the first paint is already right) and
+// pages that are open together stay in sync.
 
-export type Theme = 'light' | 'dark';
+import { BASE_SETUP, type Mode, findSetup } from './setups';
+
+export type Theme = Mode;
+export type Look = { theme: Theme; setup: string };
 
 const KEY = 'sidekick-theme';
+const SETUP_KEY = 'sidekick-setup';
 
 /** Dark unless the user picked light. */
 export function parseTheme(value: string | null): Theme {
   return value === 'light' ? 'light' : 'dark';
 }
 
-export function readTheme(): Theme {
+/** A stored setup id if it still exists, otherwise the default. */
+export function parseSetup(value: string | null): string {
+  return findSetup(value)?.id ?? BASE_SETUP;
+}
+
+function load(key: string): string | null {
   try {
-    return parseTheme(localStorage.getItem(KEY));
+    return localStorage.getItem(key);
   } catch {
-    return 'dark';
+    return null;
   }
 }
 
-function applyTheme(theme: Theme) {
-  document.documentElement.dataset.theme = theme;
+function save(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Storage blocked: the change still applies to this page.
+  }
+}
+
+export function readTheme(): Theme {
+  return parseTheme(load(KEY));
+}
+
+function readLook(): Look {
+  return { theme: readTheme(), setup: parseSetup(load(SETUP_KEY)) };
+}
+
+// What the page shows right now. React reads it with useLook().
+let look: Look = { theme: 'dark', setup: BASE_SETUP };
+const listeners = new Set<() => void>();
+
+export function currentLook(): Look {
+  return look;
+}
+
+export function subscribeLook(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function applyLook(next: Look) {
+  look = next;
+  const root = document.documentElement;
+  root.dataset.theme = next.theme;
+  if (next.setup === BASE_SETUP) delete root.dataset.setup;
+  else root.dataset.setup = next.setup;
+  for (const listener of listeners) listener();
 }
 
 /** Call once per page before rendering. */
 export function initTheme() {
-  applyTheme(readTheme());
+  applyLook(readLook());
   window.addEventListener('storage', (event) => {
-    if (event.key === KEY) applyTheme(parseTheme(event.newValue));
+    if (event.key === KEY || event.key === SETUP_KEY) applyLook(readLook());
   });
 }
 
-/**
- * Switches theme. The new look grows out of `origin` in a circle, while the
- * sun and moon icon morphs on its own CSS transition.
- */
-export function toggleTheme(origin?: HTMLElement) {
-  const next: Theme = readTheme() === 'light' ? 'dark' : 'light';
-  try {
-    localStorage.setItem(KEY, next);
-  } catch {
-    // Storage blocked: still switch for this page.
-  }
-
+/** The new look grows out of `origin` in a circle. */
+function reveal(next: Look, origin?: HTMLElement) {
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!document.startViewTransition || reduceMotion) {
-    applyTheme(next);
+    applyLook(next);
     return;
   }
 
@@ -57,7 +93,7 @@ export function toggleTheme(origin?: HTMLElement) {
     Math.max(y, window.innerHeight - y),
   );
 
-  const transition = document.startViewTransition(() => applyTheme(next));
+  const transition = document.startViewTransition(() => applyLook(next));
   transition.ready
     .then(() => {
       document.documentElement.animate(
@@ -70,4 +106,23 @@ export function toggleTheme(origin?: HTMLElement) {
       );
     })
     .catch(() => {});
+}
+
+/**
+ * Switches the current setup between its light and dark version. The sun and
+ * moon icon morphs on its own CSS transition.
+ */
+export function toggleTheme(origin?: HTMLElement) {
+  const theme: Theme = look.theme === 'light' ? 'dark' : 'light';
+  save(KEY, theme);
+  reveal({ theme, setup: look.setup }, origin);
+}
+
+/** Puts on a setup in its light or dark version. */
+export function chooseSetup(id: string, theme: Theme, origin?: HTMLElement) {
+  const setup = findSetup(id);
+  if (!setup) return;
+  save(KEY, theme);
+  save(SETUP_KEY, setup.id);
+  reveal({ theme, setup: setup.id }, origin);
 }

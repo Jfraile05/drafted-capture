@@ -3,11 +3,13 @@ import {
   ArrowsClockwise,
   CaretLeft,
   CaretRight,
+  Palette,
   TagSimple,
   Trash,
 } from '@phosphor-icons/react';
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import Brand from '../shared/Brand';
+import SetupPicker from '../shared/SetupPicker';
 import { SessionSyncStatus } from '../shared/SyncStatus';
 import ThemeToggle from '../shared/ThemeToggle';
 import { sendMessage, useLiveSession } from '../shared/hooks';
@@ -35,6 +37,7 @@ export function App() {
   const [rangeStart, setRangeStart] = useState<number | null>(null);
   const [rangeEnd, setRangeEnd] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('timeline');
+  const [showSetups, setShowSetups] = useState(false);
   // Which way the tab content slides in: right for a tab further along, left
   // for one before it. Only updated when the tab changes.
   const tabMotion = useRef({ tab: activeTab, dir: 1 });
@@ -226,11 +229,22 @@ export function App() {
   };
 
   return (
-    <div className="flex h-screen w-full flex-col overflow-hidden">
+    <div className="relative flex h-screen w-full flex-col overflow-hidden">
       <header className="flex h-[76px] shrink-0 items-center justify-between gap-2 border-b border-ink/[0.07] px-4">
         <Brand size="text-[24px]" />
         <div className="flex shrink-0 items-center gap-0.5">
           <ThemeToggle />
+          <button
+            type="button"
+            onClick={() => setShowSetups((open) => !open)}
+            className="icon-btn"
+            data-motion="tilt"
+            aria-label="Choose your setup"
+            aria-expanded={showSetups}
+            title="Choose your setup"
+          >
+            <Palette size={18} />
+          </button>
           {!selectedSession && (
             <button
               type="button"
@@ -245,6 +259,17 @@ export function App() {
           )}
         </div>
       </header>
+
+      {showSetups && (
+        <div
+          className="view-in absolute inset-x-0 bottom-0 top-[76px] z-20 overflow-y-auto px-4 py-4"
+          style={{ background: 'var(--atmosphere)' }}
+        >
+          <div className="mx-auto max-w-[420px]">
+            <SetupPicker onClose={() => setShowSetups(false)} />
+          </div>
+        </div>
+      )}
 
       {selectedSession && (
         <div className="flex shrink-0 items-center gap-1.5 border-b border-ink/[0.07] px-2.5 py-2">

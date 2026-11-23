@@ -10,6 +10,7 @@ import {
 } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import Brand, { setMascotMoment, useMascotState } from '../shared/Brand';
+import SetupPicker, { SetupStack } from '../shared/SetupPicker';
 import { SyncStatus } from '../shared/SyncStatus';
 import ThemeToggle from '../shared/ThemeToggle';
 import { ACTION_ICON_COMPONENT } from '../shared/actionIcons';
@@ -35,6 +36,7 @@ export default function App() {
   const { user, loading: authLoading } = useAuth();
   const [showLogin, setShowLogin] = useState(false);
   const [replayGuide, setReplayGuide] = useState(false);
+  const [showSetups, setShowSetups] = useState(false);
   const [controlBusy, setControlBusy] = useState<string | null>(null);
   const [controlError, setControlError] = useState('');
   const [controlPreview, setControlPreview] = useState<LiveSession | null>(null);
@@ -114,6 +116,14 @@ export default function App() {
           setReplayGuide(false);
         }}
       />
+    );
+  }
+
+  if (showSetups) {
+    return (
+      <div className="view-in px-5 pb-4 pt-5">
+        <SetupPicker onClose={() => setShowSetups(false)} />
+      </div>
     );
   }
 
@@ -467,10 +477,22 @@ export default function App() {
       )}
 
       {!authLoading && (
-        <footer className="mt-5 flex items-center justify-between gap-3 border-t border-ink/[0.07] pt-3.5 text-xs text-text-muted">
+        <footer className="mt-5 flex items-center gap-3 border-t border-ink/[0.07] pt-3.5 text-xs text-text-muted">
+          {/* Choose your setup lives in the corner. Hidden while recording, like the guide. */}
+          {!recording && (
+            <button
+              type="button"
+              onClick={() => setShowSetups(true)}
+              className="icon-btn -my-1 -ml-1.5 h-8 w-9 shrink-0"
+              title="Choose your setup"
+              aria-label="Choose your setup"
+            >
+              <SetupStack size={16} />
+            </button>
+          )}
           {user ? (
             <>
-              <span className="truncate">Signed in as {user.email}</span>
+              <span className="min-w-0 flex-1 truncate">Signed in as {user.email}</span>
               <span className="flex shrink-0 items-center gap-3">
                 <SyncStatus uid={user.uid} localOnly={localOnly} />
                 <button
@@ -485,7 +507,7 @@ export default function App() {
             </>
           ) : (
             <>
-              <span>Sign in to sync your sessions.</span>
+              <span className="min-w-0 flex-1">Sign in to sync your sessions.</span>
               <button
                 type="button"
                 onClick={() => setShowLogin(true)}
@@ -536,7 +558,7 @@ function LiveTimer({ live }: { live: LiveSession }) {
 
   return (
     <p
-      className={`mt-3.5 text-[52px] font-semibold leading-none tracking-[-0.04em] tabular-nums ${
+      className={`timer mt-3.5 text-[52px] font-semibold leading-none tracking-[-0.04em] tabular-nums ${
         isPaused ? 'text-text-muted' : 'text-text'
       }`}
     >

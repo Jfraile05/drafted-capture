@@ -1,8 +1,11 @@
-import { type ReactNode, useEffect, useRef } from 'react';
+import { CaretRight } from '@phosphor-icons/react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import Brand from '../shared/Brand';
+import SetupPicker, { SetupStack, useLook } from '../shared/SetupPicker';
 import ThemeToggle from '../shared/ThemeToggle';
 import { EXTENSION_VERSION, IS_BETA } from '../shared/constants';
 import { useSettings } from '../shared/hooks';
+import { findSetup } from '../shared/setups';
 
 export function Options() {
   const [settings, updateSettings] = useSettings();
@@ -51,6 +54,8 @@ export function Options() {
             Make Sidekick yours. Changes save as soon as you make them.
           </p>
         </header>
+
+        <YourSetup />
 
         <Section title="While you record">
           <Toggle
@@ -187,6 +192,39 @@ export function Options() {
         </footer>
       </div>
     </div>
+  );
+}
+
+function YourSetup() {
+  const [open, setOpen] = useState(false);
+  const look = useLook();
+  return (
+    <section>
+      <h2 className="text-base font-semibold text-text">Your setup</h2>
+      {open ? (
+        <div className="surface view-in mt-3 p-4">
+          <div className="mx-auto max-w-[420px]">
+            <SetupPicker onClose={() => setOpen(false)} />
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="surface lift mt-3 flex w-full items-center gap-3 p-3 text-left"
+        >
+          <SetupStack />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium text-text">Choose your setup</span>
+            <span className="mt-0.5 block text-xs text-text-muted">
+              You're using {findSetup(look.setup)?.name}, {look.theme}. Every setup has a light and
+              a dark version, and the sun and moon button switches between them.
+            </span>
+          </span>
+          <CaretRight size={16} className="shrink-0 text-text-muted" />
+        </button>
+      )}
+    </section>
   );
 }
 
