@@ -47,6 +47,7 @@ import {
   scheduleIdleCheck,
 } from './idle';
 import { idleNoticeSession } from './idleNotice';
+import { refreshOwnTermsIfMissing } from './ownIdentity';
 import { checkCurrentScreen, invalidatePrivacyApproval, keepPrivacyPaused } from './privacy';
 import { refreshPrivacyPolicy } from './privacyPolicy';
 import { qualityReviews } from './quality';
@@ -65,6 +66,12 @@ import {
 import { clearStartPrompt, handleStartPromptButton, noteBrowsing } from './startPrompt';
 import { initializeSync, wakeSync } from './sync';
 import { getWorkflowAccess } from './workflows';
+
+// A session can keep recording across a browser restart, which clears the
+// saved name terms. Reload them when the worker wakes during a session.
+void getLiveSession().then((live) => {
+  if (live && live.state !== 'idle') void refreshOwnTermsIfMissing();
+});
 
 // ── Message router ────────────────────────────────────────────────────────
 

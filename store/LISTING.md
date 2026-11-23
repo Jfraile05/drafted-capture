@@ -1,4 +1,4 @@
-# Sidekick: Chrome Web Store submission copy (version 1.0.24)
+# Sidekick: Chrome Web Store submission copy (version 1.0.25)
 
 Paste each block into the matching field in the Developer Dashboard. Sections
 follow the dashboard tabs: Package, Store listing, Privacy, Distribution.
@@ -9,7 +9,7 @@ upload this package to it so existing installs update. A new item gets a new ID.
 
 ## Package
 
-Upload `store/release/sidekick-1.0.24.zip`, built with `npm run build` and zipped
+Upload `store/release/sidekick-1.0.25.zip`, built with `npm run build` and zipped
 from inside `dist/` so `manifest.json` sits at the top of the zip.
 
 The item name and summary come from the manifest:

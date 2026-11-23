@@ -11,6 +11,7 @@ const files = {
   'src/shared/workflowAccess': 'src/demo/workflowAccess.ts',
   'src/shared/submitToDrafted': 'src/demo/submitToDrafted.ts',
   'src/shared/privacyPolicyAccess': 'src/demo/privacyPolicyAccess.ts',
+  'src/shared/ownIdentityAccess': 'src/demo/ownIdentityAccess.ts',
   'src/shared/qualityAccess': 'src/demo/qualityAccess.ts',
   'src/popup/Onboarding': 'src/demo/Onboarding.tsx',
   'src/options/Options': 'src/demo/Options.tsx',

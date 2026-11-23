@@ -13,6 +13,7 @@ import { LIVE_RECENT_LIMIT } from '../shared/constants';
 import type { PrivacyPermit } from '../shared/privacy';
 import { appendStep } from '../shared/storage/db';
 import { getLiveSession, getSettings, setLiveSession, withLiveLock } from '../shared/storage/live';
+import { getOwnTerms } from '../shared/storage/ownTerms';
 import type {
   Action,
   CaptureEventPayload,
@@ -25,7 +26,7 @@ import type {
 import { classifyUrl } from '../shared/urlCategories';
 import { captureVisible } from '../shared/utils/captureQueue';
 import { actionLabel } from '../shared/utils/format';
-import { redactStep } from '../shared/utils/redact';
+import { ownPattern, redactStep } from '../shared/utils/redact';
 import { siteAllowed } from '../shared/utils/siteAccess';
 import { capturePermit, checkCurrentScreen, validatePermit } from './privacy';
 import { sessionCapMs, stopCapture } from './session';
@@ -46,7 +47,10 @@ async function commitStep(
   // Redact before anything is stored or shown. The label is derived from the
   // redacted action so typed text never reaches the live feed either.
   const settings = await getSettings();
-  redactStep(step, { maskAllInputs: settings.mask_all_inputs });
+  redactStep(step, {
+    maskAllInputs: settings.mask_all_inputs,
+    own: ownPattern(await getOwnTerms()),
+  });
   step.origin.site = classifyUrl(step.origin.url);
   const label = opts.label ?? actionLabel(step.action, step.dom);
 

@@ -84,7 +84,13 @@ function initContentScript(): void {
         }
 
         if (message?.type === 'GET_SENSITIVE_REGIONS') {
-          sendResponse(findSensitiveRegions(Boolean(message.payload?.maskAllInputs)));
+          const ownTerms = message.payload?.ownTerms;
+          sendResponse(
+            findSensitiveRegions(
+              Boolean(message.payload?.maskAllInputs),
+              Array.isArray(ownTerms) ? ownTerms.filter((t) => typeof t === 'string') : [],
+            ),
+          );
           return true;
         }
 

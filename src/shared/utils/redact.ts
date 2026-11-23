@@ -35,6 +35,43 @@ function isPhone(match: string): boolean {
 const SENSITIVE_PARAM =
   /([?&#;]|^)((?:access_|id_|refresh_)?token|code|(?:api_?)?key|secret|passw(?:or)?d|pwd|auth|session(?:_?id)?|sid|signature|sig)=([^&#]*)/gi;
 
+// The signed-in student's own name and email. No detector can find names in
+// general, but the student's own name is the one most likely to be on screen
+// (account menus, "Signed in as", profile pages), so it is masked everywhere.
+const MIN_NAME_PART = 3;
+const MIN_EMAIL_LOCAL = 4;
+
+/** The words to mask for one student: each full name and its longer parts,
+ *  the email, and the part of the email before the @. */
+export function ownTerms(identity: {
+  email?: string | null;
+  names?: readonly string[];
+}): string[] {
+  const terms = new Set<string>();
+  for (const raw of identity.names ?? []) {
+    const name = raw.replace(/\s+/g, ' ').trim();
+    if (name.length >= MIN_NAME_PART) terms.add(name);
+    for (const part of name.split(' ')) if (part.length >= MIN_NAME_PART) terms.add(part);
+  }
+  const email = identity.email?.trim().toLowerCase() ?? '';
+  if (email.includes('@')) {
+    terms.add(email);
+    const local = email.slice(0, email.indexOf('@'));
+    if (local.length >= MIN_EMAIL_LOCAL) terms.add(local);
+  }
+  return [...terms];
+}
+
+/** One case-insensitive pattern for `ownTerms`, matching whole words only, so
+ *  "Jordan" is masked but "Jordanian" is not. Null when there is nothing to match. */
+export function ownPattern(terms: readonly string[]): RegExp | null {
+  if (terms.length === 0) return null;
+  const alternatives = [...terms]
+    .sort((a, b) => b.length - a.length)
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  return new RegExp(`(?<![\\p{L}\\p{N}])(?:${alternatives.join('|')})(?![\\p{L}\\p{N}])`, 'giu');
+}
+
 function luhn(digits: string): boolean {
   let sum = 0;
   let double = false;
@@ -50,7 +87,7 @@ function luhn(digits: string): boolean {
   return sum % 10 === 0;
 }
 
-export function redactText(text: string): string {
+export function redactText(text: string, own?: RegExp | null): string {
   let out = text;
   for (const p of SECRET_PATTERNS) out = out.replace(p, '[secret]');
   out = out.replace(EMAIL, '[email]');
@@ -62,14 +99,15 @@ export function redactText(text: string): string {
   out = out.replace(PHONE, (m) => (isPhone(m) ? '[phone]' : m));
   out = out.replace(LABELED_SSN, (m, num: string) => `${m.slice(0, -num.length)}[ssn]`);
   out = out.replace(LABELED_PHONE, (m, num: string) => `${m.slice(0, -num.length)}[phone]`);
+  if (own) out = out.replace(own, '[name]');
   return out;
 }
 
 /** [start, end) positions of the text `redactText` would replace, so the same
  *  text can be masked where it appears in a screenshot. */
-export function findSensitiveSpans(text: string): Array<[number, number]> {
+export function findSensitiveSpans(text: string, own?: RegExp | null): Array<[number, number]> {
   const spans: Array<[number, number]> = [];
-  for (const p of [...SECRET_PATTERNS, EMAIL, SSN]) {
+  for (const p of [...SECRET_PATTERNS, EMAIL, SSN, ...(own ? [own] : [])]) {
     for (const m of text.matchAll(p)) spans.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
   }
   for (const m of text.matchAll(PHONE)) {
@@ -90,34 +128,39 @@ export function findSensitiveSpans(text: string): Array<[number, number]> {
   return spans;
 }
 
-export function redactUrl(url: string): string {
+export function redactUrl(url: string, own?: RegExp | null): string {
   if (!url) return url;
-  return redactText(url.replace(SENSITIVE_PARAM, '$1$2=[redacted]'));
+  return redactText(url.replace(SENSITIVE_PARAM, '$1$2=[redacted]'), own);
 }
 
-/** Scrub a step in place. `maskAllInputs` also hides ordinary typed text. */
-export function redactStep(step: Step, opts: { maskAllInputs: boolean }): void {
+/** Scrub a step in place. `maskAllInputs` also hides ordinary typed text, and
+ *  `own` (from `ownPattern`) hides the student's own name and email. */
+export function redactStep(
+  step: Step,
+  opts: { maskAllInputs: boolean; own?: RegExp | null },
+): void {
   const { action, dom, origin } = step;
+  const own = opts.own;
   const sensitive = !!dom && (dom.sensitive === true || dom.input_type === 'password');
 
   if (action.type === 'type' && action.text !== undefined) {
     if (sensitive) action.text = '[redacted]';
     else if (opts.maskAllInputs) action.text = '•'.repeat(action.text.length);
-    else action.text = redactText(action.text);
+    else action.text = redactText(action.text, own);
   }
-  if (action.url) action.url = redactUrl(action.url);
+  if (action.url) action.url = redactUrl(action.url, own);
 
   if (dom) {
     if (dom.input_value) {
       if (sensitive) dom.input_value = '[redacted]';
       else if (opts.maskAllInputs) dom.input_value = '•'.repeat(dom.input_value.length);
-      else dom.input_value = redactText(dom.input_value);
+      else dom.input_value = redactText(dom.input_value, own);
     }
-    if (dom.text) dom.text = redactText(dom.text);
-    if (dom.aria_label) dom.aria_label = redactText(dom.aria_label);
-    if (dom.field_label) dom.field_label = redactText(dom.field_label);
+    if (dom.text) dom.text = redactText(dom.text, own);
+    if (dom.aria_label) dom.aria_label = redactText(dom.aria_label, own);
+    if (dom.field_label) dom.field_label = redactText(dom.field_label, own);
   }
 
-  origin.url = redactUrl(origin.url);
-  origin.title = redactText(origin.title);
+  origin.url = redactUrl(origin.url, own);
+  origin.title = redactText(origin.title, own);
 }

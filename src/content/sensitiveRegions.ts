@@ -1,13 +1,13 @@
 // Finds the parts of the visible page that must not appear in a screenshot:
 // sensitive fields, text inputs when "mask all inputs" is on, payment provider
 // iframes, and any text that matches the redaction detectors (emails, phones,
-// cards, SSNs, keys). Same-origin frames (including about:blank and srcdoc
+// cards, SSNs, keys) or the student's own name and email. Same-origin frames (including about:blank and srcdoc
 // ones) are scanned too. Rects are in CSS pixels relative to the top viewport.
 // If the scan runs out of time, `complete` is false and the caller drops the
 // screenshot. Limits: cross-origin frames other than payment frames are not
 // scanned, and text drawn in a canvas or inside a closed shadow root is not seen.
 
-import { findSensitiveSpans } from '../shared/utils/redact';
+import { findSensitiveSpans, ownPattern } from '../shared/utils/redact';
 import type { Rect } from '../shared/utils/screenshotMask';
 import { isSensitiveFrame } from '../shared/utils/sensitiveFrames';
 import { isSensitiveField } from './dom';
@@ -35,7 +35,13 @@ interface Box {
   dy: number;
 }
 
-export function findSensitiveRegions(maskAllInputs: boolean): SensitiveRegions {
+export function findSensitiveRegions(
+  maskAllInputs: boolean,
+  ownTerms: readonly string[] = [],
+): SensitiveRegions {
+  const own = ownPattern(ownTerms);
+  // A non-global copy for the quick test, which must not move `own`'s lastIndex.
+  const maybeOwn = own ? new RegExp(own.source, 'iu') : null;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const rects: Rect[] = [];
@@ -61,7 +67,7 @@ export function findSensitiveRegions(maskAllInputs: boolean): SensitiveRegions {
       if (
         maskAllInputs ||
         isSensitiveField(field, type) ||
-        findSensitiveSpans(field.value).length > 0
+        findSensitiveSpans(field.value, own).length > 0
       ) {
         add(field.getBoundingClientRect(), box);
       }
@@ -107,9 +113,9 @@ export function findSensitiveRegions(maskAllInputs: boolean): SensitiveRegions {
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if (performance.now() > deadline) return false;
       const text = node.nodeValue ?? '';
-      if (text.length < 5 || !MAYBE_SENSITIVE.test(text)) continue;
+      if (text.length < 3 || !(MAYBE_SENSITIVE.test(text) || maybeOwn?.test(text))) continue;
       if (SKIP_TAGS.has(node.parentElement?.tagName ?? '')) continue;
-      for (const [start, end] of findSensitiveSpans(text)) {
+      for (const [start, end] of findSensitiveSpans(text, own)) {
         range.setStart(node, start);
         range.setEnd(node, end);
         for (const r of Array.from(range.getClientRects())) add(r, box);

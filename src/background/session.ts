@@ -43,6 +43,7 @@ import { resetCaptureQueue } from '../shared/utils/captureQueue';
 import { selectWorkflow, selectedWorkflow, workflowSnapshot } from '../shared/workflows';
 import { scheduleIdleCheck } from './idle';
 import { clearIdleNotices, showIdleNotice } from './idleNotice';
+import { refreshOwnTerms, refreshOwnTermsIfMissing } from './ownIdentity';
 import { checkCurrentScreen, prepareResume } from './privacy';
 import { pauseRecording, resumeRecording, stopRecording } from './recorder';
 import { wakeSync } from './sync';
@@ -187,7 +188,7 @@ export async function startCapture(
   const selectedId = workflowId ?? (await selectedWorkflow(access.uid));
   const workflow = access.workflows.find((item) => item.id === selectedId);
   if (!workflow) throw new Error('Choose a workflow assigned to you before starting a task.');
-  const environment = await snapshotEnvironment();
+  const [environment] = await Promise.all([snapshotEnvironment(), refreshOwnTerms()]);
   const metadata: SessionMetadata = {
     extension_version: EXTENSION_VERSION,
     drafted_org_id: workflow.org_id,
@@ -284,6 +285,7 @@ export async function resumeCapture(
   if (automaticGateId && before.privacy_gate?.id !== automaticGateId) return before;
   if (request.session_id && before.id !== request.session_id) return before;
   if (!(await prepareResume(before.id, privacyGateId, automaticGateId))) return getLiveSession();
+  void refreshOwnTermsIfMissing();
   const requestedAt = request.requested_at ?? Date.now();
   const { live, changed } = await withLiveLock(async () => {
     const cur = await getLiveSession();

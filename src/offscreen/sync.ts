@@ -1,4 +1,5 @@
 import { onAuthChanged } from '../shared/auth';
+import { loadOwnIdentity } from '../shared/ownIdentityAccess';
 import { loadPrivacyPolicy } from '../shared/privacyPolicyAccess';
 import { loadQualityReviews } from '../shared/qualityAccess';
 import { type SyncDestination, syncQueuedSessions } from '../shared/syncQueue';
@@ -30,6 +31,10 @@ chrome.runtime.onMessage.addListener((message, _sender, respond) => {
   if (message.target !== 'offscreen') return;
   if (message.type === 'PRIVACY_POLICY') {
     void loadPrivacyPolicy().then(respond, () => respond(null));
+    return true;
+  }
+  if (message.type === 'OWN_IDENTITY') {
+    void loadOwnIdentity().then(respond, () => respond(null));
     return true;
   }
   if (message.type === 'WORKFLOW_ACCESS') {

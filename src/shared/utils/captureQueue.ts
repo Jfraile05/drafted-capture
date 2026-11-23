@@ -17,6 +17,7 @@ import { SCREENSHOT_MIN_INTERVAL_MS } from '../constants';
 import type { PrivacyPermit } from '../privacy';
 import { putScreenshot } from '../storage/db';
 import { getLiveSession, getSettings, withLiveLock } from '../storage/live';
+import { getOwnTerms } from '../storage/ownTerms';
 import type { ScreenshotRef } from '../types';
 import { sha256 } from './crypto';
 import { getImageDimensions } from './screenshot';
@@ -64,12 +65,12 @@ async function matchesTarget(opts: CaptureOpts): Promise<boolean> {
 async function getSensitiveRegions(
   tabId: number,
 ): Promise<{ rects: Rect[]; viewportWidth: number } | null> {
-  const { mask_all_inputs } = await getSettings();
+  const [{ mask_all_inputs }, ownTerms] = await Promise.all([getSettings(), getOwnTerms()]);
   try {
     const answer = (await Promise.race([
       chrome.tabs.sendMessage(
         tabId,
-        { type: 'GET_SENSITIVE_REGIONS', payload: { maskAllInputs: mask_all_inputs } },
+        { type: 'GET_SENSITIVE_REGIONS', payload: { maskAllInputs: mask_all_inputs, ownTerms } },
         { frameId: 0 },
       ),
       sleep(1000).then(() => null),
