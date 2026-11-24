@@ -15,7 +15,9 @@
 // ════════════════════════════════════════════════════════════════════════
 
 import { getApps, initializeApp } from 'firebase/app';
-import { getAuth, indexedDBLocalPersistence, initializeAuth } from 'firebase/auth';
+// The web-extension build leaves out the code that loads Google scripts
+// (gapi, reCAPTCHA), which Manifest V3 treats as remote code.
+import { getAuth, indexedDBLocalPersistence, initializeAuth } from 'firebase/auth/web-extension';
 import { getFirestore } from 'firebase/firestore';
 import {
   getBytes,

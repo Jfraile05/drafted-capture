@@ -12,7 +12,7 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
-} from 'firebase/auth';
+} from 'firebase/auth/web-extension';
 import { useEffect, useState } from 'react';
 // @ts-expect-error - firebaseInit.js is a vendored module without types
 import { auth as firebaseAuth } from '../vendor/seeker/firebaseInit.js';
