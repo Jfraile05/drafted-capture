@@ -89,6 +89,9 @@ export async function handleCaptureEvent(
 ): Promise<{ ok: boolean }> {
   const live = await getLiveSession();
   if (!live || live.state !== 'capturing') return { ok: false };
+  // A scroll that moved nothing has no direction, so it is not a step.
+  const raw = payload.event;
+  if (raw.type === 'scroll' && !raw.scroll_delta_x && !raw.scroll_delta_y) return { ok: false };
 
   const settings = await getSettings();
 
@@ -132,6 +135,9 @@ export async function handleCaptureEvent(
 
   // Build the action from the raw event.
   const action = mapRawEventToAction(payload.event);
+  // A frame reports positions relative to itself, but the screenshot is the
+  // whole tab. Leave the coordinate out rather than store a wrong one.
+  if ((sender.frameId ?? 0) !== 0) action.coordinate = undefined;
 
   // Build origin from sender context.
   const origin: StepOrigin = {

@@ -14,6 +14,8 @@ export const backend = {
   failUpload: false,
   failCommit: false,
   failRead: false,
+  /** Refuse record updates, like the deployed rule does for students. */
+  denyUpdate: false,
 };
 export const auth = { currentUser: { uid: 'student', email: 'student@example.invalid' } };
 export const db = {};
@@ -64,6 +66,8 @@ function patch(value: any, updates: any) {
   return value;
 }
 export async function updateDoc(path: string, updates: any) {
+  if (backend.denyUpdate)
+    throw new Error('FirebaseError: [code=permission-denied]: Missing or insufficient permissions.');
   backend.records.set(path, patch(structuredClone(backend.records.get(path)), updates));
 }
 export async function runTransaction(_db: unknown, callback: (tx: any) => Promise<any>) {

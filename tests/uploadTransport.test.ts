@@ -29,6 +29,7 @@ beforeEach(async (t) => {
   backend.maxInFlight = 0;
   backend.failCommit = false;
   backend.failUpload = false;
+  backend.denyUpdate = false;
   auth.currentUser.uid = 'student';
   backend.records.set('drafted-accounts/student@example.invalid', {});
   await putScreenshot('frame', new Blob(['image bytes'], { type: 'image/png' }));
@@ -297,6 +298,41 @@ describe('automatic upload transport', () => {
     const saved = backend.records.get('credential_tasks/session-stable-id');
     assert.equal(saved.instruction.text, 'Updated workflow');
     assert.equal(backend.records.get('drafted-accounts/student@example.invalid').tasksCompleted.computer_use_trajectory, 1);
+  });
+
+  it('leaves the steps file alone when the rules refuse a label save', async () => {
+    const captured = longSession(1500);
+    const result = await submitSessionToDrafted(captured);
+    const path = backend.records.get(`credential_tasks/${result.taskId}`).trajectory.steps_storage_path;
+    const file = backend.files.get(path);
+    const attempts = backend.attempts;
+    backend.denyUpdate = true;
+    await assert.rejects(
+      enrichSubmittedSession(captured, result.taskId, { 1400: { thought: 'checked the chart' } }),
+      /permission-denied/,
+    );
+    assert.equal(backend.attempts, attempts);
+    assert.equal(backend.files.get(path), file);
+    assert.equal(backend.records.get(`credential_tasks/${result.taskId}`).enriched_at, undefined);
+  });
+
+  it('keeps an upload receipt when the rules refuse the labels sent after it', async () => {
+    await submitSessionToDrafted(session());
+    const changed = session();
+    changed.intent = 'Updated workflow';
+    changed.sync = { revision: 2, synced_revision: 0, attempts: 1, retry_at: 0 };
+    backend.denyUpdate = true;
+    const result = await submitSessionToDrafted(changed);
+    assert.equal(result.taskId, 'session-stable-id');
+    assert.notEqual(backend.records.get('credential_tasks/session-stable-id').instruction.text, 'Updated workflow');
+  });
+
+  it('uploads a click recorded inside a frame without a position', async () => {
+    const captured = session();
+    captured.steps[0].action = { type: 'click', button: 'left' };
+    const result = await submitSessionToDrafted(captured);
+    const saved = backend.records.get(`credential_tasks/${result.taskId}`);
+    assert.deepEqual(saved.trajectory.steps[0].action, { action_type: 'click' });
   });
 
   it('does not upload any data under a different signed-in account', async () => {
