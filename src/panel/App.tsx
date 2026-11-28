@@ -9,6 +9,7 @@ import {
 } from '@phosphor-icons/react';
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import Brand from '../shared/Brand';
+import { SovereignUpload } from '../enterprise/SovereignUpload';
 import SetupPicker from '../shared/SetupPicker';
 import { SessionSyncStatus } from '../shared/SyncStatus';
 import ThemeToggle from '../shared/ThemeToggle';
@@ -381,6 +382,7 @@ export function App() {
 
       {selectedSessionId && selectedSession && (
         <div className="view-in flex flex-1 flex-col overflow-hidden" style={slideFrom(1)}>
+          <SovereignUpload session={selectedSession} />
           <div className="shrink-0 px-4 pb-1 pt-3">
             <SessionSyncStatus session={selectedSession} />
           </div>
