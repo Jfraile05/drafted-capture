@@ -1,5 +1,6 @@
 import { getCurrentUser } from './auth';
 import { getSession, listSessions, updateSession } from './storage/db';
+import { isPermissionDenied } from './submitErrors';
 import { enrichArchivedSession, submitArchivedSession } from './submitManager';
 import { submittedSessionOwner } from './submitToDrafted';
 import { SYNC_CONFIG } from './syncConfig';
@@ -59,6 +60,20 @@ export async function syncQueuedSessions(destination: SyncDestination): Promise<
         ? await enrichArchivedSession(session.id)
         : await submitArchivedSession(session.id);
       if (outcome.ok) continue;
+      // The record is on the server and its rules refuse this label save. Every
+      // retry would be refused too, so stop. The labels stay on this device.
+      if (session.submission?.drafted_task_id && isPermissionDenied(outcome.error)) {
+        const revision = session.sync?.revision ?? 0;
+        await updateSession(session.id, (current) =>
+          current.sync
+            ? {
+                ...current,
+                sync: { ...current.sync, synced_revision: revision, attempts: 0, retry_at: 0 },
+              }
+            : current,
+        ).catch(() => {});
+        continue;
+      }
       await updateSession(session.id, (current) => {
         if (!current.sync) return current;
         const attempts = current.sync.attempts + 1;

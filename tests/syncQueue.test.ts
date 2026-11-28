@@ -183,6 +183,47 @@ describe('durable background uploads', () => {
     assert.equal((await getSession(older.id))?.metadata.drafted_project_id, null);
   });
 
+  it('stops retrying a label save the rules refuse and keeps the labels on this device', async (t) => {
+    let now = 1_000;
+    t.mock.method(Date, 'now', () => now);
+    const labeled = archived('labeled-session');
+    labeled.intent = 'Compared flights';
+    labeled.steps[0].annotation = { thought: 'picked the cheaper one' } as any;
+    labeled.submission = { drafted_task_id: 'labeled-receipt', quality_score: 80, submitted_at: '2026-11-11', last_enriched_at: null };
+    await putSession(labeled);
+    let saves = 0;
+    submission.enrich = async () => {
+      saves++;
+      throw new Error('FirebaseError: [code=permission-denied]: Missing or insufficient permissions.');
+    };
+    await syncQueuedSessions(destination);
+    now += 60 * 60_000;
+    await syncQueuedSessions(destination);
+    assert.equal(saves, 1);
+    const saved = (await getSession(labeled.id))!;
+    assert.equal(pendingSync(saved), false);
+    assert.equal(saved.intent, 'Compared flights');
+    assert.deepEqual(saved.steps[0].annotation, { thought: 'picked the cheaper one' });
+    assert.equal(saved.submission?.last_enriched_at, null);
+    // A later edit is tried once more, in case the rules have changed.
+    await updateSession(labeled.id, (current) => markSessionDirty({ ...current, intent: 'Booked flights' }));
+    await syncQueuedSessions(destination);
+    assert.equal(saves, 2);
+    assert.equal(pendingSync((await getSession(labeled.id))!), false);
+  });
+
+  it('keeps retrying label saves that fail for other reasons', async () => {
+    const labeled = archived('labeled-session');
+    labeled.submission = { drafted_task_id: 'labeled-receipt', quality_score: 80, submitted_at: '2026-11-11', last_enriched_at: null };
+    await putSession(labeled);
+    submission.enrich = async () => { throw new Error('Failed to fetch'); };
+    await syncQueuedSessions(destination);
+    const saved = (await getSession(labeled.id))!;
+    assert.equal(pendingSync(saved), true);
+    assert.equal(saved.sync?.attempts, 1);
+    assert.ok((saved.sync?.retry_at ?? 0) > 0);
+  });
+
   it('does not claim another user’s older receipt', async () => {
     const older = archived('older-session');
     delete older.metadata.owner_uid;

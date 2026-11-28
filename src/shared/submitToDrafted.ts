@@ -26,6 +26,7 @@ import { earningsForSession } from './earnings';
 import { buildEnrichment } from './enrichment';
 import { getRecording, getScreenshot } from './storage/db';
 import { patchStepThoughts, submissionLabelFields } from './submissionLabels';
+import { isPermissionDenied } from './submitErrors';
 import type { Action, Session, Step } from './types';
 import { siteForOrigin, tagSegment } from './urlCategories';
 
@@ -293,7 +294,13 @@ export async function submitSessionToDrafted(
     { resume: (session.sync?.attempts ?? 0) > 0 },
   )) as SubmitResult;
   if ((result.captureRevision ?? 0) < (session.sync?.revision ?? 1)) {
-    await enrichSubmittedSession(session, result.taskId, enrich ?? buildEnrichment(session));
+    // The upload itself is on the server. Labels the rules refuse would be
+    // refused on every retry too, so they must not fail the upload.
+    await enrichSubmittedSession(session, result.taskId, enrich ?? buildEnrichment(session)).catch(
+      (error) => {
+        if (!isPermissionDenied(String(error))) throw error;
+      },
+    );
   }
   return result;
 }
@@ -359,14 +366,10 @@ export async function enrichSubmittedSession(
         }
       : step;
   });
-  if (stepsPath)
-    await uploadBytes(ref(storage, stepsPath), stepsFileBlob(patchedSteps), {
-      contentType: 'application/json',
-    });
-
   const labels = submissionLabelFields(session);
   const now = new Date().toISOString();
 
+  // The record first: if the rules refuse it, the steps file stays as it was.
   await updateDoc(taskRef, {
     'trajectory.steps': stepsPath ? patchedSteps.slice(0, STEPS_KEPT_IN_RECORD) : patchedSteps,
     'instruction.text': labels.instruction,
@@ -375,4 +378,8 @@ export async function enrichSubmittedSession(
     enriched_at: now,
     enriched_from_extension: true,
   });
+  if (stepsPath)
+    await uploadBytes(ref(storage, stepsPath), stepsFileBlob(patchedSteps), {
+      contentType: 'application/json',
+    });
 }

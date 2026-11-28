@@ -8,8 +8,9 @@ let keystrokeBuffer: string[] = [];
 let keystrokeTimer: ReturnType<typeof setTimeout> | null = null;
 let keystrokeTarget: Element | null = null;
 let lastScrollTime = 0;
-let lastScrollX = 0;
-let lastScrollY = 0;
+// Last reported position of each scrolled element. Many apps scroll an inner
+// panel and never move the window.
+let lastScroll = new WeakMap<Element, { x: number; y: number }>();
 
 function getModifiers(e: MouseEvent | KeyboardEvent): ModifierKey[] {
   const mods: ModifierKey[] = [];
@@ -164,17 +165,23 @@ export function startCapture(): CleanupFn {
     }
   });
 
-  addListener('scroll', () => {
+  addListener('scroll', (e: Event) => {
     const now = Date.now();
     if (now - lastScrollTime < SCROLL_THROTTLE_MS) return;
 
-    const currentX = window.scrollX;
-    const currentY = window.scrollY;
-    const deltaX = currentX - lastScrollX;
-    const deltaY = currentY - lastScrollY;
+    // An inner panel is the event target. The page itself scrolling targets the document.
+    const scroller = e.target instanceof Element ? e.target : document.scrollingElement;
+    if (!scroller) return;
+    const currentX = scroller.scrollLeft;
+    const currentY = scroller.scrollTop;
+    const last = lastScroll.get(scroller);
+    lastScroll.set(scroller, { x: currentX, y: currentY });
+    // The first scroll seen on a panel has no known starting position.
+    if (!last) return;
+    const deltaX = currentX - last.x;
+    const deltaY = currentY - last.y;
+    if (deltaX === 0 && deltaY === 0) return;
 
-    lastScrollX = currentX;
-    lastScrollY = currentY;
     lastScrollTime = now;
 
     const event: RawEvent = {
@@ -207,8 +214,9 @@ export function startCapture(): CleanupFn {
   window.addEventListener('beforeunload', onBeforeUnload);
   cleanups.push(() => window.removeEventListener('beforeunload', onBeforeUnload));
 
-  lastScrollX = window.scrollX;
-  lastScrollY = window.scrollY;
+  lastScroll = new WeakMap();
+  const page = document.scrollingElement;
+  if (page) lastScroll.set(page, { x: page.scrollLeft, y: page.scrollTop });
 
   return () => {
     if (keystrokeTimer) clearTimeout(keystrokeTimer);
